@@ -55,7 +55,7 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Warning: Could not get S&P 500 symbols: %v", err)
 	}
 
-		data := struct {
+	data := struct {
 		Title           string
 		DefaultStocks   []string
 		DefaultCash     int
