@@ -1,0 +1,102 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+barracuda-server
+barracuda
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go module cache
+go.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+obj/
+lib/
+bin/
+tests/bin/
+
+# CUDA compiled objects
+*.o
+*.ptx
+*.cubin
+*.fatbin
+
+# Configuration files with secrets (keep template)
+config.yaml
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Cache directories
+.cache/
+cache/
+
+# Runtime data
+data/runtime/
+*.pid
+
+# Coverage reports
+coverage.html
+coverage.out
+
+# Profiling data
+*.prof
+*.pprof
+
+# Editor backups
+*~
+.*.swp
+.*.swo
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Debug files
+debug
+debug.test
+__debug_bin
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Test output
+test-results/
+test-output/

@@ -1,0 +1,87 @@
+package models
+
+// AnalysisRequest represents a request for options analysis
+type AnalysisRequest struct {
+	Symbols        []string `json:"symbols"`
+	ExpirationDate string   `json:"expiration_date"`
+	TargetDelta    float64  `json:"target_delta"`
+	AvailableCash  float64  `json:"available_cash"`
+	Strategy       string   `json:"strategy"` // "puts" or "calls"
+}
+
+// OptionResult represents the result of analyzing an option
+type OptionResult struct {
+	Ticker       string  `json:"ticker"`
+	OptionSymbol string  `json:"option_symbol"`
+	OptionType   string  `json:"option_type"`
+	Strike       float64 `json:"strike"`
+	StockPrice   float64 `json:"stock_price"`
+	Premium      float64 `json:"premium"`
+	MaxContracts int     `json:"max_contracts"`
+	TotalPremium float64 `json:"total_premium"`
+	Delta        float64 `json:"delta"`
+	Gamma        float64 `json:"gamma"`
+	Theta        float64 `json:"theta"`
+	Vega         float64 `json:"vega"`
+	ImpliedVol   float64 `json:"implied_volatility"`
+	Expiration   string  `json:"expiration"`
+	DaysToExp    int     `json:"days_to_expiration"`
+}
+
+// AnalysisResponse represents the response from options analysis
+type AnalysisResponse struct {
+	Results         []OptionResult `json:"results"`
+	TotalPremium    float64        `json:"total_premium"`
+	RequestedDelta  float64        `json:"requested_delta"`
+	Strategy        string         `json:"strategy"`
+	ExpirationDate  string         `json:"expiration_date"`
+	Timestamp       string         `json:"timestamp"`
+	ProcessingTime  float64        `json:"processing_time"`
+	ProcessingStats string         `json:"processing_stats"`
+}
+
+// SP500Symbol represents a symbol in the S&P 500
+type SP500Symbol struct {
+	Symbol      string `json:"symbol"`
+	Company     string `json:"company"`
+	Sector      string `json:"sector"`
+	SubIndustry string `json:"sub_industry"`
+	Location    string `json:"location"`
+	DateAdded   string `json:"date_added"`
+	CIK         string `json:"cik"`
+	Founded     string `json:"founded"`
+}
+
+// CUDACalculationRequest for Black-Scholes calculations
+type CUDACalculationRequest struct {
+	StockPrice     float64 `json:"stock_price"`
+	StrikePrice    float64 `json:"strike_price"`
+	TimeToMaturity float64 `json:"time_to_maturity"`
+	RiskFreeRate   float64 `json:"risk_free_rate"`
+	Volatility     float64 `json:"volatility"`
+	OptionType     string  `json:"option_type"` // "call" or "put"
+}
+
+// CUDACalculationResponse for Black-Scholes results
+type CUDACalculationResponse struct {
+	OptionPrice float64 `json:"option_price"`
+	Delta       float64 `json:"delta"`
+	Gamma       float64 `json:"gamma"`
+	Theta       float64 `json:"theta"`
+	Vega        float64 `json:"vega"`
+	Rho         float64 `json:"rho"`
+}
+
+// BatchCalculationRequest for multiple calculations
+type BatchCalculationRequest struct {
+	Calculations []CUDACalculationRequest `json:"calculations"`
+}
+
+// BatchCalculationResponse for multiple results
+type BatchCalculationResponse struct {
+	Results           []CUDACalculationResponse `json:"results"`
+	ProcessedIn       float64                   `json:"processed_in_ms"`
+	UsedCUDA          bool                      `json:"used_cuda"`
+	DeviceCount       int                       `json:"device_count"`
+	TotalCalculations int                       `json:"total_calculations"`
+}

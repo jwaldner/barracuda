@@ -1,0 +1,1268 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"deltaquest/internal/alpaca"
+	"deltaquest/internal/config"
+	"deltaquest/internal/handlers"
+)
+
+func main() {
+	// Load configuration
+	cfg := config.Load()
+
+	// Validate required config
+	if cfg.AlpacaAPIKey == "" {
+		log.Fatal("ALPACA_API_KEY environment variable is required")
+	}
+	if cfg.AlpacaSecretKey == "" {
+		log.Fatal("ALPACA_SECRET_KEY environment variable is required")
+	}
+
+	// Create Alpaca client
+	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey, cfg.AlpacaPaperTrading)
+
+	// Create handlers with config
+	handler := handlers.NewHandler(alpacaClient, cfg)
+
+	// Setup routes
+	http.HandleFunc("/", handler.HomeHandler)
+	http.HandleFunc("/analyze", handler.AnalyzeHandler)
+	http.HandleFunc("/test-connection", handler.TestConnectionHandler)
+	http.HandleFunc("/calculate", handler.CalculateHandler)
+	http.HandleFunc("/static/", handler.StaticHandler)
+	http.HandleFunc("/stock-history", handler.StockHistoryHandler)
+	http.HandleFunc("/api/analyze-volatility", handler.AnalyzeVolatilityHandler)
+
+	// Start server
+	fmt.Printf("🎯 DeltaQuest server starting on port %s\n", cfg.Port)
+	fmt.Printf("📊 Visit http://localhost:%s to start analyzing options\n", cfg.Port)
+	fmt.Printf("📈 Default stocks: %v\n", cfg.DefaultStocks)
+	fmt.Printf("💰 Default cash: $%d\n", cfg.DefaultCash)
+	fmt.Printf("📋 Default strategy: %s\n", cfg.DefaultStrategy)
+	fmt.Printf("⚡ Assembly calculator available at /calculate\n")
+	fmt.Printf("📉 Volatility API available at /api/analyze-volatility\n")
+
+	if cfg.AlpacaPaperTrading {
+		fmt.Printf("📝 Using Alpaca Paper Trading environment\n")
+	} else {
+		fmt.Printf("💸 Using Alpaca LIVE Trading environment\n")
+	}
+
+	if err := http.ListenAndServe("0.0.0.0:"+cfg.Port, nil); err != nil {
+		log.Fatal("Server failed to start:", err)
+	}
+}
+
+package alpaca
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"deltaquest/internal/models"
+)
+
+type Client struct {
+	APIKey     string
+	SecretKey  string
+	BaseURL    string
+	DataURL    string
+	HTTPClient *http.Client
+}
+
+func NewClient(apiKey, secretKey string, paperTrading bool) *Client {
+	baseURL := "https://api.alpaca.markets"
+	dataURL := "https://data.alpaca.markets"
+
+	if paperTrading {
+		baseURL = "https://paper-api.alpaca.markets"
+	}
+
+	return &Client{
+		APIKey:    apiKey,
+		SecretKey: secretKey,
+		BaseURL:   baseURL,
+		DataURL:   dataURL,
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// Stock Price Structures
+type StockPrice struct {
+	Symbol string  `json:"symbol"`
+	Price  float64 `json:"price"`
+}
+
+type AlpacaBarResponse struct {
+	Bar struct {
+		Close     float64 `json:"c"`
+		High      float64 `json:"h"`
+		Low       float64 `json:"l"`
+		NumTrades int     `json:"n"`
+		Open      float64 `json:"o"`
+		Timestamp string  `json:"t"`
+		Volume    int     `json:"v"`
+		VWAP      float64 `json:"vw"`
+	} `json:"bar"`
+	Symbol string `json:"symbol"`
+}
+
+// Options Quote Structures
+type OptionQuote struct {
+	AskPrice  float64 `json:"ap"`
+	AskSize   int     `json:"as"`
+	AskEx     string  `json:"ax"`
+	BidPrice  float64 `json:"bp"`
+	BidSize   int     `json:"bs"`
+	BidEx     string  `json:"bx"`
+	Condition string  `json:"c"`
+	Timestamp string  `json:"t"`
+}
+
+type AlpacaOptionQuotesResponse struct {
+	Quotes map[string]OptionQuote `json:"quotes"`
+}
+
+// Options Chain Structures
+type OptionContract struct {
+	ID                string      `json:"id"`
+	Symbol            string      `json:"symbol"`
+	Name              string      `json:"name"`
+	Status            string      `json:"status"`
+	Tradable          bool        `json:"tradable"`
+	ExpirationDate    string      `json:"expiration_date"`
+	RootSymbol        string      `json:"root_symbol"`
+	UnderlyingSymbol  string      `json:"underlying_symbol"`
+	UnderlyingAssetId string      `json:"underlying_asset_id"`
+	Type              string      `json:"type"`
+	Style             string      `json:"style"`
+	StrikePrice       string      `json:"strike_price"`
+	Multiplier        string      `json:"multiplier"`
+	Size              string      `json:"size"`
+	OpenInterest      interface{} `json:"open_interest"`
+	OpenInterestDate  interface{} `json:"open_interest_date"`
+	ClosePrice        interface{} `json:"close_price"`
+	ClosePriceDate    interface{} `json:"close_price_date"`
+	Ppind             bool        `json:"ppind"`
+	Delta             float64     `json:"delta,omitempty"`
+	Gamma             float64     `json:"gamma,omitempty"`
+	Theta             float64     `json:"theta,omitempty"`
+	Vega              float64     `json:"vega,omitempty"`
+	ImpliedVol        float64     `json:"implied_volatility,omitempty"`
+}
+
+type AlpacaOptionsResponse struct {
+	Options       []OptionContract `json:"option_contracts"`
+	NextPageToken interface{}      `json:"next_page_token"`
+}
+
+// Stock History Structures
+type StockBar struct {
+	Date  string  `json:"date"`
+	Close float64 `json:"close"`
+}
+
+type AlpacaBarsResponse struct {
+	Bars map[string][]struct {
+		Close     float64 `json:"c"`
+		High      float64 `json:"h"`
+		Low       float64 `json:"l"`
+		NumTrades int     `json:"n"`
+		Open      float64 `json:"o"`
+		Timestamp string  `json:"t"`
+		Volume    int     `json:"v"`
+		VWAP      float64 `json:"vw"`
+	} `json:"bars"`
+}
+
+// Get real stock price from Alpaca using bars (more reliable than quotes)
+func (c *Client) GetStockPrice(symbol string) (*StockPrice, error) {
+	endpoint := fmt.Sprintf("/v2/stocks/%s/bars/latest", symbol)
+
+	req, err := http.NewRequest("GET", c.DataURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+	fmt.Printf("Making stock price request to: %s\n", req.URL.String())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("alpaca stock API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var alpacaResp AlpacaBarResponse
+	if err := json.NewDecoder(resp.Body).Decode(&alpacaResp); err != nil {
+		return nil, err
+	}
+
+	// Use close price from bars (actual last trade price)
+	return &StockPrice{
+		Symbol: symbol,
+		Price:  alpacaResp.Bar.Close,
+	}, nil
+}
+
+// Get options chain from Alpaca with filtering per symbol
+func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy string) (map[string][]*OptionContract, error) {
+	contractsBySymbol := make(map[string][]*OptionContract)
+
+	// Get stock prices first to determine strike limits
+	stockPrices := make(map[string]float64)
+	for _, symbol := range symbols {
+		symbol = strings.TrimSpace(symbol)
+		stockPrice, err := c.GetStockPrice(symbol)
+		if err != nil {
+			fmt.Printf("Error getting stock price for %s: %v\n", symbol, err)
+			continue
+		}
+		stockPrices[symbol] = stockPrice.Price
+	}
+
+	// Make separate API calls for each symbol with proper filtering
+	for _, symbol := range symbols {
+		symbol = strings.TrimSpace(symbol)
+
+		stockPrice, exists := stockPrices[symbol]
+		if !exists {
+			continue
+		}
+
+		endpoint := "/v2/options/contracts"
+		req, err := http.NewRequest("GET", c.BaseURL+endpoint, nil)
+		if err != nil {
+			fmt.Printf("Error creating request for %s: %v\n", symbol, err)
+			continue
+		}
+
+		// Add query parameters with filtering
+		q := req.URL.Query()
+		q.Add("underlying_symbols", symbol)
+		if expiration != "" {
+			q.Add("expiration_date", expiration)
+		}
+
+		// Filter by option type (puts or calls)
+		if strategy == "puts" {
+			q.Add("type", "put")
+			// For puts: only get strikes below stock price
+			q.Add("strike_price_lte", fmt.Sprintf("%.0f", stockPrice-1))
+		} else {
+			q.Add("type", "call")
+			// For calls: only get strikes above stock price
+			q.Add("strike_price_gte", fmt.Sprintf("%.0f", stockPrice+1))
+		}
+
+		q.Add("limit", "1000")
+		req.URL.RawQuery = q.Encode()
+
+		req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+		req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+		fmt.Printf("Making options request for %s: %s\n", symbol, req.URL.String())
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			fmt.Printf("Error making request for %s: %v\n", symbol, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			fmt.Printf("Alpaca API error for %s: %d - %s\n", symbol, resp.StatusCode, string(body))
+			continue
+		}
+
+		var alpacaResp AlpacaOptionsResponse
+		if err := json.NewDecoder(resp.Body).Decode(&alpacaResp); err != nil {
+			fmt.Printf("Error decoding response for %s: %v\n", symbol, err)
+			continue
+		}
+
+		// Convert to pointers and sort by strike price
+		contracts := make([]*OptionContract, len(alpacaResp.Options))
+		for i := range alpacaResp.Options {
+			contracts[i] = &alpacaResp.Options[i]
+		}
+
+		// Sort by strike price (ascending)
+		for i := 0; i < len(contracts); i++ {
+			for j := i + 1; j < len(contracts); j++ {
+				strike1, _ := strconv.ParseFloat(contracts[i].StrikePrice, 64)
+				strike2, _ := strconv.ParseFloat(contracts[j].StrikePrice, 64)
+				if strike1 > strike2 {
+					contracts[i], contracts[j] = contracts[j], contracts[i]
+				}
+			}
+		}
+
+		contractsBySymbol[symbol] = contracts
+		fmt.Printf("Found %d %s contracts for %s (stock price: $%.2f)\n",
+			len(contracts), strategy, symbol, stockPrice)
+	}
+
+	return contractsBySymbol, nil
+}
+
+// Get real options quote (bid/ask prices)
+func (c *Client) GetOptionQuote(optionSymbol string) (*OptionQuote, error) {
+	endpoint := "/v1beta1/options/quotes/latest"
+
+	req, err := http.NewRequest("GET", c.DataURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add query parameters
+	q := req.URL.Query()
+	q.Add("symbols", optionSymbol)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("alpaca options quote API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var alpacaResp AlpacaOptionQuotesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&alpacaResp); err != nil {
+		return nil, err
+	}
+
+	// Get the quote for this symbol
+	quote, exists := alpacaResp.Quotes[optionSymbol]
+	if !exists {
+		return nil, fmt.Errorf("no quote found for symbol %s", optionSymbol)
+	}
+
+	return &quote, nil
+}
+
+// Analyze options for a specific strategy and delta target
+func (c *Client) AnalyzeOptions(symbols []string, expiration string, targetDelta float64, availableCash float64, strategy string) (*models.AnalysisResponse, error) {
+	var allResults []models.OptionResult
+
+	// Get options chain for all symbols with proper filtering
+	contractsBySymbol, err := c.GetOptionsChain(symbols, expiration, strategy)
+	if err != nil {
+		return nil, fmt.Errorf("error getting options chain: %v", err)
+	}
+
+	for _, symbol := range symbols {
+		symbol = strings.TrimSpace(symbol)
+
+		// Get current stock price
+		stockPrice, err := c.GetStockPrice(symbol)
+		if err != nil {
+			fmt.Printf("Error getting stock price for %s: %v\n", symbol, err)
+			continue
+		}
+
+		// Get contracts for this symbol
+		contracts, exists := contractsBySymbol[symbol]
+		if !exists {
+			fmt.Printf("No contracts found for %s\n", symbol)
+			continue
+		}
+
+		// Find best matching contract
+		result := c.findBestContract(contracts, stockPrice, targetDelta, availableCash, strategy)
+		if result != nil {
+			fmt.Printf("Found contract for %s: %s strike $%.2f, Total Premium: $%.2f\n",
+				symbol, result.OptionType, result.Strike, result.TotalPremium)
+			allResults = append(allResults, *result)
+		} else {
+			fmt.Printf("No matching contract found for %s\n", symbol)
+		}
+	}
+
+	// Debug output before sorting
+	fmt.Printf("\n=== RANKING COMPARISON ===\n")
+	for i, result := range allResults {
+		fmt.Printf("%d. %s: %d contracts × $%.2f = $%.2f total\n",
+			i+1, result.Ticker, result.MaxContracts, result.Premium, result.TotalPremium)
+	}
+
+	// Sort by total premium (highest first) - this is the ranking!
+	for i := 0; i < len(allResults); i++ {
+		for j := i + 1; j < len(allResults); j++ {
+			if allResults[j].TotalPremium > allResults[i].TotalPremium {
+				allResults[i], allResults[j] = allResults[j], allResults[i]
+			}
+		}
+	}
+
+	fmt.Printf("\n=== FINAL RANKING ===\n")
+
+	for i, result := range allResults {
+		var icon string
+
+		switch i {
+		case 0:
+			icon = "🥇"
+		case 1:
+			icon = "🥈"
+		case 2:
+			icon = "🥉"
+		default:
+			icon = "🏆"
+		}
+
+		fmt.Printf("%s #%d: %s with $%.2f total premium\n",
+			icon, i+1, result.Ticker, result.TotalPremium)
+	}
+
+	return &models.AnalysisResponse{
+		Results:        allResults,
+		TotalPremium:   0, // Remove meaningless total - we want ranking!
+		RequestedDelta: targetDelta,
+		Strategy:       strategy,
+		ExpirationDate: expiration,
+	}, nil
+}
+
+// Find the best contract matching criteria
+func (c *Client) findBestContract(contracts []*OptionContract, stockPrice *StockPrice, targetDelta float64, availableCash float64, strategy string) *models.OptionResult {
+	var bestContract *OptionContract
+	bestDistanceDiff := 1.0
+
+	// Filter by strategy (puts or calls)
+	targetType := "put"
+	if strategy == "calls" {
+		targetType = "call"
+	}
+
+	// Map delta to distance targets based on assignment likelihood
+	var targetDistance float64
+	if targetType == "put" {
+		// For puts: higher delta = closer to stock price (below it)
+		// Assignment likelihood increases as strike approaches stock price from below
+		if targetDelta == 0.75 { // High risk = very likely assignment = very close to stock price
+			targetDistance = 0.02 // 2% below stock price
+		} else if targetDelta == 0.50 { // Medium risk = moderate assignment = moderately close
+			targetDistance = 0.05 // 5% below stock price (FIXED!)
+		} else { // Low risk = unlikely assignment = further away
+			targetDistance = 0.12 // 12% below stock price (FIXED!)
+		}
+	} else {
+		// For calls: higher delta = closer to stock price (above it)
+		// Call away likelihood increases as strike approaches stock price from above
+		if targetDelta == 0.75 { // High risk = very likely called = very close to stock price
+			targetDistance = 0.02 // 2% above stock price
+		} else if targetDelta == 0.50 { // Medium risk = moderate call = moderately close
+			targetDistance = 0.05 // 5% above stock price (FIXED!)
+		} else { // Low risk = unlikely called = further away
+			targetDistance = 0.12 // 12% above stock price (FIXED!)
+		}
+	}
+
+	for _, contract := range contracts {
+		if contract.Type != targetType {
+			continue
+		}
+
+		// Skip if not tradable
+		if !contract.Tradable {
+			continue
+		}
+
+		// Parse strike price
+		strikePrice, err := strconv.ParseFloat(contract.StrikePrice, 64)
+		if err != nil {
+			continue
+		}
+
+		// Calculate distance based on assignment likelihood
+		var strikeDistance float64
+		if targetType == "put" {
+			// For puts: only consider strikes BELOW stock price
+			if strikePrice >= stockPrice.Price {
+				continue // Skip strikes at/above stock price
+			}
+			// Distance = how far below stock price (positive value)
+			strikeDistance = (stockPrice.Price - strikePrice) / stockPrice.Price
+		} else {
+			// For calls: only consider strikes ABOVE stock price
+			if strikePrice <= stockPrice.Price {
+				continue // Skip strikes at/below stock price
+			}
+			// Distance = how far above stock price (positive value)
+			strikeDistance = (strikePrice - stockPrice.Price) / stockPrice.Price
+		}
+
+		// Find strike closest to target distance
+		distanceDiff := abs(strikeDistance - targetDistance)
+
+		// Debug output to see strike distance matching
+		fmt.Printf("Contract %s: strike $%.2f, distance %.1f%% %s stock, target %.1f%%, diff %.1f%%\n",
+			contract.Symbol, strikePrice, strikeDistance*100,
+			map[bool]string{true: "below", false: "above"}[targetType == "put"],
+			targetDistance*100, distanceDiff*100)
+
+		if distanceDiff < bestDistanceDiff {
+			bestDistanceDiff = distanceDiff
+			bestContract = contract
+		}
+	}
+
+	if bestContract == nil {
+		fmt.Printf("❌ No contract found matching criteria\n")
+		return nil
+	}
+
+	fmt.Printf("🏆 WINNER: %s selected as best match!\n", bestContract.Symbol)
+
+	// Parse strike price
+	strikePrice, err := strconv.ParseFloat(bestContract.StrikePrice, 64)
+	if err != nil {
+		return nil
+	}
+
+	// Get real option quote for accurate premium
+	quote, err := c.GetOptionQuote(bestContract.Symbol)
+	if err != nil {
+		fmt.Printf("Error getting quote for %s: %v\n", bestContract.Symbol, err)
+		return nil
+	}
+
+	// Use mid price (average of bid and ask)
+	premium := (quote.BidPrice + quote.AskPrice) / 2
+	if premium <= 0 {
+		// Fallback to ask price if mid is zero
+		premium = quote.AskPrice
+	}
+
+	fmt.Printf("Real premium for %s: $%.2f (bid: $%.2f, ask: $%.2f)\n",
+		bestContract.Symbol, premium, quote.BidPrice, quote.AskPrice)
+
+	// Calculate contract details
+	cashPerContract := strikePrice * 100
+	if strategy == "calls" {
+		cashPerContract = stockPrice.Price * 100
+	}
+
+	maxContracts := int(availableCash / cashPerContract)
+	if maxContracts <= 0 {
+		maxContracts = 1
+	}
+
+	cashUsed := float64(maxContracts) * cashPerContract
+	totalPremium := premium * float64(maxContracts) * 100
+
+	premiumYield := (totalPremium / cashUsed) * 100
+	daysToExpiration := 30.0
+	annualizedReturn := (premiumYield / daysToExpiration) * 365
+
+	// Calculate actual distance for display (not estimated delta)
+	actualDistance := abs(strikePrice-stockPrice.Price) / stockPrice.Price
+
+	// Final debug summary
+	fmt.Printf("📊 FINAL RESULT: %s at $%.2f (%.1f%% below stock) with $%.2f premium = $%.2f total\n",
+		bestContract.Symbol, strikePrice, actualDistance*100, premium, totalPremium)
+
+	return &models.OptionResult{
+		Ticker:           bestContract.UnderlyingSymbol,
+		CurrentPrice:     stockPrice.Price,
+		Strike:           strikePrice,
+		Delta:            actualDistance, // Show actual distance instead of fake delta
+		Premium:          premium,
+		MaxContracts:     maxContracts,
+		CashUsed:         cashUsed,
+		TotalPremium:     totalPremium,
+		PremiumYield:     premiumYield,
+		AnnualizedReturn: annualizedReturn,
+		OptionType:       bestContract.Type,
+	}
+}
+
+// Get stock history from Alpaca
+func (c *Client) GetStockHistory(symbol string, days int) ([]StockBar, error) {
+	// Use older dates to avoid "recent SIP data" restriction
+	// End data collection 60 days ago instead of today
+	endDate := time.Now().AddDate(0, 0, -60)  // 60 days ago
+	startDate := endDate.AddDate(0, 0, -days) // Go back 'days' from that point
+
+	endpoint := "/v2/stocks/bars"
+
+	req, err := http.NewRequest("GET", c.DataURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add query parameters
+	q := req.URL.Query()
+	q.Add("symbols", symbol)
+	q.Add("timeframe", "1Day")
+	q.Add("start", startDate.Format("2006-01-02"))
+	q.Add("end", endDate.Format("2006-01-02"))
+	q.Add("limit", strconv.Itoa(days+10)) // Buffer for weekends
+	q.Add("adjustment", "raw")
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+	fmt.Printf("Making stock history request: %s\n", req.URL.String())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("alpaca bars API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var alpacaResp AlpacaBarsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&alpacaResp); err != nil {
+		return nil, err
+	}
+
+	// Extract bars for the symbol
+	bars, exists := alpacaResp.Bars[symbol]
+	if !exists || len(bars) == 0 {
+		return nil, fmt.Errorf("no historical data found for %s", symbol)
+	}
+
+	// Convert to our format
+	var history []StockBar
+	for _, bar := range bars {
+		// Parse timestamp and format as date
+		timestamp, err := time.Parse(time.RFC3339, bar.Timestamp)
+		if err != nil {
+			continue
+		}
+
+		history = append(history, StockBar{
+			Date:  timestamp.Format("2006-01-02"),
+			Close: bar.Close,
+		})
+	}
+
+	fmt.Printf("Retrieved %d days of history for %s\n", len(history), symbol)
+	return history, nil
+}
+
+// Test connection to Alpaca
+func (c *Client) TestConnection() error {
+	req, err := http.NewRequest("GET", c.BaseURL+"/v2/account", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("alpaca connection failed: %d - %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// Helper function for absolute value
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+package config
+
+import (
+    "os"
+    "strconv"
+    "strings"
+)
+
+type Config struct {
+    // Server settings
+    Port string
+    
+    // Alpaca API settings
+    AlpacaAPIKey      string
+    AlpacaSecretKey   string
+    AlpacaPaperTrading bool
+    
+    // Default application settings
+    DefaultStocks   []string
+    DefaultCash     int
+    DefaultStrategy string
+}
+
+func Load() *Config {
+    cfg := &Config{
+        Port:              getEnv("PORT", "8080"),
+        AlpacaAPIKey:      getEnv("ALPACA_API_KEY", ""),
+        AlpacaSecretKey:   getEnv("ALPACA_SECRET_KEY", ""),
+        AlpacaPaperTrading: getEnvBool("ALPACA_PAPER_TRADING", true),
+        DefaultStocks:     getEnvStringSlice("DEFAULT_STOCKS", []string{"AAPL", "MSFT", "GOOGL"}),
+        DefaultCash:       getEnvInt("DEFAULT_CASH", 10000),
+        DefaultStrategy:   getEnv("DEFAULT_STRATEGY", "puts"),
+    }
+    
+    return cfg
+}
+
+func getEnv(key, defaultValue string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+    if value := os.Getenv(key); value != "" {
+        if parsed, err := strconv.ParseBool(value); err == nil {
+            return parsed
+        }
+    }
+    return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+    if value := os.Getenv(key); value != "" {
+        if parsed, err := strconv.Atoi(value); err == nil {
+            return parsed
+        }
+    }
+    return defaultValue
+}
+
+func getEnvStringSlice(key string, defaultValue []string) []string {
+    if value := os.Getenv(key); value != "" {
+        return strings.Split(value, ",")
+    }
+    return defaultValue
+}
+
+package handlers
+
+import (
+	"deltaquest/internal/alpaca"
+	"deltaquest/internal/config"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+	"os/exec"
+	"strconv"
+	"strings"
+)
+
+type Handler struct {
+	template     *template.Template
+	alpacaClient *alpaca.Client
+	config       *config.Config
+}
+
+func NewHandler(alpacaClient *alpaca.Client, cfg *config.Config) *Handler {
+	tmpl, err := template.ParseFiles("web/templates/index.html")
+	if err != nil {
+		panic("Failed to parse template: " + err.Error())
+	}
+
+	return &Handler{
+		template:     tmpl,
+		alpacaClient: alpacaClient,
+		config:       cfg,
+	}
+}
+
+func (h *Handler) HomeHandler(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Title           string
+		DefaultStocks   []string
+		DefaultCash     int
+		DefaultStrategy string
+	}{
+		Title:           "DeltaQuest",
+		DefaultStocks:   h.config.DefaultStocks,
+		DefaultCash:     h.config.DefaultCash,
+		DefaultStrategy: h.config.DefaultStrategy,
+	}
+	h.template.Execute(w, data)
+}
+
+func (h *Handler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse form data
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Extract form values
+	symbolsStr := r.FormValue("symbols")
+	expirationDate := r.FormValue("expiration_date")
+	targetDeltaStr := r.FormValue("target_delta")
+	availableCashStr := r.FormValue("available_cash")
+	strategy := r.FormValue("strategy")
+
+	// Validate required fields
+	if symbolsStr == "" || expirationDate == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	// Parse symbols (split by newlines and commas)
+	symbolsStr = strings.ReplaceAll(symbolsStr, "\n", ",")
+	symbols := strings.Split(symbolsStr, ",")
+	var cleanSymbols []string
+	for _, symbol := range symbols {
+		symbol = strings.TrimSpace(strings.ToUpper(symbol))
+		if symbol != "" {
+			cleanSymbols = append(cleanSymbols, symbol)
+		}
+	}
+
+	if len(cleanSymbols) == 0 {
+		http.Error(w, "No valid symbols provided", http.StatusBadRequest)
+		return
+	}
+
+	// Parse numeric values
+	targetDelta, err := strconv.ParseFloat(targetDeltaStr, 64)
+	if err != nil {
+		targetDelta = 0.5 // Default
+	}
+
+	availableCash, err := strconv.ParseFloat(availableCashStr, 64)
+	if err != nil {
+		availableCash = 50000 // Default
+	}
+
+	// Default strategy
+	if strategy == "" {
+		strategy = "puts"
+	}
+
+	// Call alpaca client to analyze options
+	response, err := h.alpacaClient.AnalyzeOptions(cleanSymbols, expirationDate, targetDelta, availableCash, strategy)
+	if err != nil {
+		http.Error(w, "Failed to analyze options: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *Handler) TestConnectionHandler(w http.ResponseWriter, r *http.Request) {
+	err := h.alpacaClient.TestConnection()
+
+	response := map[string]interface{}{
+		"status":  "connected",
+		"message": "Alpaca connection successful",
+	}
+
+	if err != nil {
+		response["status"] = "error"
+		response["message"] = "Alpaca connection failed: " + err.Error()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *Handler) StaticHandler(w http.ResponseWriter, r *http.Request) {
+	http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))).ServeHTTP(w, r)
+}
+
+func (h *Handler) CalculateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Operation string `json:"operation"` // "add", "subtract", "multiply", "divide"
+		Value1    string `json:"value1"`
+		Value2    string `json:"value2"`
+		UseFloat  bool   `json:"useFloat"` // true for fcalc, false for calc
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate operation
+	validOps := map[string]bool{
+		"add": true, "subtract": true, "multiply": true, "divide": true,
+	}
+	if !validOps[req.Operation] {
+		http.Error(w, "Invalid operation", http.StatusBadRequest)
+		return
+	}
+
+	// Validate inputs are numbers
+	if _, err := strconv.ParseFloat(req.Value1, 64); err != nil {
+		http.Error(w, "Invalid value1", http.StatusBadRequest)
+		return
+	}
+	if _, err := strconv.ParseFloat(req.Value2, 64); err != nil {
+		http.Error(w, "Invalid value2", http.StatusBadRequest)
+		return
+	}
+
+	var cmd *exec.Cmd
+	var calculator string
+
+	if req.UseFloat {
+		// Use fcalc with correct flags
+		calculator = "fcalc"
+		switch req.Operation {
+		case "add":
+			cmd = exec.Command("fcalc", "-a", req.Value1, req.Value2)
+		case "subtract":
+			cmd = exec.Command("fcalc", "-s", req.Value1, req.Value2)
+		case "multiply":
+			cmd = exec.Command("fcalc", "--mul", req.Value1, req.Value2)
+		case "divide":
+			cmd = exec.Command("fcalc", "-d", req.Value1, req.Value2)
+		}
+	} else {
+		// Use calc with original syntax
+		calculator = "calc"
+		cmd = exec.Command("calc", req.Operation, req.Value1, req.Value2)
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		http.Error(w, "Calculation failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	result := strings.TrimSpace(string(output))
+
+	response := map[string]interface{}{
+		"result":     result,
+		"operation":  fmt.Sprintf("%s %s %s %s", calculator, req.Operation, req.Value1, req.Value2),
+		"calculator": calculator,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Combined handler: One-step stock analysis using assembly calculator
+func (h *Handler) StockHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get symbol from query parameter
+	symbol := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("symbol")))
+	if symbol == "" {
+		http.Error(w, "Symbol parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// Get drop percentage from the dropdown (default 20%)
+	dropPercentage := r.URL.Query().Get("drop")
+	if dropPercentage == "" {
+		dropPercentage = "20" // Default
+	}
+
+	dropPct, err := strconv.ParseFloat(dropPercentage, 64)
+	if err != nil || dropPct <= 0 || dropPct > 50 {
+		dropPct = 20.0
+	}
+
+	log.Printf("One-step analysis: %s for %.0f%% drops using assembly calculator", symbol, dropPct)
+
+	// Use the existing GetStockHistory method
+	history, err := h.alpacaClient.GetStockHistory(symbol, 365)
+	if err != nil {
+		log.Printf("Error fetching stock history: %s", err.Error())
+
+		// Return error response instead of HTTP error
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"symbol":       symbol,
+			"error":        "Historical data not available: " + err.Error(),
+			"average_days": 0,
+			"drops_found":  0,
+		})
+		return
+	}
+
+	// Do the drop analysis using assembly calculator
+	result := h.analyzeDropsWithCalc(history, symbol, dropPct)
+
+	// Return the analysis results directly
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// API endpoint for external projects
+func (h *Handler) AnalyzeVolatilityHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Symbol    string `json:"symbol"`
+		Threshold string `json:"threshold"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	symbol := strings.ToUpper(req.Symbol)
+	dropPct, _ := strconv.ParseFloat(req.Threshold, 64)
+	if dropPct <= 0 {
+		dropPct = 20.0
+	}
+
+	log.Printf("API: Analyzing %s for %.0f%% drops using assembly calculator", symbol, dropPct)
+
+	// Get historical data
+	history, err := h.alpacaClient.GetStockHistory(symbol, 365)
+	if err != nil {
+		log.Printf("API: Error fetching historical data: %s", err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"symbol":       symbol,
+			"threshold":    int(dropPct),
+			"error":        "Historical data not available: " + err.Error(),
+			"average_days": 0,
+			"drops_found":  0,
+		})
+		return
+	}
+
+	result := h.analyzeDropsWithCalc(history, symbol, dropPct)
+
+	// Format response to match external API spec
+	response := map[string]interface{}{
+		"symbol":       result["symbol"],
+		"threshold":    int(dropPct),
+		"average_days": result["average_days"],
+		"drops_found":  result["drops_found"],
+	}
+
+	log.Printf("API: Returning volatility analysis for %s", symbol)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Add this helper function at the top of the file (after imports):
+func parseFcalcOutput(output string) (float64, error) {
+	parts := strings.Split(strings.TrimSpace(output), "Result: ")
+	if len(parts) < 2 {
+		return 0, fmt.Errorf("invalid fcalc output format: %s", output)
+	}
+	return strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+}
+
+// Drop analysis with assembly calculator precision
+func (h *Handler) analyzeDropsWithCalc(history []alpaca.StockBar, symbol string, dropThreshold float64) map[string]interface{} {
+	if len(history) < 30 {
+		return map[string]interface{}{
+			"error": "Insufficient data for analysis (need at least 30 days)",
+		}
+	}
+
+	var drops []int
+	var dropDays []int // Track the actual day when drops occurred
+	var peak float64 = 0
+	var peakDay int = 0
+
+	for i, bar := range history {
+		price := bar.Close
+
+		// Track new peaks
+		if price > peak {
+			peak = price
+			peakDay = i
+		}
+
+		// Calculate drawdown using assembly calculator for precision
+		if peak > 0 {
+			// Step 1: peak - price
+			cmd := exec.Command("fcalc", "-s", fmt.Sprintf("%.6f", peak), fmt.Sprintf("%.6f", price))
+			output, err := cmd.Output()
+			if err != nil {
+				continue
+			}
+			difference, err := parseFcalcOutput(string(output))
+			if err != nil {
+				continue
+			}
+
+			// Step 2: difference / peak
+			cmd = exec.Command("fcalc", "-d", fmt.Sprintf("%.6f", difference), fmt.Sprintf("%.6f", peak))
+			output, err = cmd.Output()
+			if err != nil {
+				continue
+			}
+			ratio, err := parseFcalcOutput(string(output))
+			if err != nil {
+				continue
+			}
+
+			// Step 3: ratio * 100
+			cmd = exec.Command("fcalc", "--mul", fmt.Sprintf("%.6f", ratio), "100.0")
+			output, err = cmd.Output()
+			if err != nil {
+				continue
+			}
+			drawdown, err := parseFcalcOutput(string(output))
+			if err != nil {
+				continue
+			}
+
+			// Check if this is a drop event
+			if drawdown >= dropThreshold {
+				daysSincePeak := i - peakDay
+				if daysSincePeak > 0 {
+					drops = append(drops, daysSincePeak) // Keep for backwards compatibility
+					dropDays = append(dropDays, i)       // Track when drops actually occurred
+					log.Printf("Found %.0f%% drop: %d days from peak (%.2f to %.2f) on day %d",
+						dropThreshold, daysSincePeak, peak, price, i)
+					// Reset peak tracking after drop event
+					peak = price
+					peakDay = i
+				}
+			}
+		}
+	}
+
+	// Calculate average FREQUENCY (days between drops) using assembly calculator
+	var avgDays float64 = 0
+	if len(dropDays) > 0 {
+		if len(dropDays) == 1 {
+			// Only one drop found - frequency is total days
+			totalDays := len(history)
+			avgDays = float64(totalDays)
+			log.Printf("Single drop found: occurs every %.1f days", avgDays)
+		} else {
+			// Multiple drops - calculate intervals between them
+			totalStr := "0.0"
+			for i := 1; i < len(dropDays); i++ {
+				interval := dropDays[i] - dropDays[i-1]
+				cmd := exec.Command("fcalc", "-a", totalStr, fmt.Sprintf("%d", interval))
+				output, err := cmd.Output()
+				if err != nil {
+					break
+				}
+				total, err := parseFcalcOutput(string(output))
+				if err != nil {
+					break
+				}
+				totalStr = fmt.Sprintf("%.6f", total)
+			}
+
+			// Divide by number of intervals (drops - 1)
+			intervals := len(dropDays) - 1
+			cmd := exec.Command("fcalc", "-d", totalStr, fmt.Sprintf("%d", intervals))
+			output, err := cmd.Output()
+			if err == nil {
+				avgDays, err = parseFcalcOutput(string(output))
+				if err == nil {
+					log.Printf("Multiple drops: average %.1f days between drops", avgDays)
+				}
+			}
+		}
+	}
+
+	log.Printf("Drop analysis complete: %d drops found, average %.1f days between drops", len(drops), avgDays)
+
+	return map[string]interface{}{
+		"symbol":          symbol,
+		"drop_threshold":  dropThreshold,
+		"total_days":      len(history),
+		"drops_found":     len(drops),
+		"average_days":    avgDays,
+		"drop_intervals":  drops,
+		"analysis":        fmt.Sprintf("%s: %d drops of %.0f%%+ found over %d days (avg %.1f days between drops)", symbol, len(drops), dropThreshold, len(history), avgDays),
+		"calculator_used": "fcalc (assembly precision)",
+	}
+}
+
+package models
+
+// AnalysisRequest represents the user's analysis parameters
+type AnalysisRequest struct {
+	Symbols        []string `json:"symbols"`
+	ExpirationDate string   `json:"expiration_date"`
+	TargetDelta    float64  `json:"target_delta"`
+	AvailableCash  float64  `json:"available_cash"`
+	Strategy       string   `json:"strategy"`
+}
+
+// OptionResult represents the analysis result for one option
+type OptionResult struct {
+	Ticker           string  `json:"ticker"`
+	CurrentPrice     float64 `json:"current_price"`
+	Strike           float64 `json:"strike"`
+	Delta            float64 `json:"delta"`
+	Premium          float64 `json:"premium"`
+	MaxContracts     int     `json:"max_contracts"`
+	CashUsed         float64 `json:"cash_used"`
+	TotalPremium     float64 `json:"total_premium"`
+	PremiumYield     float64 `json:"premium_yield"`
+	AnnualizedReturn float64 `json:"annualized_return"`
+	OptionType       string  `json:"option_type"`
+}
+
+// AnalysisResponse represents the complete analysis results
+type AnalysisResponse struct {
+	Results        []OptionResult `json:"results"`
+	TotalPremium   float64        `json:"total_premium"`
+	RequestedDelta float64        `json:"requested_delta"`
+	Strategy       string         `json:"strategy"`
+	ExpirationDate string         `json:"expiration_date"`
+}

@@ -1,0 +1,124 @@
+# Barracuda Project Context
+
+# Go-CUDA Barracuda Project
+
+This is a GPU-accelerated options analysis system using Go, CUDA, and real-time market data from Alpaca.
+
+## Quick Commands (Use These!)
+```bash
+# Build only
+make build
+
+# Build and run  
+make run
+
+# Clean up
+make clean
+
+# Kill and restart
+pkill barracuda && make run
+
+# Check if running
+ps aux | grep barracuda
+```
+
+## Project Structure
+- **Main Application**: Go server with HTTP API endpoints
+- **CUDA Engine**: C++ with CUDA kernels for Black-Scholes calculations
+- **Market Data**: Alpaca Markets integration for real-time data
+- **Symbol Management**: S&P 500 service with quarterly updates
+- **Precision Calculations**: Assembly calculator integration (fcalc/calc)
+
+## Key Technologies
+- Go 1.21+ with CGO for CUDA integration
+- CUDA Toolkit for GPU acceleration
+- Alpaca Markets API for real-time trading data
+- GitHub CSV sources for S&P 500 data
+- Assembly calculators for financial precision
+
+## Main Components
+
+### Core Services
+1. **Baracuda CUDA Engine** (`baracuda/engine.go`, `src/baracuda_engine.cpp`)
+   - GPU-accelerated Black-Scholes options pricing
+   - Monte Carlo simulations
+   - 25-delta volatility skew analysis
+   - Greek calculations (Delta, Gamma, Theta, Vega, Rho)
+
+2. **S&P 500 Symbol Service** (`internal/symbols/sp500_service.go`)
+   - Quarterly updates from GitHub CSV sources
+   - Local asset backup for reliability
+   - Complete company metadata (sector, headquarters, CIK, etc.)
+
+3. **Alpaca Market Integration** (`internal/alpaca/`)
+   - Real-time stock prices and options chains
+   - Historical data for volatility analysis
+   - Paper trading and live trading support
+
+4. **HTTP API Server** (`main.go`)
+   - CUDA-accelerated endpoints (`/cuda/*`)
+   - S&P 500 management (`/sp500/*`)
+   - Traditional analysis endpoints
+   - Assembly calculator operations
+
+### Key Features
+- **Delta-based options selection** with assignment probability mapping
+- **Real premium pricing** using bid/ask spreads
+- **Cash allocation optimization** for contract quantities
+- **High-performance batch processing** (1000+ contracts)
+- **Fallback systems** for data reliability
+- **Precision calculations** using assembly tools
+
+## Data Flow
+1. **Market Data**: Alpaca API → Go structs → CUDA processing
+2. **Symbols**: GitHub CSV → S&P 500 service → Asset backup
+3. **Calculations**: Options data → CUDA kernels → Greeks/pricing
+4. **Results**: Processed data → JSON API → Client applications
+
+## Configuration
+Environment variables control API keys, trading mode (paper/live), default settings, and server configuration.
+
+## Performance
+- CUDA processing: ~175ms for 503 symbols
+- S&P 500 updates: ~175ms for complete refresh
+- Asset backup: 64KB for 503 symbols with full metadata
+- Batch processing: 1000+ contracts simultaneously
+
+This system combines quantitative trading strategies with high-performance computing for sophisticated options analysis and trading operations.
+
+## Assistant Rules & Preferences
+
+### CRITICAL SAFETY RULES
+- **NEVER DELETE THE PROJECT OR WORKSPACE** - No rm -rf, no workspace deletion commands
+- **FILE SAFETY** - Always edit/modify files, never delete entire project directories
+- **BACKUP AWARENESS** - Understand that git provides version control safety net
+- **WORKSPACE PROTECTION** - Treat the workspace as permanent and valuable
+- **GIT OPERATIONS** - All git operations including force operations are allowed when needed
+
+### Code Style & Standards
+- Always use absolute file paths for tools and operations
+- Prefer multi_replace_string_in_file for multiple edits to improve efficiency
+- Include 3-5 lines of context when making code changes
+- Use proper Go naming conventions and error handling
+- Maintain CUDA memory management best practices
+
+### Project Behavior
+- Prioritize performance and precision in financial calculations
+- Always validate market data and handle API failures gracefully
+- Use assembly calculators (fcalc) for critical financial precision
+- Maintain backward compatibility with existing API endpoints
+- Include comprehensive error handling and logging
+
+### Development Approach
+- Test all changes with the existing test suite
+- Document API changes in the appropriate files
+- Consider CUDA memory constraints when adding features
+- Validate S&P 500 data integrity after updates
+- Ensure thread safety in concurrent operations
+
+### Communication Style
+- Provide clear explanations of financial calculations
+- Show performance impact of changes
+- Explain CUDA optimization decisions
+- Use emoji indicators for status and results (🎯, ✅, 📊, etc.)
+- Keep responses focused on actionable solutions
