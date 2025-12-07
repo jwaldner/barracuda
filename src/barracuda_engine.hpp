@@ -132,6 +132,9 @@ extern "C" {
     bool baracuda_is_cuda_available(void* engine);
     int baracuda_get_device_count(void* engine);
     double baracuda_benchmark(void* engine, int num_contracts, int iterations);
+    
+    // Monte Carlo PI estimation (for workload testing)
+    int baracuda_monte_carlo_pi(void* engine, int samples);
 }
 
 } // namespace barracuda

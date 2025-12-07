@@ -243,13 +243,49 @@ extern "C" {
         return static_cast<BarracudaEngine*>(engine)->InitializeCUDA();
     }
     
-    int barracuda_calculate_options(void* engine, OptionContract* contracts, int count) {
+    int barracuda_calculate_options(void* engine, OptionContract* c_contracts, int count) {
         auto* eng = static_cast<BarracudaEngine*>(engine);
-        std::vector<OptionContract> input(contracts, contracts + count);
-        auto results = eng->CalculateBlackScholes(input);
         
-        for (size_t i = 0; i < results.size(); i++) {
-            contracts[i] = results[i];
+        // C struct layout: char[32] symbol, then doubles, char, then output doubles
+        // Offsets: symbol=0, strike=32, underlying=40, time=48, rate=56, vol=64, type=72
+        // Outputs: delta=80, gamma=88, theta=96, vega=104, rho=112, price=120
+        
+        // Convert C contracts to C++ contracts
+        std::vector<OptionContract> cpp_contracts;
+        cpp_contracts.reserve(count);
+        
+        for (int i = 0; i < count; i++) {
+            OptionContract cpp_contract;
+            // Copy char array to std::string
+            char* c_ptr = (char*)&c_contracts[i];
+            char symbol_buf[33];
+            memcpy(symbol_buf, c_ptr, 32);
+            symbol_buf[32] = '\0';
+            cpp_contract.symbol = std::string(symbol_buf);
+            
+            // Copy input fields using correct offsets
+            cpp_contract.strike_price = *(double*)(c_ptr + 32);
+            cpp_contract.underlying_price = *(double*)(c_ptr + 40);
+            cpp_contract.time_to_expiration = *(double*)(c_ptr + 48);
+            cpp_contract.risk_free_rate = *(double*)(c_ptr + 56);
+            cpp_contract.volatility = *(double*)(c_ptr + 64);
+            cpp_contract.option_type = *(char*)(c_ptr + 72);
+            
+            cpp_contracts.push_back(cpp_contract);
+        }
+        
+        // Calculate with C++ engine
+        auto results = eng->CalculateBlackScholes(cpp_contracts);
+        
+        // Copy results back using correct offsets
+        for (size_t i = 0; i < results.size() && i < (size_t)count; i++) {
+            char* c_ptr = (char*)&c_contracts[i];
+            *(double*)(c_ptr + 80) = results[i].delta;
+            *(double*)(c_ptr + 88) = results[i].gamma;
+            *(double*)(c_ptr + 96) = results[i].theta;
+            *(double*)(c_ptr + 104) = results[i].vega;
+            *(double*)(c_ptr + 112) = results[i].rho;
+            *(double*)(c_ptr + 120) = results[i].theoretical_price;
         }
         
         return 0; // Success

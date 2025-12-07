@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
@@ -27,18 +28,39 @@ func main() {
 		log.Fatal("ALPACA_SECRET_KEY is required (set in config.yaml or environment variable)")
 	}
 
-	// Initialize engine based on configuration
-	engine := barracuda.NewBaracudaEngine()
-	if engine == nil {
-		log.Fatal("Failed to initialize Barracuda engine")
+	// Only reject obvious placeholder values - let web handle actual auth errors
+	if strings.Contains(cfg.AlpacaAPIKey, "<") || strings.Contains(cfg.AlpacaAPIKey, ">") || 
+	   cfg.AlpacaAPIKey == "YOUR_API_KEY" || cfg.AlpacaAPIKey == "REPLACE_ME" {
+		log.Fatal("❌ API key appears to be a placeholder - please set real credentials")
 	}
-	defer engine.Close()
+	if strings.Contains(cfg.AlpacaSecretKey, "<") || strings.Contains(cfg.AlpacaSecretKey, ">") ||
+	   cfg.AlpacaSecretKey == "YOUR_SECRET_KEY" || cfg.AlpacaSecretKey == "REPLACE_ME" {
+		log.Fatal("❌ Secret key appears to be a placeholder - please set real credentials")
+	}
 
+	log.Printf("✅ Starting with API key: %s... (auth validated at runtime)", cfg.AlpacaAPIKey[:4])
+
+	// Initialize engine based on configuration
+	var engine *barracuda.BaracudaEngine
+	
 	// Check execution mode from config
 	executionMode := cfg.Engine.ExecutionMode
 	if executionMode == "" {
 		executionMode = "auto" // fallback to auto if not set
 	}
+	
+	if executionMode == "cpu" {
+		// Force CPU mode by creating engine differently
+		engine = barracuda.NewBaracudaEngineForced("cpu")
+		log.Println("CPU FORCED MODE: CUDA disabled")
+	} else {
+		engine = barracuda.NewBaracudaEngine()
+	}
+	
+	if engine == nil {
+		log.Fatal("Failed to initialize Barracuda engine")
+	}
+	defer engine.Close()
 
 	switch executionMode {
 	case "cuda":
@@ -48,7 +70,8 @@ func main() {
 			log.Fatal("❌ CUDA mode requested but CUDA not available")
 		}
 	case "cpu":
-		// CPU-only mode
+		// Force CPU-only mode
+		log.Println("CPU FORCED MODE: CUDA disabled")
 	case "auto":
 		fallthrough
 	default:

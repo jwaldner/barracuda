@@ -205,7 +205,7 @@ function displayResults(data) {
     
     // Add processing statistics if available
     if (data.processing_stats) {
-        html += '<div style="margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 11px; color: #666;">';
+        html += '<div class="performance-footer">';
         html += '<strong>Performance:</strong> ';
         
         // Highlight CUDA/CPU status with bright yellow background

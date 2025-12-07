@@ -4,13 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🎯 {{.Title}}</h1>
             <p>Put Options Analysis for S&P 500 Stocks</p>
+        </div>
+
+        <!-- Global Error/Status Banner -->
+        <div id="statusBanner" class="status-banner" style="display: none;">
+            <div class="status-content">
+                <span id="statusIcon">🔒</span>
+                <div class="status-text">
+                    <strong id="statusTitle">API Connection Status</strong>
+                    <p id="statusMessage">Checking connection...</p>
+                </div>
+                <button id="statusClose" class="status-close">×</button>
+            </div>
         </div>
 
         <div class="status-grid">

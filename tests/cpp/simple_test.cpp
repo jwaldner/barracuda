@@ -1,15 +1,15 @@
-#include "baracuda_engine.hpp"
+#include "barracuda_engine.hpp"
 #include <iostream>
 #include <cassert>
 #include <cmath>
 #include <chrono>
 
-using namespace baracuda;
+using namespace barracuda;
 
 void testBasicCalculation() {
     std::cout << "🧪 Testing Basic Black-Scholes Calculation..." << std::endl;
     
-    BaracudaEngine engine;
+    BarracudaEngine engine;
     
     std::vector<OptionContract> contracts = {
         {"TEST", 100.0, 100.0, 0.25, 0.05, 0.20, 'C', 0, 0, 0, 0, 0, 0}
@@ -30,7 +30,7 @@ void testBasicCalculation() {
 void testBatchProcessing() {
     std::cout << "🧪 Testing Batch Processing..." << std::endl;
     
-    BaracudaEngine engine;
+    BarracudaEngine engine;
     const int numContracts = 1000;
     
     std::vector<OptionContract> contracts;
@@ -69,7 +69,7 @@ void testBatchProcessing() {
 void testPerformance() {
     std::cout << "🧪 Testing Performance..." << std::endl;
     
-    BaracudaEngine engine;
+    BarracudaEngine engine;
     const int numContracts = 10000;
     const int iterations = 5;
     
@@ -109,7 +109,7 @@ void testPerformance() {
 void testCudaAvailability() {
     std::cout << "🧪 Testing CUDA Availability..." << std::endl;
     
-    BaracudaEngine engine;
+    BarracudaEngine engine;
     
     std::cout << "   ✅ CUDA Available: " << (engine.IsCudaAvailable() ? "YES" : "NO") << std::endl;
     std::cout << "   ✅ CUDA Devices: " << engine.GetDeviceCount() << std::endl;
@@ -122,7 +122,7 @@ void testCudaAvailability() {
 }
 
 int main() {
-    std::cout << "🔥 BARACUDA ENGINE TESTS 🔥" << std::endl << std::endl;
+    std::cout << "🔥 BARRACUDA ENGINE TESTS 🔥" << std::endl << std::endl;
     
     try {
         testCudaAvailability();

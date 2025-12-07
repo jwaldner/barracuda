@@ -95,6 +95,17 @@ This system combines quantitative trading strategies with high-performance compu
 - **WORKSPACE PROTECTION** - Treat the workspace as permanent and valuable
 - **GIT OPERATIONS** - All git operations including force operations are allowed when needed
 
+### CRITICAL PERFORMANCE RULES
+- **WORKLOAD FACTOR IMPLEMENTATION** - The workload_factor in config.yaml MUST use real CUDA mathematical calculations (BarracudaEngine.CalculateBlackScholes) NOT API call repetition
+- **NO API CALL FUDGING** - Workload multiplication should NEVER repeat Alpaca API calls - this does not test CUDA performance
+- **CUDA-APPROPRIATE TASKS** - Design work that leverages CUDA's strengths: parallel mathematical computations, matrix operations, large dataset processing
+- **CPU-APPROPRIATE TASKS** - Recognize when CPU is better: sequential operations, branching logic, small datasets, network I/O, API calls
+- **ASSISTANT ADVISORY ROLE** - Must advise when a task is better suited for CPU vs CUDA. Don't force CUDA on CPU-optimized tasks
+- **BENCHMARK ALIGNMENT** - Web interface workload should use the same mathematical functions as the C++ benchmark tests
+- **PERFORMANCE VALIDATION** - CUDA should outperform CPU only on CUDA-appropriate tasks (parallel math). If CPU and CUDA show similar performance on mathematical work, the CUDA implementation needs review
+- **C++ BENCHMARK REFERENCE** - Use `LD_LIBRARY_PATH=./lib ./bin/benchmark` to verify real CUDA performance on mathematical computations (3x faster small workloads, 12% faster large workloads)
+- **TASK-APPROPRIATE OPTIMIZATION** - Design workloads that play to each processor's strengths rather than forcing CUDA to win every comparison
+
 ### Code Style & Standards
 - Always use absolute file paths for tools and operations
 - Prefer multi_replace_string_in_file for multiple edits to improve efficiency

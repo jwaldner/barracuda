@@ -1,247 +1,193 @@
 package barracuda
 
+/*
+#cgo CXXFLAGS: -I${SRCDIR}/../src -std=c++11
+#cgo LDFLAGS: -L${SRCDIR}/../lib -lbarracuda -lcudart -lcurand -lstdc++ -Wl,-rpath,${SRCDIR}/../lib
+
+// C struct matching barracuda_engine.cpp
+typedef struct {
+    char symbol[32];
+    double strike_price;
+    double underlying_price;
+    double time_to_expiration;
+    double risk_free_rate;
+    double volatility;
+    char option_type;
+    double delta;
+    double gamma;
+    double theta;
+    double vega;
+    double rho;
+    double theoretical_price;
+} COptionContract;
+
+// C functions from barracuda_engine.cpp
+void* barracuda_create_engine();
+void barracuda_destroy_engine(void* engine);
+int barracuda_initialize_cuda(void* engine);
+int barracuda_is_cuda_available(void* engine);
+int barracuda_get_device_count(void* engine);
+int barracuda_calculate_options(void* engine, COptionContract* contracts, int count);
+*/
+import "C"
 import (
-	"math"
-	"time"
+	"fmt"
+	"unsafe"
 )
 
-// OptionContract represents an options contract for processing
+// OptionContract represents an options contract
 type OptionContract struct {
-	Symbol           string  `json:"symbol"`
-	StrikePrice      float64 `json:"strike_price"`
-	UnderlyingPrice  float64 `json:"underlying_price"`
-	TimeToExpiration float64 `json:"time_to_expiration"`
-	RiskFreeRate     float64 `json:"risk_free_rate"`
-	Volatility       float64 `json:"volatility"`
-	OptionType       byte    `json:"option_type"` // 'C' or 'P'
+	Symbol           string
+	StrikePrice      float64
+	UnderlyingPrice  float64
+	TimeToExpiration float64
+	RiskFreeRate     float64
+	Volatility       float64
+	OptionType       byte // 'C' or 'P'
 
 	// Output Greeks
-	Delta            float64 `json:"delta"`
-	Gamma            float64 `json:"gamma"`
-	Theta            float64 `json:"theta"`
-	Vega             float64 `json:"vega"`
-	Rho              float64 `json:"rho"`
-	TheoreticalPrice float64 `json:"theoretical_price"`
-}
-
-// MarketData represents real-time market data
-type MarketData struct {
-	Symbol    string  `json:"symbol"`
-	Price     float64 `json:"price"`
-	Bid       float64 `json:"bid"`
-	Ask       float64 `json:"ask"`
-	Timestamp int64   `json:"timestamp"`
-	Volume    float64 `json:"volume"`
-}
-
-// VolatilitySkew represents the 25-delta put/call IV skew
-type VolatilitySkew struct {
-	Symbol     string  `json:"symbol"`
-	Expiration string  `json:"expiration"`
-	Put25DIV   float64 `json:"put_25d_iv"`
-	Call25DIV  float64 `json:"call_25d_iv"`
-	Skew       float64 `json:"skew"`
-	ATMIV      float64 `json:"atm_iv"`
+	Delta            float64
+	Gamma            float64
+	Theta            float64
+	Vega             float64
+	Rho              float64
+	TheoreticalPrice float64
 }
 
 // ExecutionMode defines how calculations are performed
 type ExecutionMode string
 
 const (
-	ExecutionModeAuto ExecutionMode = "auto" // Auto-detect best method
-	ExecutionModeCUDA ExecutionMode = "cuda" // Force CUDA (fail if not available)
-	ExecutionModeCPU  ExecutionMode = "cpu"  // Force CPU calculation
+	ExecutionModeAuto ExecutionMode = "auto"
+	ExecutionModeCUDA ExecutionMode = "cuda"
+	ExecutionModeCPU  ExecutionMode = "cpu"
 )
 
-// BenchmarkResult contains performance metrics
-type BenchmarkResult struct {
-	Mode               ExecutionMode `json:"mode"`
-	Calculations       int           `json:"calculations"`
-	ProcessingTimeMs   float64       `json:"processing_time_ms"`
-	CalculationsPerSec float64       `json:"calculations_per_sec"`
-	BatchSize          int           `json:"batch_size"`
-	Batches            int           `json:"batches"`
-	CUDAAvailable      bool          `json:"cuda_available"`
-	DeviceCount        int           `json:"device_count"`
-	WorkloadFactor     float64       `json:"workload_factor"`
-}
-
-// BaracudaEngine provides high-performance options calculations
+// BaracudaEngine provides CUDA-accelerated options calculations
 type BaracudaEngine struct {
+	engine        unsafe.Pointer
 	executionMode ExecutionMode
 }
 
-// NewBaracudaEngine creates a new options engine
+// NewBaracudaEngine creates a new CUDA-accelerated engine
 func NewBaracudaEngine() *BaracudaEngine {
-	// Try to initialize CUDA, fall back to CPU if not available
-	execMode := ExecutionModeCPU
-	if isCudaAvailable() {
-		execMode = ExecutionModeCUDA
+	engine := C.barracuda_create_engine()
+	if engine == nil {
+		fmt.Println("❌ Failed to create CUDA engine")
+		return nil
 	}
-	return &BaracudaEngine{
-		executionMode: execMode,
+
+	be := &BaracudaEngine{
+		engine:        engine,
+		executionMode: ExecutionModeCUDA,
 	}
+
+	// Initialize CUDA
+	if C.barracuda_initialize_cuda(engine) == 0 {
+		fmt.Println("⚠️  CUDA initialization failed, falling back to CPU")
+		be.executionMode = ExecutionModeCPU
+	} else {
+		deviceCount := C.barracuda_get_device_count(engine)
+		fmt.Printf("✅ CUDA initialized with %d device(s)\n", deviceCount)
+	}
+
+	return be
 }
 
-// Close cleans up the engine resources
+// NewBaracudaEngineForced creates engine with forced execution mode
+func NewBaracudaEngineForced(mode string) *BaracudaEngine {
+	be := NewBaracudaEngine()
+	if be == nil {
+		return nil
+	}
+
+	switch mode {
+	case "cpu":
+		be.executionMode = ExecutionModeCPU
+		fmt.Println("🔄 Forced CPU mode")
+	case "cuda":
+		be.executionMode = ExecutionModeCUDA
+		fmt.Println("⚡ Forced CUDA mode")
+	default:
+		be.executionMode = ExecutionModeAuto
+	}
+
+	return be
+}
+
+// Close cleans up engine resources
 func (be *BaracudaEngine) Close() {
-	// Nothing to clean up in CPU mode
-}
-
-// IsCudaAvailable returns true if CUDA is available for calculations
-func (be *BaracudaEngine) IsCudaAvailable() bool {
-	return be.executionMode == ExecutionModeCUDA
-}
-
-// isCudaAvailable checks if CUDA is actually available
-func isCudaAvailable() bool {
-	// This should call into the C++ CUDA detection code
-	// For now, assume CUDA is available if the library exists
-	return true // Will be replaced with actual CUDA detection
-}
-
-// GetDeviceCount returns the number of CUDA devices
-func (be *BaracudaEngine) GetDeviceCount() int {
-	if be.executionMode == ExecutionModeCUDA {
-		return 1 // Assume 1 NVIDIA device for now
+	if be.engine != nil {
+		C.barracuda_destroy_engine(be.engine)
+		be.engine = nil
 	}
-	return 0
 }
 
-// CalculateBlackScholes performs Black-Scholes calculation
+// IsCudaAvailable returns true if CUDA is available
+func (be *BaracudaEngine) IsCudaAvailable() bool {
+	if be.engine == nil {
+		return false
+	}
+	return be.executionMode == ExecutionModeCUDA && C.barracuda_is_cuda_available(be.engine) != 0
+}
+
+// GetDeviceCount returns number of CUDA devices
+func (be *BaracudaEngine) GetDeviceCount() int {
+	if be.engine == nil {
+		return 0
+	}
+	return int(C.barracuda_get_device_count(be.engine))
+}
+
+// CalculateBlackScholes performs GPU-accelerated Black-Scholes calculation
 func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract) ([]OptionContract, error) {
 	if len(contracts) == 0 {
 		return contracts, nil
 	}
 
-	// Calculate using CPU-based Black-Scholes
+	if be.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
+
+	// Convert Go contracts to C contracts
+	cContracts := make([]C.COptionContract, len(contracts))
+	for i, contract := range contracts {
+		// Copy symbol (truncate if too long)
+		symbolBytes := []byte(contract.Symbol)
+		for j := 0; j < len(symbolBytes) && j < 31; j++ {
+			cContracts[i].symbol[j] = C.char(symbolBytes[j])
+		}
+		cContracts[i].symbol[31] = 0 // Null terminate
+
+		cContracts[i].strike_price = C.double(contract.StrikePrice)
+		cContracts[i].underlying_price = C.double(contract.UnderlyingPrice)
+		cContracts[i].time_to_expiration = C.double(contract.TimeToExpiration)
+		cContracts[i].risk_free_rate = C.double(contract.RiskFreeRate)
+		cContracts[i].volatility = C.double(contract.Volatility)
+		cContracts[i].option_type = C.char(contract.OptionType)
+	}
+
+	// Call CUDA calculation
+	result := C.barracuda_calculate_options(
+		be.engine,
+		(*C.COptionContract)(unsafe.Pointer(&cContracts[0])),
+		C.int(len(contracts)))
+
+	if result != 0 {
+		return nil, fmt.Errorf("CUDA calculation failed with code %d", result)
+	}
+
+	// Convert results back to Go
+	results := make([]OptionContract, len(contracts))
 	for i := range contracts {
-		contract := &contracts[i]
-
-		// Basic Black-Scholes calculation
-		S := contract.UnderlyingPrice
-		K := contract.StrikePrice
-		T := contract.TimeToExpiration
-		r := contract.RiskFreeRate
-		sigma := contract.Volatility
-
-		if T <= 0 {
-			// Handle expired options
-			if contract.OptionType == 'C' {
-				contract.TheoreticalPrice = math.Max(S-K, 0)
-				contract.Delta = func() float64 {
-					if S > K {
-						return 1.0
-					} else {
-						return 0.0
-					}
-				}()
-			} else {
-				contract.TheoreticalPrice = math.Max(K-S, 0)
-				contract.Delta = func() float64 {
-					if K > S {
-						return -1.0
-					} else {
-						return 0.0
-					}
-				}()
-			}
-			continue
-		}
-
-		// Black-Scholes calculations
-		d1 := (math.Log(S/K) + (r+0.5*sigma*sigma)*T) / (sigma * math.Sqrt(T))
-		d2 := d1 - sigma*math.Sqrt(T)
-
-		normCDFd1 := normalCDF(d1)
-		normCDFd2 := normalCDF(d2)
-		normCDFNegd1 := normalCDF(-d1)
-		normCDFNegd2 := normalCDF(-d2)
-
-		if contract.OptionType == 'C' {
-			// Call option
-			contract.TheoreticalPrice = S*normCDFd1 - K*math.Exp(-r*T)*normCDFd2
-			contract.Delta = normCDFd1
-		} else {
-			// Put option
-			contract.TheoreticalPrice = K*math.Exp(-r*T)*normCDFNegd2 - S*normCDFNegd1
-			contract.Delta = normCDFd1 - 1
-		}
-
-		// Calculate other Greeks
-		sqrtT := math.Sqrt(T)
-		expMinusRT := math.Exp(-r * T)
-
-		// Gamma (same for calls and puts)
-		contract.Gamma = normalPDF(d1) / (S * sigma * sqrtT)
-
-		// Vega (same for calls and puts)
-		contract.Vega = S * normalPDF(d1) * sqrtT / 100 // Divide by 100 for 1% volatility change
-
-		// Theta
-		if contract.OptionType == 'C' {
-			contract.Theta = -(S*normalPDF(d1)*sigma/(2*sqrtT) + r*K*expMinusRT*normCDFd2) / 365
-		} else {
-			contract.Theta = -(S*normalPDF(d1)*sigma/(2*sqrtT) - r*K*expMinusRT*normCDFNegd2) / 365
-		}
-
-		// Rho
-		if contract.OptionType == 'C' {
-			contract.Rho = K * T * expMinusRT * normCDFd2 / 100 // Divide by 100 for 1% rate change
-		} else {
-			contract.Rho = -K * T * expMinusRT * normCDFNegd2 / 100
-		}
+		results[i] = contracts[i] // Copy input data
+		results[i].Delta = float64(cContracts[i].delta)
+		results[i].Gamma = float64(cContracts[i].gamma)
+		results[i].Theta = float64(cContracts[i].theta)
+		results[i].Vega = float64(cContracts[i].vega)
+		results[i].Rho = float64(cContracts[i].rho)
+		results[i].TheoreticalPrice = float64(cContracts[i].theoretical_price)
 	}
 
-	return contracts, nil
-}
-
-// CalculateBatch processes multiple options contracts efficiently
-func (be *BaracudaEngine) CalculateBatch(contracts []OptionContract) ([]OptionContract, error) {
-	return be.CalculateBlackScholes(contracts)
-}
-
-// GetBenchmarkResult performs a performance test
-func (be *BaracudaEngine) GetBenchmarkResult(numCalculations int) BenchmarkResult {
-	start := time.Now()
-
-	// Create test contracts
-	contracts := make([]OptionContract, numCalculations)
-	for i := range contracts {
-		contracts[i] = OptionContract{
-			Symbol:           "TEST",
-			StrikePrice:      100.0,
-			UnderlyingPrice:  100.0,
-			TimeToExpiration: 0.25, // 3 months
-			RiskFreeRate:     0.05,
-			Volatility:       0.25,
-			OptionType:       'C',
-		}
-	}
-
-	// Perform calculations
-	_, _ = be.CalculateBlackScholes(contracts)
-
-	elapsed := time.Since(start)
-
-	return BenchmarkResult{
-		Mode:               ExecutionModeCPU,
-		Calculations:       numCalculations,
-		ProcessingTimeMs:   float64(elapsed.Nanoseconds()) / 1e6,
-		CalculationsPerSec: float64(numCalculations) / elapsed.Seconds(),
-		BatchSize:          numCalculations,
-		Batches:            1,
-		CUDAAvailable:      false,
-		DeviceCount:        0,
-	}
-}
-
-// normalCDF approximates the cumulative distribution function of standard normal distribution
-func normalCDF(x float64) float64 {
-	return 0.5 * (1.0 + math.Erf(x/math.Sqrt2))
-}
-
-// normalPDF calculates the probability density function of standard normal distribution
-func normalPDF(x float64) float64 {
-	return math.Exp(-0.5*x*x) / math.Sqrt(2*math.Pi)
+	return results, nil
 }

@@ -91,6 +91,31 @@ __global__ void monte_carlo_kernel(
     states[idx] = local_state;
 }
 
+// Monte Carlo PI estimation kernel
+__global__ void monte_carlo_pi_kernel(int* inside, int samples_per_thread, curandState* states) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    curandState local_state = states[idx];
+    int local_inside = 0;
+    
+    for (int i = 0; i < samples_per_thread; i++) {
+        double x = curand_uniform_double(&local_state) * 2.0 - 1.0;
+        double y = curand_uniform_double(&local_state) * 2.0 - 1.0;
+        
+        double distance = sqrt(x*x + y*y);
+        if (distance <= 1.0) {
+            local_inside++;
+        }
+        
+        // Extra work to match CPU benchmark
+        double extra = sin(x) * cos(y) * exp(-distance);
+        (void)extra; // Prevent optimization
+    }
+    
+    atomicAdd(inside, local_inside);
+    states[idx] = local_state;
+}
+
 // Initialize cuRAND states
 __global__ void setup_kernel(curandState* state, unsigned long seed, int num_paths) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -126,6 +151,16 @@ extern "C" {
         int blocksPerGrid = (num_paths + threadsPerBlock - 1) / threadsPerBlock;
         
         setup_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_states, seed, num_paths);
+        
+        cudaDeviceSynchronize();
+    }
+    
+    void launch_monte_carlo_pi_kernel(int* d_inside, int samples, int num_threads, curandState* d_states) {
+        int samples_per_thread = (samples + num_threads - 1) / num_threads;
+        int threadsPerBlock = 256;
+        int blocksPerGrid = (num_threads + threadsPerBlock - 1) / threadsPerBlock;
+        
+        monte_carlo_pi_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_inside, samples_per_thread, d_states);
         
         cudaDeviceSynchronize();
     }

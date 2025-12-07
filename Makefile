@@ -23,8 +23,8 @@ $(LIBRARY): $(CPP_OBJECTS) $(CU_OBJECTS)
 	$(CC) -shared -o $@ $^ $(LIBS)
 
 # Build benchmark executable
-$(BENCHMARK): benchmark.cpp $(LIBRARY)
-	$(CC) $(CFLAGS) $(INCLUDES) -L$(LIBDIR) -o $@ benchmark.cpp -lbarracuda $(LIBS)
+$(BENCHMARK): src/benchmark.cpp $(LIBRARY)
+	$(CC) $(CFLAGS) $(INCLUDES) -L$(LIBDIR) -o $@ src/benchmark.cpp -lbarracuda $(LIBS)
 
 # Go module build
 # Build Go binary with CUDA support
