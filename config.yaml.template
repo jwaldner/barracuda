@@ -1,0 +1,25 @@
+# Barracuda Options Analyzer Configuration Template
+# Copy this file to config.yaml and fill in your API keys
+
+alpaca:
+  api_key: "YOUR_ALPACA_API_KEY_HERE"
+  secret_key: "YOUR_ALPACA_SECRET_KEY_HERE"
+
+trading:
+  default_cash: 70000
+  target_delta: 0.25
+  max_results: 100
+  default_stocks: []
+
+engine:
+  execution_mode: "auto"    # auto, cuda, cpu
+  batch_size: 1000         # Max options contracts per CUDA batch
+  enable_benchmarks: true  # Enable performance benchmarking
+  workload_factor: 1.0     # Computational workload multiplier (1.0 = normal, 2.0 = double work)
+
+compute:
+  execution_mode: "auto"
+  benchmark_mode: false
+  benchmark_calculations: 10000
+  benchmark_batch_size: 1000
+  simulation_workload: false
