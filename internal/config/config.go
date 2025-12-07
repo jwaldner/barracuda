@@ -80,7 +80,7 @@ func Load() *Config {
 		Engine: EngineConfig{
 			ExecutionMode:    getEnv("ENGINE_EXECUTION_MODE", "auto"),
 			BatchSize:        getEnvInt("ENGINE_BATCH_SIZE", 1000),
-			EnableBenchmarks: getEnvBool("ENGINE_ENABLE_BENCHMARKS", false),
+			EnableBenchmarks: getEnvBool("ENGINE_ENABLE_BENCHMARKS", true),
 		},
 
 		// Default compute configuration (legacy)
