@@ -29,12 +29,12 @@ func main() {
 	}
 
 	// Only reject obvious placeholder values - let web handle actual auth errors
-	if strings.Contains(cfg.AlpacaAPIKey, "<") || strings.Contains(cfg.AlpacaAPIKey, ">") || 
-	   cfg.AlpacaAPIKey == "YOUR_API_KEY" || cfg.AlpacaAPIKey == "REPLACE_ME" {
+	if strings.Contains(cfg.AlpacaAPIKey, "<") || strings.Contains(cfg.AlpacaAPIKey, ">") ||
+		cfg.AlpacaAPIKey == "YOUR_API_KEY" || cfg.AlpacaAPIKey == "REPLACE_ME" {
 		log.Fatal("❌ API key appears to be a placeholder - please set real credentials")
 	}
 	if strings.Contains(cfg.AlpacaSecretKey, "<") || strings.Contains(cfg.AlpacaSecretKey, ">") ||
-	   cfg.AlpacaSecretKey == "YOUR_SECRET_KEY" || cfg.AlpacaSecretKey == "REPLACE_ME" {
+		cfg.AlpacaSecretKey == "YOUR_SECRET_KEY" || cfg.AlpacaSecretKey == "REPLACE_ME" {
 		log.Fatal("❌ Secret key appears to be a placeholder - please set real credentials")
 	}
 
@@ -42,13 +42,13 @@ func main() {
 
 	// Initialize engine based on configuration
 	var engine *barracuda.BaracudaEngine
-	
+
 	// Check execution mode from config
 	executionMode := cfg.Engine.ExecutionMode
 	if executionMode == "" {
 		executionMode = "auto" // fallback to auto if not set
 	}
-	
+
 	if executionMode == "cpu" {
 		// Force CPU mode by creating engine differently
 		engine = barracuda.NewBaracudaEngineForced("cpu")
@@ -56,7 +56,7 @@ func main() {
 	} else {
 		engine = barracuda.NewBaracudaEngine()
 	}
-	
+
 	if engine == nil {
 		log.Fatal("Failed to initialize Barracuda engine")
 	}

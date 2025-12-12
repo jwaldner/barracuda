@@ -34,7 +34,7 @@
                 </div>
             </div>
             <div class="status-card">
-                <h3>📊 S&P 500 Symbols</h3>
+                <h3>📊 Analysis Symbols</h3>
                 <p>{{.SP500Count}} Available</p>
             </div>
             <div class="status-card" id="contractsProcessed">
@@ -52,14 +52,16 @@
             <div class="auto-analysis">
                 <div class="analysis-info">
                     <h3>📊 Automated Put Options Analysis</h3>
-                    <p><strong>Symbols:</strong> Top 25 S&P 500 (loaded dynamically)</p>
+                    <p><strong>Symbols:</strong> {{if .DefaultStocks}}{{len .DefaultStocks}} Configured: {{range $i, $symbol := .DefaultStocks}}{{if $i}}, {{end}}{{$symbol}}{{end}}{{else}}ALL S&P 500 (~500 symbols, batched processing, top 25 results){{end}}</p>
                     <p><strong>Expiration:</strong> <span id="autoExpiration">Calculating...</span></p>
                     <p><strong>Target Delta:</strong> 0.25 (Higher Risk)</p>
                     <p><strong>Available Cash:</strong> ${{.DefaultCash}}</p>
                 </div>
                 <div style="text-align: center; margin-top: 20px;">
                     <button type="button" id="runAnalysis" class="btn" 
-                            data-default-cash="{{.DefaultCash}}">🔍 Run Put Options Analysis</button>
+                            data-default-cash="{{.DefaultCash}}"
+                            data-symbols="{{range $i, $symbol := .DefaultStocks}}{{if $i}},{{end}}{{$symbol}}{{end}}"
+                            data-use-sp500="{{if not .DefaultStocks}}true{{else}}false{{end}}">🔍 Run Put Options Analysis</button>
                     <button type="button" id="exportCSV" class="btn" style="background: linear-gradient(45deg, #4caf50, #45a049); margin-left: 10px;" disabled>📋 Copy CSV</button>
                 </div>
             </div>

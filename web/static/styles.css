@@ -354,65 +354,41 @@ div.status-card:first-of-type p {
 }
 
 .results-table {
-    width: 100%;
-    border-collapse: collapse;
-    border: none;
-    min-width: 800px;
-    font-size: 14px;
-    font-family: 'Courier New', monospace; /* Better for numbers */
+    width: 100% !important;
+    border-collapse: collapse !important;
+    min-width: 1000px !important;
+    font-size: 18px !important;
+    font-family: 'Arial', sans-serif !important;
+    background: #ffffff !important;
+    color: #000000 !important;
 }
 
 .results-table th {
-    background: linear-gradient(135deg, #2c3e50, #3498db);
-    color: white;
-    padding: 15px 12px;
-    text-align: center;
-    font-weight: bold;
-    border: 2px solid #34495e;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    background: #333333 !important;
+    color: #ffffff !important;
+    padding: 20px !important;
+    text-align: center !important;
+    font-weight: bold !important;
+    border: 3px solid #000000 !important;
+    font-size: 18px !important;
 }
 
 .results-table td {
-    padding: 12px;
-    border: 1px solid #bdc3c7;
-    text-align: center;
-    font-weight: 500;
-    background: white;
+    padding: 20px !important;
+    border: 3px solid #000000 !important;
+    text-align: center !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 18px !important;
+    font-weight: normal !important;
 }
 
 .results-table tr:nth-child(even) td {
-    background: #ecf0f1;
+    background: #f8f8f8 !important;
+    color: #000000 !important;
 }
 
 .results-table tr:hover td {
-    background: #d5dbdb;
-    transition: background 0.2s ease;
-}
-
-/* Make key columns stand out */
-.results-table td:first-child { /* Symbol */
-    font-weight: bold;
-    font-size: 15px;
-    color: #2c3e50;
-    background: #f8f9fa !important;
-}
-
-.results-table tr:nth-child(even) td:first-child {
-    background: #e9ecef !important;
-}
-
-/* Money columns - green for profits */
-.results-table td:nth-child(4), /* Option Price */
-.results-table td:nth-child(5), /* Premium Income */
-.results-table td:nth-child(6) { /* ROI */
-    color: #27ae60;
-    font-weight: bold;
-}
-
-/* Strike price - blue */
-.results-table td:nth-child(3) {
-    color: #3498db;
-    font-weight: bold;
+    background: #dddddd !important;
+    color: #000000 !important;
 }

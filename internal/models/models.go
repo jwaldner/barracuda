@@ -11,21 +11,23 @@ type AnalysisRequest struct {
 
 // OptionResult represents the result of analyzing an option
 type OptionResult struct {
-	Ticker       string  `json:"ticker"`
-	OptionSymbol string  `json:"option_symbol"`
-	OptionType   string  `json:"option_type"`
-	Strike       float64 `json:"strike"`
-	StockPrice   float64 `json:"stock_price"`
-	Premium      float64 `json:"premium"`
-	MaxContracts int     `json:"max_contracts"`
-	TotalPremium float64 `json:"total_premium"`
-	Delta        float64 `json:"delta"`
-	Gamma        float64 `json:"gamma"`
-	Theta        float64 `json:"theta"`
-	Vega         float64 `json:"vega"`
-	ImpliedVol   float64 `json:"implied_volatility"`
-	Expiration   string  `json:"expiration"`
-	DaysToExp    int     `json:"days_to_expiration"`
+	Ticker           string  `json:"ticker"`
+	OptionSymbol     string  `json:"option_symbol"`
+	OptionType       string  `json:"option_type"`
+	Strike           float64 `json:"strike"`
+	StockPrice       float64 `json:"stock_price"`
+	Premium          float64 `json:"premium"`
+	MaxContracts     int     `json:"max_contracts"`
+	TotalPremium     float64 `json:"total_premium"`
+	CashNeeded       float64 `json:"cash_needed"`
+	ProfitPercentage float64 `json:"profit_percentage"`
+	Delta            float64 `json:"delta"`
+	Gamma            float64 `json:"gamma"`
+	Theta            float64 `json:"theta"`
+	Vega             float64 `json:"vega"`
+	ImpliedVol       float64 `json:"implied_volatility"`
+	Expiration       string  `json:"expiration"`
+	DaysToExp        int     `json:"days_to_expiration"`
 }
 
 // AnalysisResponse represents the response from options analysis

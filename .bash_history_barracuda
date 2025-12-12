@@ -1,0 +1,14 @@
+make build ./bar
+ls bar*
+ls -la barracuda* && echo "--- Checking Makefile ---" && ls -la Makefile
+make build
+make build && ./barracuda
+make build
+make build && ./barracuda
+./barracuda > server.log 2>&1 &
+make build && ./barracuda
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 2 && ./barracuda
+cd /home/joe/projects/go-cuda && make build
+cd /home/joe/projects/go-cuda && ./barracuda

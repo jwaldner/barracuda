@@ -27,8 +27,10 @@ function getThirdFriday() {
         return nextThirdFriday;
     }
     
-    return thirdFriday;
+    return new Date(year, month, day);
 }
+
+
 
 document.addEventListener('DOMContentLoaded', function() {
     const thirdFriday = getThirdFriday();
@@ -43,19 +45,34 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingDiv.style.display = 'block';
         resultsDiv.style.display = 'none';
         
-        // Always fetch S&P 500 top 25 symbols dynamically - NO DEFAULTS
+        // Get symbols - either from config or S&P 500 assets
         let symbols;
-        try {
-            const sp500Response = await fetch('/api/sp500/top25');
-            const sp500Data = await sp500Response.json();
-            if (sp500Data.status === 'success' && sp500Data.symbols) {
-                symbols = sp500Data.symbols;
-            } else {
-                throw new Error('Failed to get S&P 500 symbols');
+        const symbolsData = e.target.dataset.symbols;
+        const useSP500 = e.target.dataset.useSp500 === 'true';
+        
+        if (useSP500 || !symbolsData || !symbolsData.trim()) {
+            // Empty config list - get ALL S&P 500 symbols from assets
+            try {
+                const response = await fetch('/api/sp500/symbols');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                if (!data.symbols || data.symbols.length === 0) {
+                    throw new Error('No S&P 500 symbols available');
+                }
+                // Extract just the symbol strings from the full symbol objects
+                symbols = data.symbols.map(s => typeof s === 'string' ? s : s.symbol);
+                console.log('Using ALL S&P 500 symbols from assets:', symbols.length, 'symbols (will process in batches, show top 25 results)');
+            } catch (error) {
+                console.error('Error fetching S&P 500 symbols:', error);
+                alert('Error loading S&P 500 symbols: ' + error.message);
+                return;
             }
-        } catch (error) {
-            alert('Error fetching S&P 500 symbols: ' + error.message);
-            return;
+        } else {
+            // Use configured symbol list
+            symbols = symbolsData.split(',').map(s => s.trim()).filter(s => s);
+            console.log('Using configured symbols:', symbols);
         }
         const defaultCash = e.target.dataset.defaultCash ? 
             parseInt(e.target.dataset.defaultCash) : 
@@ -130,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('exportCSV').addEventListener('click', function() {
         if (!window.lastResults) return;
         
-        const headers = ['Rank', 'Symbol', 'Strike', 'Stock_Price', 'Premium_Per_Contract', 'Max_Contracts', 'Total_Premium', 'Delta', 'Days_To_Expiration'];
+        const headers = ['Rank', 'Symbol', 'Strike', 'Stock_Price', 'Premium_Per_Contract', 'Max_Contracts', 'Total_Premium', 'Expiration'];
         let csvContent = headers.join(',') + '\n';
         
         window.lastResults.forEach((option, index) => {
@@ -143,8 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 option.premium.toFixed(2),
                 option.max_contracts,
                 option.total_premium.toFixed(2),
-                (option.delta || 0).toFixed(3),
-                option.days_to_expiration || 'N/A'
+                option.expiration || 'N/A'
             ];
             csvContent += row.join(',') + '\n';
         });
@@ -172,34 +188,40 @@ function displayResults(data) {
     window.lastResults = data.results;
     
     let html = '<div class="table-container">';
-    html += '<table class="results-table" style="background: white; color: black; font-family: monospace; font-size: 12px;">';
+    html += '<table class="results-table">';
+    html += '<thead>';
     html += '<tr>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: left;">Rank</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: left;">Symbol</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Strike</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Stock Price</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Contracts</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Premium/Contract</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Total Premium</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Delta</th>';
-    html += '<th style="border: 1px solid #ccc; padding: 5px; background: #f8f8f8; text-align: right;">Days</th>';
+    html += '<th>Rank</th>';
+    html += '<th>Symbol</th>';
+    html += '<th>Strike</th>';
+    html += '<th>Stock Price</th>';
+    html += '<th>Contracts</th>';
+    html += '<th>Premium/Contract</th>';
+    html += '<th>Total Premium</th>';
+    html += '<th>Cash Needed</th>';
+    html += '<th>Profit %</th>';
+    html += '<th>Exp Date</th>';
     html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
     
     data.results.forEach((option, index) => {
         const rank = index + 1;
         html += '<tr>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: center;">' + rank + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: left;">' + option.ticker + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + option.strike.toFixed(2) + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + option.stock_price.toFixed(2) + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + option.max_contracts + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + option.premium.toFixed(2) + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + option.total_premium.toFixed(2) + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + (option.delta || 0).toFixed(3) + '</td>';
-        html += '<td style="border: 1px solid #ccc; padding: 5px; text-align: right;">' + (option.days_to_expiration || 'N/A') + '</td>';
+        html += '<td>' + rank + '</td>';
+        html += '<td>' + option.ticker + '</td>';
+        html += '<td>' + option.strike.toFixed(2) + '</td>';
+        html += '<td>' + option.stock_price.toFixed(2) + '</td>';
+        html += '<td>' + option.max_contracts + '</td>';
+        html += '<td>' + option.premium.toFixed(2) + '</td>';
+        html += '<td>' + option.total_premium.toFixed(2) + '</td>';
+        html += '<td>' + (option.cash_needed ? option.cash_needed.toFixed(2) : 'N/A') + '</td>';
+        html += '<td>' + (option.profit_percentage ? option.profit_percentage.toFixed(2) + '%' : 'N/A') + '</td>';
+        html += '<td>' + (option.expiration || 'N/A') + '</td>';
         html += '</tr>';
     });
     
+    html += '</tbody>';
     html += '</table>';
     html += '</div>';
     
