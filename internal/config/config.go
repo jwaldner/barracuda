@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -28,9 +29,10 @@ type Config struct {
 	AlpacaPaperTrading bool
 
 	// Default application settings
-	DefaultStocks   []string
-	DefaultCash     int
-	DefaultStrategy string
+	DefaultStocks    []string
+	DefaultCash      int
+	DefaultStrategy  string
+	DefaultRiskLevel string
 
 	// Engine settings
 	Engine EngineConfig `yaml:"engine"`
@@ -56,10 +58,11 @@ type YAMLConfig struct {
 	Alpaca AlpacaConfig `yaml:"alpaca"`
 
 	Trading struct {
-		DefaultCash   int      `yaml:"default_cash"`
-		TargetDelta   float64  `yaml:"target_delta"`
-		MaxResults    int      `yaml:"max_results"`
-		DefaultStocks []string `yaml:"default_stocks"`
+		DefaultCash      int      `yaml:"default_cash"`
+		TargetDelta      float64  `yaml:"target_delta"`
+		MaxResults       int      `yaml:"max_results"`
+		DefaultStocks    []string `yaml:"default_stocks"`
+		DefaultRiskLevel string   `yaml:"default_risk_level"`
 	} `yaml:"trading"`
 
 	Engine  EngineConfig  `yaml:"engine"`
@@ -75,6 +78,7 @@ func Load() *Config {
 		DefaultStocks:      getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
 		DefaultCash:        getEnvInt("DEFAULT_CASH", 10000),
 		DefaultStrategy:    getEnv("DEFAULT_STRATEGY", "puts"),
+		DefaultRiskLevel:   getEnv("DEFAULT_RISK_LEVEL", "LOW"),
 
 		// Default engine configuration
 		Engine: EngineConfig{
@@ -111,11 +115,15 @@ func Load() *Config {
 			}
 			cfg.AlpacaSecretKey = yamlCfg.Alpaca.SecretKey
 		}
+
 		if yamlCfg.Trading.DefaultCash > 0 {
 			cfg.DefaultCash = yamlCfg.Trading.DefaultCash
 		}
 		if len(yamlCfg.Trading.DefaultStocks) > 0 {
 			cfg.DefaultStocks = yamlCfg.Trading.DefaultStocks
+		}
+		if yamlCfg.Trading.DefaultRiskLevel != "" {
+			cfg.DefaultRiskLevel = yamlCfg.Trading.DefaultRiskLevel
 		}
 
 		// Engine configuration from YAML
@@ -188,4 +196,35 @@ func getEnvStringSlice(key string, defaultValue []string) []string {
 		return strings.Split(value, ",")
 	}
 	return defaultValue
+}
+
+// CalculateDefaultExpirationDate calculates the next options expiration (3rd Friday) in YYYY-MM-DD format
+func CalculateDefaultExpirationDate() string {
+	today := time.Now()
+	currentMonth := today.Month()
+	currentYear := today.Year()
+
+	// Find 3rd Friday of current month
+	firstDay := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, time.UTC)
+	firstFriday := firstDay.AddDate(0, 0, (5-int(firstDay.Weekday())+7)%7)
+	thirdFriday := firstFriday.AddDate(0, 0, 14)
+
+	// If current day is PAST the 3rd Friday, use next month's 3rd Friday
+	// Otherwise use current month's 3rd Friday
+	if today.After(thirdFriday) {
+		// Use next month's 3rd Friday
+		nextMonth := currentMonth + 1
+		nextYear := currentYear
+		if nextMonth > 12 {
+			nextMonth = 1
+			nextYear++
+		}
+
+		nextFirstDay := time.Date(nextYear, nextMonth, 1, 0, 0, 0, 0, time.UTC)
+		nextFirstFriday := nextFirstDay.AddDate(0, 0, (5-int(nextFirstDay.Weekday())+7)%7)
+		nextThirdFriday := nextFirstFriday.AddDate(0, 0, 14)
+		return nextThirdFriday.Format("2006-01-02")
+	}
+
+	return thirdFriday.Format("2006-01-02")
 }

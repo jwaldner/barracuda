@@ -172,7 +172,7 @@ func (c *Client) getStockPricesBatchInternal(symbols []string) (map[string]*Stoc
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Parse the nested structure
 	var batchResp struct {
 		Bars map[string]struct {
@@ -332,7 +332,7 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 		}
 
 		contractsBySymbol[symbol] = contracts
-		
+
 		// Rate limiting between options requests
 		time.Sleep(350 * time.Millisecond)
 	}

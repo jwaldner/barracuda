@@ -134,27 +134,37 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		symbolCount = 500 // Indicate we'll process ALL S&P 500 symbols
 	}
 
+	// Calculate the default expiration date (third Friday) in YYYY-MM-DD format for HTML date input
+	defaultExpirationDate := config.CalculateDefaultExpirationDate()
+	log.Printf("📅 Default expiration date set to: %s", defaultExpirationDate)
+
 	data := dto.TemplateData{
-		Title:           "Barracuda Options Analyzer",
-		DefaultStocks:   displaySymbols,
-		DefaultCash:     h.config.DefaultCash,
-		DefaultStrategy: h.config.DefaultStrategy,
-		SP500Count:      symbolCount,
-		CUDAAvailable:   h.engine.IsCudaAvailable(),
-		DeviceCount:     h.engine.GetDeviceCount(),
-		PaperTrading:    h.config.AlpacaPaperTrading,
-		WorkloadFactor:  h.config.Engine.WorkloadFactor,
+		Title:                 "Barracuda Options Analytics",
+		DefaultStocks:         h.config.DefaultStocks,
+		DefaultCash:           h.config.DefaultCash,
+		DefaultStrategy:       h.config.DefaultStrategy,
+		DefaultRiskLevel:      h.config.DefaultRiskLevel,
+		DefaultExpirationDate: defaultExpirationDate,
+		SP500Count:            symbolCount,
+		CUDAAvailable:         h.engine.IsCudaAvailable(),
+		DeviceCount:           h.engine.GetDeviceCount(),
+		PaperTrading:          h.config.AlpacaPaperTrading,
+		WorkloadFactor:        h.config.Engine.WorkloadFactor,
 	}
 
-	// Load template from file
+	// Load template from file (reloaded on each request - NO REBUILD NEEDED for web changes!)
 	tmpl, err := template.ParseFiles("web/templates/home.html")
 	if err != nil {
+		log.Printf("❌ Template error: %v", err)
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("❌ Template execution error: %v", err)
 		http.Error(w, "Template execution error: "+err.Error(), http.StatusInternalServerError)
+	} else {
+		log.Printf("📄 Template served with default expiration: %s", defaultExpirationDate)
 	}
 }
 
@@ -182,8 +192,6 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	log.Printf("🔍 Debug: Raw request received - Symbols: %v, Strategy: %s", req.Symbols, req.Strategy)
 
 	// Validate request
 	if len(req.Symbols) == 0 {
@@ -229,18 +237,14 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Get stock prices in batches (up to 100 symbols per API call)
 	log.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
-	log.Printf("🔍 Debug: Requested symbols: %v", cleanSymbols)
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
 	if err != nil {
-		log.Printf("❌ Error getting batch stock prices: %v", err)
-		http.Error(w, "Failed to get stock prices: "+err.Error(), http.StatusServiceUnavailable)
+		log.Printf("❌ Error fetching stock prices: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("📊 Retrieved %d stock prices", len(stockPrices))
-	for symbol, price := range stockPrices {
-		log.Printf("💰 %s: $%.2f", symbol, price.Price)
-	}
 
 	// Process real options data using batch approach
 	results := h.processBatchedRealOptions(stockPrices, req)
@@ -489,14 +493,30 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 		if strategy == "puts" {
 			// For puts, prefer strikes below current price
 			if strikePrice < stockPrice {
-				// Closer to target delta range (around 0.5 = 95% of stock price)
-				targetStrike := stockPrice * 0.95
+				// Calculate target strike based on delta/risk level
+				var targetMultiplier float64
+				if targetDelta <= 0.30 {
+					targetMultiplier = 0.88 // 12% OTM for LOW risk
+				} else if targetDelta <= 0.60 {
+					targetMultiplier = 0.95 // 5% OTM for MOD risk
+				} else {
+					targetMultiplier = 0.98 // 2% OTM for HIGH risk
+				}
+				targetStrike := stockPrice * targetMultiplier
 				score = 1.0 - math.Abs(strikePrice-targetStrike)/targetStrike
 			}
 		} else {
 			// For calls, prefer strikes above current price
 			if strikePrice > stockPrice {
-				targetStrike := stockPrice * 1.05
+				var targetMultiplier float64
+				if targetDelta <= 0.30 {
+					targetMultiplier = 1.12 // 12% ITM for LOW risk calls
+				} else if targetDelta <= 0.60 {
+					targetMultiplier = 1.05 // 5% ITM for MOD risk calls
+				} else {
+					targetMultiplier = 1.02 // 2% ITM for HIGH risk calls
+				}
+				targetStrike := stockPrice * targetMultiplier
 				score = 1.0 - math.Abs(strikePrice-targetStrike)/targetStrike
 			}
 		}

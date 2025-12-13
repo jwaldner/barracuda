@@ -131,6 +131,36 @@ body {
     font-weight: bold;
 }
 
+/* Risk Level Selector Styles */
+.risk-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.risk-section h3 {
+    margin-bottom: 15px;
+    text-align: center;
+    color: #64b5f6;
+    font-weight: bold;
+}
+
+/* Tailwind override for selected state */
+.risk-btn.selected {
+    background: white !important;
+    color: #000000 !important;
+    border: 4px solid white !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.3) !important;
+    ring: 4px !important;
+    --tw-ring-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* No CSS styling - using pure Tailwind classes in HTML */
+
 /* Highlight CUDA/CPU status with bright yellow background - MAXIMUM VISIBILITY */
 .status-grid .status-card:first-child p,
 .status-card:nth-child(1) p,
@@ -353,42 +383,4 @@ div.status-card:first-of-type p {
     background: white;
 }
 
-.results-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    min-width: 1000px !important;
-    font-size: 18px !important;
-    font-family: 'Arial', sans-serif !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-}
-
-.results-table th {
-    background: #333333 !important;
-    color: #ffffff !important;
-    padding: 20px !important;
-    text-align: center !important;
-    font-weight: bold !important;
-    border: 3px solid #000000 !important;
-    font-size: 18px !important;
-}
-
-.results-table td {
-    padding: 20px !important;
-    border: 3px solid #000000 !important;
-    text-align: center !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 18px !important;
-    font-weight: normal !important;
-}
-
-.results-table tr:nth-child(even) td {
-    background: #f8f8f8 !important;
-    color: #000000 !important;
-}
-
-.results-table tr:hover td {
-    background: #dddddd !important;
-    color: #000000 !important;
-}
+/* Removed old table CSS - using Tailwind classes now */

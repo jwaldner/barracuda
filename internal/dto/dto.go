@@ -2,16 +2,18 @@ package dto
 
 // TemplateData represents data passed to HTML templates
 type TemplateData struct {
-	Title           string
-	DefaultStocks   []string
-	DefaultCash     int
-	DefaultStrategy string
-	SP500Count      int
-	CUDAAvailable   bool
-	DeviceCount     int
-	PaperTrading    bool
-	WorkloadFactor  float64
-	SymbolSource    string
+	Title                 string
+	DefaultStocks         []string
+	DefaultCash           int
+	DefaultStrategy       string
+	DefaultRiskLevel      string
+	DefaultExpirationDate string
+	SP500Count            int
+	CUDAAvailable         bool
+	DeviceCount           int
+	PaperTrading          bool
+	WorkloadFactor        float64
+	SymbolSource          string
 }
 
 // AnalysisRequest represents an options analysis request

@@ -94,7 +94,7 @@ func main() {
 	// Setup router
 	r := mux.NewRouter()
 
-	// Serve static files
+	// Serve static files (CSS, JS, images) - NO REBUILD NEEDED
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))))
 
 	// Main application endpoints

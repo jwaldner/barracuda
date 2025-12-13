@@ -12,3 +12,225 @@ cd /home/joe/projects/go-cuda && make build && ./barracuda
 cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 2 && ./barracuda
 cd /home/joe/projects/go-cuda && make build
 cd /home/joe/projects/go-cuda && ./barracuda
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+cd /home/joe/projects/go-cuda && make build
+cd /home/joe/projects/go-cuda && git add .
+cd /home/joe/projects/go-cuda && git commit -m "Add cash needed and profit percentage calculations to options table
+
+- Added CashNeeded and ProfitPercentage fields to OptionResult struct
+- Calculate total cash needed per position and profit percentage
+- Updated frontend to display all 10 columns including missing Cash Needed and Profit %
+- Improved table styling with better visibility (darker headers, larger text)
+- Fixed table text readability issues with proper contrast"
+make build && ./barracuda
+mak
+cd /home/joe/projects/go-cuda && make build
+make build && ./barracuda
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && make run
+lsof -i :8080
+cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 1 && make run
+cd /home/joe/projects/go-cuda && go run cmd/server/main.go
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && go run cmd/server/main.go
+cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 2 && go run cmd/server/main.go
+cd /home/joe/projects/go-cuda && node -c web/static/app.js
+curl -s http://localhost:8080 | grep -A 5 -B 5 "runAnalysis"
+curl -s http://localhost:8080 > /tmp/page.html && grep -n "runAnalysis" /tmp/page.html
+curl -I http://localhost:8080
+node -c web/static/app.js
+make build && ./barracuda
+node -c web/static/app.js
+cd /home/joe/projects/go-cuda && go run cmd/server/main.go
+make build && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["KO"],
+    "expiration_date": "2024-12-20",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["KO"],
+    "expiration_date": "2024-12-20",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["KO"],
+    "expiration_date": "2024-12-20",
+    "target_delta": 0.75,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["KO"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl http://localhost:8080/api/sp500/symbols | head -20
+curl -s http://localhost:8080/api/sp500/symbols | grep -i "KO"
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' | jq -r '.results[0].strike'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -s http://localhost:8080/api/sp500/symbols | grep -i "AAPL"
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["TSLA"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' && echo -e "\n\nDelta 0.50:" && curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["TSLA"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 2 && go run cmd/server/main.go
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+./barracuda
+pkill -f barracuda && sleep 1 && cd /home/joe/projects/go-cuda && ./barracuda
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && ./barracuda
+pkill -f barracuda && sleep 2 && cd /home/joe/projects/go-cuda && ./barracuda
+./barracuda
+cd /home/joe/projects/go-cuda && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+cd /home/joe/projects/go-cuda && ./barracuda
+curl -X GET "https://data.alpaca.markets/v2/stocks/AAPL/quotes/latest"   -H "APCA-API-KEY-ID: AKAH5DUSE2K1VT79VE9V"   -H "APCA-API-SECRET-KEY: $(grep alpaca_secret /home/joe/projects/go-cuda/config.yaml | cut -d' ' -f2)"
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-12-19",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+pkill -f barracuda && sleep 2 && cd /home/joe/projects/go-cuda && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }'
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-01-17",
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' &
+cd /home/joe/projects/go-cuda && make build && pkill -f barracuda && ./barracuda
+./barracuda
+cd /home/joe/projects/go-cuda && make build
+cd /home/joe/projects/go-cuda && ./barracuda
+cd /home/joe/projects/go-cuda && make build
+cd /home/joe/projects/go-cuda && git diff
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+cd /home/joe/projects/go-cuda && make build
+cd /home/joe/projects/go-cuda && ./barracuda
+cd /home/joe/projects/go-cuda && git log -p --grep="Friday\|date\|expiration" -n 5
+cd /home/joe/projects/go-cuda && node -e "
+function getThirdFriday() {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    // Find 3rd Friday of current month
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const firstFriday = new Date(firstDay);
+    firstFriday.setDate(1 + (5 - firstDay.getDay() + 7) % 7);
+    const thirdFriday = new Date(firstFriday);
+    thirdFriday.setDate(firstFriday.getDate() + 14);
+    
+    // If current day is in the week of 3rd Friday or past it, use next month's 3rd Friday
+    const weekStart = new Date(thirdFriday);
+    weekStart.setDate(thirdFriday.getDate() - 7);
+    
+    if (today >= weekStart) {
+        // Use next month's 3rd Friday
+        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+        const nextFirstDay = new Date(nextYear, nextMonth, 1);
+        const nextFirstFriday = new Date(nextFirstDay);
+        nextFirstFriday.setDate(1 + (5 - nextFirstDay.getDay() + 7) % 7);
+        const nextThirdFriday = new Date(nextFirstFriday);
+        nextThirdFriday.setDate(nextFirstFriday.getDate() + 14);
+        return nextThirdFriday;
+    }
+    
+    return thirdFriday;
+}
+
+const today = new Date();
+console.log('Today is:', today.toLocaleDateString());
+console.log('Third Friday calculated:', getThirdFriday().toLocaleDateString());
+console.log('ISO date for picker:', getThirdFriday().toISOString().split('T')[0]);
+"
+cd /home/joe/projects/go-cuda && go build -o barracuda cmd/server/main.go
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && go run -c 'import "github.com/jwaldner/barracuda/internal/config"; import "fmt"; fmt.Println("Go calculated:", config.CalculateDefaultExpirationDate())'
+cd /home/joe/projects/go-cuda && go run test_date.go
+date -d "2025-12-20" +"%A %Y-%m-%d"
+cal 12 2025
+cd /home/joe/projects/go-cuda && go run test_date.go
+cd /home/joe/projects/go-cuda && rm test_date.go
+cd /home/joe/projects/go-cuda && make build && ./barracuda
+cd /home/joe/projects/go-cuda && rm internal/handlers/handlers.go.disabled
+ps aux | grep -E "(barracuda|server|main)" | grep -v grep
+curl -s http://localhost:8080 | head -20
+netstat -tlpn 2>/dev/null | grep LISTEN | grep $(whoami)
+pkill -f "./server" || true
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && go run cmd/server/main.go
+cd /home/joe/projects/go-cuda && git log --oneline -5 internal/handlers/options.go
+cd /home/joe/projects/go-cuda && go run cmd/server/main.go
+lsof -ti:8080 | xargs kill -9 2>/dev/null || true && pkill -f "go run.*server" 2>/dev/null || true

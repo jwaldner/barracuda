@@ -1,87 +1,379 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=4">
+        <title>⚡ Barracuda - Options Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in',
+                        'pulse-slow': 'pulse 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🎯 {{.Title}}</h1>
-            <p>Put Options Analysis for S&P 500 Stocks</p>
+<body class="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold text-white mb-4 drop-shadow-lg">
+                ⚡ Barracuda
+            </h1>
+            <p class="text-xl text-blue-100 font-medium">
+                Options Analysis Platform
+            </p>
         </div>
 
-        <!-- Global Error/Status Banner -->
-        <div id="statusBanner" class="status-banner" style="display: none;">
-            <div class="status-content">
-                <span id="statusIcon">🔒</span>
-                <div class="status-text">
-                    <strong id="statusTitle">API Connection Status</strong>
-                    <p id="statusMessage">Checking connection...</p>
+        <!-- Main Form -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 mb-8">
+            <form id="analysis-form" class="space-y-6">
+                <!-- Hidden field for selected delta -->
+                <input type="hidden" id="selected-delta" name="delta" value="0.50">
+
+                <!-- Settings Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Available Cash -->
+                    <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                        <label class="block text-white font-semibold mb-3">
+                            💰 Available Cash
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-3 text-white text-lg">$</span>
+                            <input type="number" id="available-cash" name="available_cash" value="{{.DefaultCash}}" step="1000"
+                                class="w-full pl-8 pr-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-lg font-semibold">
+                        </div>
+                    </div>
+
+                    <!-- Expiration Date -->
+                    <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                        <label class="block text-white font-semibold mb-3">
+                            📅 Expiration Date
+                        </label>
+                        <input type="date" id="expiration-date" name="expiration_date" value="{{.DefaultExpirationDate}}"
+                            class="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                    </div>
                 </div>
-                <button id="statusClose" class="status-close">×</button>
-            </div>
+
+                <!-- Stock Symbols -->
+                <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                    <label class="block text-white font-semibold mb-3">
+                        📊 Stock Symbols (one per line)
+                    </label>
+                    <textarea id="symbols" name="symbols" rows="4"
+                        class="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent font-mono">{{range $i, $stock := .DefaultStocks}}{{if $i}}{{printf "\n"}}{{end}}{{$stock}}{{end}}</textarea>
+                </div>
+
+                <!-- Risk Level and Analyze Button -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                    <!-- Risk Level -->
+                    <div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                        <label class="block text-white font-semibold mb-3">
+                            ⚖️ Assignment Risk Level
+                        </label>
+                        <div class="risk-selector">
+                            <div class="grid grid-cols-3 gap-3">
+                                <button type="button" onclick="selectRisk(0.25)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-green-600/40 border-2 border-green-400 hover:bg-green-600/60 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.25">
+                                    <div class="text-base">LOW</div>
+                                    <div class="text-xs opacity-80">Δ 0.25</div>
+                                </button>
+                                <button type="button" onclick="selectRisk(0.50)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-orange-600/40 border-2 border-orange-400 hover:bg-orange-600/60 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.50">
+                                    <div class="text-base">MOD</div>
+                                    <div class="text-xs opacity-80">Δ 0.50</div>
+                                </button>
+                                <button type="button" onclick="selectRisk(0.75)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-red-600/40 border-2 border-red-400 hover:bg-red-600/60 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.75">
+                                    <div class="text-base">HIGH</div>
+                                    <div class="text-xs opacity-80">Δ 0.75</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <div class="flex items-center">
+                        <button type="submit" id="analyze-btn"
+                            class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-full text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 uppercase tracking-wide">
+                            🔍 Analyze Options
+                        </button>
+                    </div>
+                </div>
+            </form>
+
         </div>
 
-        <div class="status-grid">
-            <div class="status-card">
-                <h3>⚡ Compute Mode</h3>
-                <p>{{if .CUDAAvailable}}CUDA ({{.DeviceCount}} devices){{else}}CPU{{end}}</p>
-                <div class="workload-info" id="workloadStatus">
-                    <small>🔥 WORKLOAD: {{printf "%.1f" .WorkloadFactor}}x {{if eq .WorkloadFactor 1.0}}[NORMAL]{{else if gt .WorkloadFactor 1.0}}[HIGH]{{else}}[LOW]{{end}} | IDLE</small>
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            <p class="text-white mt-4 text-lg">Fetching live options data...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="hidden bg-red-600 border border-red-500 text-white p-4 rounded-lg mb-6 shadow-lg">
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden">
+            <div class="bg-white rounded-lg shadow border overflow-hidden">
+                <!-- Results Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6 flex justify-between items-center">
+                    <div>
+                        <h2 id="results-title" class="text-2xl font-bold text-white">Premium Analysis Results</h2>
+                        <p class="text-blue-100">Ranked by Total Premium Income</p>
+                    </div>
+                    <button id="copy-csv-btn" onclick="copyTableToCSV()" 
+                        class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
+                        title="Export results as CSV">
+                        📋 Export CSV
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-semibold">Rank</th>
+                                <th class="px-4 py-2 text-left font-semibold">Ticker</th>
+                                <th class="px-4 py-2 text-left font-semibold">Strike</th>
+                                <th class="px-4 py-2 text-left font-semibold">Stock Price</th>
+                                <th class="px-4 py-2 text-left font-semibold">Contracts</th>
+                                <th class="px-4 py-2 text-left font-semibold">Premium</th>
+                                <th class="px-4 py-2 text-left font-semibold">Total Premium</th>
+                                <th class="px-4 py-2 text-left font-semibold">Cash Needed</th>
+                                <th class="px-4 py-2 text-left font-semibold">Yield %</th>
+                                <th class="px-4 py-2 text-left font-semibold">Annualized %</th>
+                                <th class="px-4 py-2 text-left font-semibold">Exp Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="status-card">
-                <h3>📊 Analysis Symbols</h3>
-                <p>{{.SP500Count}} Available</p>
-            </div>
-            <div class="status-card" id="contractsProcessed">
-                <h3>🔢 Contracts Processed</h3>
-                <p>0</p>
-            </div>
-            <div class="status-card">
-                <h3>💰 Analysis Cash</h3>
-                <p>${{.DefaultCash}}</p>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <h2 style="margin-bottom: 20px;">📈 Options Analysis</h2>
-            <div class="auto-analysis">
-                <div class="analysis-info">
-                    <h3>📊 Automated Put Options Analysis</h3>
-                    <p><strong>Symbols:</strong> {{if .DefaultStocks}}{{len .DefaultStocks}} Configured: {{range $i, $symbol := .DefaultStocks}}{{if $i}}, {{end}}{{$symbol}}{{end}}{{else}}ALL S&P 500 (~500 symbols, batched processing, top 25 results){{end}}</p>
-                    <p><strong>Expiration:</strong> <span id="autoExpiration">Calculating...</span></p>
-                    <p><strong>Target Delta:</strong> 0.25 (Higher Risk)</p>
-                    <p><strong>Available Cash:</strong> ${{.DefaultCash}}</p>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button type="button" id="runAnalysis" class="btn" 
-                            data-default-cash="{{.DefaultCash}}"
-                            data-symbols="{{range $i, $symbol := .DefaultStocks}}{{if $i}},{{end}}{{$symbol}}{{end}}"
-                            data-use-sp500="{{if not .DefaultStocks}}true{{else}}false{{end}}">🔍 Run Put Options Analysis</button>
-                    <button type="button" id="exportCSV" class="btn" style="background: linear-gradient(45deg, #4caf50, #45a049); margin-left: 10px;" disabled>📋 Copy CSV</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Analyzing options...</p>
-        </div>
-
-        <div id="notification" style="display: none; position: fixed; top: 20px; right: 20px; background: #4caf50; color: white; padding: 15px; border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            📋 CSV data copied to clipboard!
-        </div>
-
-        <div class="results" id="results">
-            <h2>📊 Put Options Analysis Results</h2>
-            <div id="resultsContent"></div>
         </div>
     </div>
 
     <script src="/static/app.js"></script>
+    <script>
+        console.log('Barracuda initialized');        function setDefaultDate() {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+            const nextFriday = new Date(today);
+            nextFriday.setDate(today.getDate() + daysUntilFriday);
+
+            document.getElementById('expiration-date').value = nextFriday.toISOString().split('T')[0];
+        }
+
+        async function handleSubmit(e) {
+            console.log('Form submission started');
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Validate selectedDelta before proceeding
+            if (isNaN(selectedDelta) || selectedDelta <= 0) {
+                selectedDelta = 0.50;
+            }
+
+            console.log('Using delta:', selectedDelta);
+
+            // Show loading
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('error-message').classList.add('hidden');
+
+            // Get form values
+            const symbolsValue = document.getElementById('symbols').value;
+            const expirationValue = document.getElementById('expiration-date').value;
+            const cashValue = parseFloat(document.getElementById('available-cash').value);
+
+            console.log('Form values:', {
+                symbols: symbolsValue,
+                expiration: expirationValue,
+                cash: cashValue,
+                delta: selectedDelta
+            });
+
+            // Validate required fields
+            if (!symbolsValue.trim()) {
+                showError('Please enter at least one stock symbol');
+                document.getElementById('loading').classList.add('hidden');
+                return;
+            }
+
+            if (!expirationValue) {
+                showError('Please select an expiration date');
+                document.getElementById('loading').classList.add('hidden');
+                return;
+            }
+
+            if (cashValue <= 0) {
+                showError('Available cash must be greater than 0');
+                document.getElementById('loading').classList.add('hidden');
+                return;
+            }
+
+            // Parse symbols into array
+            const symbolsArray = symbolsValue.split('\n')
+                .map(s => s.trim().toUpperCase())
+                .filter(s => s.length > 0);
+
+            // Create JSON request data to match backend API
+            const requestData = {
+                symbols: symbolsArray,
+                expiration_date: expirationValue,
+                target_delta: selectedDelta,
+                available_cash: cashValue,
+                strategy: "puts"  // Always puts since user only trades puts
+            };
+
+            console.log('Sending request:', requestData);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                console.log('Response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error('HTTP error! status: ' + response.status + ', message: ' + errorText);
+                }
+
+                const data = await response.json();
+                console.log('Response data:', data);
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                showError('Analysis failed: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+
+
+        // One-step analysis function (calls /stock-history endpoint)
+        async function analyzeDrops(symbol) {
+            const dropPercentage = document.getElementById('drop-percentage').value;
+            
+            try {
+                console.log(`Analyzing ${symbol} for ${dropPercentage}% drops...`);
+                
+                const response = await fetch(`/stock-history?symbol=${symbol}&drop=${dropPercentage}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(`Error: ${data.error}`);
+                    return;
+                }
+                
+                let message = `${data.analysis}\n`;
+                if (data.average_days > 0) {
+                    message += `Average days between ${data.drop_threshold}% drops: ${data.average_days.toFixed(0)} days\n`;
+                    message += `\nCalculated using assembly calculator for financial precision\n`;
+                    message += `Drop intervals: ${data.drop_intervals.join(', ')} days`;
+                } else {
+                    message += `No ${data.drop_threshold}% drops found in the data period.`;
+                }
+                
+                alert(message);
+                
+            } catch (error) {
+                alert('Analysis error: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 8000);
+        }
+
+        async function copyTableToCSV() {
+            const table = document.querySelector('#results table');
+            if (!table) {
+                alert('No table data available to copy');
+                return;
+            }
+
+            const rows = table.querySelectorAll('tr');
+            const csvContent = [];
+
+            // Process each row
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                const rowData = [];
+                
+                cells.forEach(cell => {
+                    // Get text content and clean it up
+                    let text = cell.textContent.trim();
+                    
+                    // Remove extra whitespace and newlines
+                    text = text.replace(/\s+/g, ' ');
+                    
+                    // Handle commas in values by wrapping in quotes
+                    if (text.includes(',')) {
+                        text = `"${text}"`;
+                    }
+                    
+                    rowData.push(text);
+                });
+                
+                csvContent.push(rowData.join(','));
+            });
+
+            const csvString = csvContent.join('\n');
+
+            try {
+                await navigator.clipboard.writeText(csvString);
+                
+                // Visual feedback
+                const btn = document.getElementById('copy-csv-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.classList.add('bg-green-500/40');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-green-500/40');
+                }, 2000);
+                
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = csvString;
+                document.body.appendChild(textArea);
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    alert('CSV data copied to clipboard');
+                } catch (fallbackErr) {
+                    alert('Failed to copy to clipboard. Please copy manually:\n\n' + csvString);
+                }
+                
+                document.body.removeChild(textArea);
+            }
+        }
+    </script>
 </body>
 </html>
