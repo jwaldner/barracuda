@@ -234,3 +234,14 @@ cd /home/joe/projects/go-cuda && go run cmd/server/main.go
 cd /home/joe/projects/go-cuda && git log --oneline -5 internal/handlers/options.go
 cd /home/joe/projects/go-cuda && go run cmd/server/main.go
 lsof -ti:8080 | xargs kill -9 2>/dev/null || true && pkill -f "go run.*server" 2>/dev/null || true
+cd /home/joe/projects/go-cuda && git status
+cd /home/joe/projects/go-cuda && git add docs/design_failures.md
+git add -A
+git commit -m "Apply DeltaQuest glass-morphism styling and fix frontend-backend integration
+
+- Added glass-morphism UI with backdrop blur effects
+- Fixed duplicate displayResults functions breaking frontend
+- Corrected field mapping between Go backend and JavaScript frontend  
+- Added comprehensive architectural analysis documenting design failures
+- Cleaned up JavaScript event handling and API communication"
+git push origin main
