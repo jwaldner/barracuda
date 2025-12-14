@@ -267,8 +267,8 @@ function displayResults(data) {
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.rank)}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.ticker)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${companyName}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${sectorName}</td>
+            <td class="company-tooltip px-6 py-4 whitespace-nowrap text-sm text-gray-700" data-sector="${sectorName}">${companyName}</td>
+            <td class="sector-column px-6 py-4 whitespace-nowrap text-sm text-gray-600">${sectorName}</td>
             <td class="${getCSSClass(option.strike, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.strike)}</td>
             <td class="${getCSSClass(option.stock_price, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.stock_price)}</td>
             <td class="${getCSSClass(option.max_contracts, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.max_contracts)}</td>

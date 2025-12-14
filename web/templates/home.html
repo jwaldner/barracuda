@@ -18,6 +18,62 @@
             }
         }
     </script>
+    <style>
+        /* Company Tooltip */
+        .company-tooltip {
+            position: relative;
+            cursor: help;
+        }
+        
+        .company-tooltip::after {
+            content: attr(data-sector);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            background-color: #1f2937;
+            color: white;
+            font-size: 0.875rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            z-index: 50;
+        }
+        
+        .company-tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Tooltip Arrow */
+        .company-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 4px;
+            border: 4px solid transparent;
+            border-top-color: #1f2937;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .company-tooltip:hover::before {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Hide sector column */
+        .sector-column {
+            display: none;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-6xl">
@@ -143,7 +199,7 @@
                     <table class="w-full">
                         <thead class="bg-gray-50">
                             <tr>
-                                {{range tableHeaders}}<th class="px-4 py-2 text-left font-semibold">{{.}}</th>{{end}}
+                                {{range $i, $header := tableHeaders}}<th class="px-4 py-2 text-left font-semibold{{if eq $header "Sector"}} sector-column{{end}}">{{$header}}</th>{{end}}
                             </tr>
                         </thead>
                         <tbody id="results-body">
