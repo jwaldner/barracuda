@@ -99,7 +99,7 @@ func Load() *Config {
 
 	// Try to load from YAML file and set environment variables
 	if yamlCfg := loadYAMLConfig(); yamlCfg != nil {
-		log.Println("YAML config loaded successfully")
+		// YAML config loaded
 		// Set environment variables from YAML if not already set
 		if yamlCfg.Alpaca.APIKey != "" && yamlCfg.Alpaca.APIKey != "YOUR_ALPACA_API_KEY" {
 			if os.Getenv("ALPACA_API_KEY") == "" {

@@ -10,16 +10,24 @@ import (
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/handlers"
+	"github.com/jwaldner/barracuda/internal/logger"
 	"github.com/jwaldner/barracuda/internal/symbols"
 
 	"github.com/gorilla/mux"
 )
 
 func main() {
-	log.Println("Starting barracuda...")
+	log.Println("🚀 Starting Barracuda Options Analyzer...")
 	// Load configuration (this will set env vars from YAML)
 	cfg := config.Load()
-	log.Println("Config loaded")
+	log.Println("⚙️  Configuration loaded")
+
+	// Initialize proper logging
+	if err := logger.Init(); err != nil {
+		log.Fatalf("Failed to initialize logging: %v", err)
+	}
+	logger.Info.Println("📝 Logging system initialized - debug/warnings -> barracuda.log")
+	logger.Debug.Printf("Config: Port=%s, Paper Trading=%v", cfg.Port, cfg.AlpacaPaperTrading)
 
 	// Validate required config after loading from YAML
 	if cfg.AlpacaAPIKey == "" {
@@ -39,7 +47,7 @@ func main() {
 		log.Fatal("❌ Secret key appears to be a placeholder - please set real credentials")
 	}
 
-	log.Printf("✅ Starting with API key: %s... (auth validated at runtime)", cfg.AlpacaAPIKey[:4])
+	log.Printf("🔑 Alpaca API configured (key: %s...)", cfg.AlpacaAPIKey[:8])
 
 	// Initialize engine based on configuration
 	var engine *barracuda.BaracudaEngine
@@ -77,14 +85,16 @@ func main() {
 		fallthrough
 	default:
 		if engine != nil && engine.IsCudaAvailable() {
-			log.Println("CUDA AUTO-SELECTED:", engine.GetDeviceCount(), "devices")
+			log.Printf("🔥 Compute Mode: CUDA (%d devices detected)", engine.GetDeviceCount())
+			logger.Debug.Printf("CUDA engine initialized with %d devices", engine.GetDeviceCount())
 		} else {
 			log.Println("CPU FALLBACK: CUDA not available")
 		}
 	}
 
 	// Create Alpaca client
-	log.Println("Creating Alpaca client...")
+	log.Println("📡 Creating Alpaca client...")
+	logger.Debug.Printf("Alpaca client configuration: BaseURL=%s, PaperTrading=%v", "https://paper-api.alpaca.markets", cfg.AlpacaPaperTrading)
 	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey, cfg.AlpacaPaperTrading)
 
 	// Create symbol service for company/sector lookups
@@ -113,7 +123,8 @@ func main() {
 	r.HandleFunc("/api/sp500/top25", sp500Handler.GetTop25Handler).Methods("GET")
 
 	// Start server
-	log.Println("Starting server on port", cfg.Port)
+	log.Printf("🌐 Server starting on http://localhost:%s", cfg.Port)
+	logger.Debug.Printf("Server routes configured, listening on port %s", cfg.Port)
 
 	// Check if we should open browser
 	if os.Getenv("OPEN_BROWSER") == "true" {

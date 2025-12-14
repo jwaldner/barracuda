@@ -39,7 +39,7 @@ bool BarracudaEngine::InitializeCUDA() {
     cudaSetDevice(0);
     cuda_available_ = true;
     
-    std::cout << "CUDA initialized with " << device_count_ << " device(s)" << std::endl;
+    // CUDA initialized silently
     return true;
 }
 

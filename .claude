@@ -36,6 +36,28 @@ ps aux | grep barracuda
 - GitHub CSV sources for S&P 500 data
 - Assembly calculators for financial precision
 
+## Logging System (Emoji-Enhanced)
+
+**Terminal Output (Startup Info):**
+
+- 🚀 Application startup messages
+- ⚙️ Configuration loading status
+- 🔑 API credential confirmation
+- 🔥 CUDA/CPU compute mode detection
+- 🌐 Server startup with URL
+
+**Debug Log File (`barracuda.log`):**
+- 🐛 DEBUG: Detailed operational information
+- ⚠️ WARN: Warning messages and fallback operations
+- ❌ ERROR: Error conditions and failures
+- All debug messages include file/line numbers for debugging
+
+**Best Practices:**
+- Use `logger.Debug.Printf()` for debug information
+- Use `logger.Warn.Printf()` for warnings
+- Use `logger.Error.Printf()` for errors
+- Terminal shows essential startup info, logfile contains detailed debug data
+
 ## Main Components
 
 ### Core Services

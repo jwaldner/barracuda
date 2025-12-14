@@ -73,7 +73,7 @@ type BaracudaEngine struct {
 func NewBaracudaEngine() *BaracudaEngine {
 	engine := C.barracuda_create_engine()
 	if engine == nil {
-		fmt.Println("❌ Failed to create CUDA engine")
+		// CUDA engine creation failed
 		return nil
 	}
 
@@ -84,11 +84,11 @@ func NewBaracudaEngine() *BaracudaEngine {
 
 	// Initialize CUDA
 	if C.barracuda_initialize_cuda(engine) == 0 {
-		fmt.Println("⚠️  CUDA initialization failed, falling back to CPU")
+		// CUDA initialization failed, using CPU
 		be.executionMode = ExecutionModeCPU
 	} else {
-		deviceCount := C.barracuda_get_device_count(engine)
-		fmt.Printf("✅ CUDA initialized with %d device(s)\n", deviceCount)
+		_ = C.barracuda_get_device_count(engine) // CUDA device count checked
+		// CUDA initialized successfully
 	}
 
 	return be
@@ -104,10 +104,10 @@ func NewBaracudaEngineForced(mode string) *BaracudaEngine {
 	switch mode {
 	case "cpu":
 		be.executionMode = ExecutionModeCPU
-		fmt.Println("🔄 Forced CPU mode")
+		// CPU mode selected
 	case "cuda":
 		be.executionMode = ExecutionModeCUDA
-		fmt.Println("⚡ Forced CUDA mode")
+		// CUDA mode selected
 	default:
 		be.executionMode = ExecutionModeAuto
 	}

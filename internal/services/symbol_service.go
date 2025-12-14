@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/symbols"
@@ -26,7 +25,7 @@ func NewSymbolService(cfg *config.Config, sp500Service *symbols.SP500Service) *S
 func (s *SymbolService) GetAnalysisSymbols() ([]string, error) {
 	// Use configured default stocks if available
 	if len(s.config.DefaultStocks) > 0 {
-		log.Printf("Using configured default stocks: %v", s.config.DefaultStocks)
+		// Using configured default stocks
 		return s.config.DefaultStocks, nil
 	}
 
@@ -42,7 +41,7 @@ func (s *SymbolService) GetAnalysisSymbols() ([]string, error) {
 		sp500Symbols = sp500Symbols[:maxSymbols]
 	}
 
-	log.Printf("Using S&P 500 symbols (config default_stocks empty): %d symbols", len(sp500Symbols))
+	// Using S&P 500 symbols
 	return sp500Symbols, nil
 }
 

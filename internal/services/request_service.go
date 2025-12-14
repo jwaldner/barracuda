@@ -3,7 +3,6 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -65,9 +64,7 @@ func (s *RequestService) ParseAnalysisRequest(r *http.Request) (*dto.AnalysisReq
 	}
 	req.Symbols = cleanSymbols
 
-	log.Printf("🔍 Parsed analysis request: %d symbols, strategy: %s, delta: %.2f",
-		len(req.Symbols), req.Strategy, req.TargetDelta)
-
+	// Analysis request parsed
 	return &req, nil
 }
 
