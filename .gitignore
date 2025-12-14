@@ -56,6 +56,9 @@ config.yaml
 # Log files
 *.log
 
+# Shell history files
+.bash_history_barracuda
+
 # Temporary files
 tmp/
 temp/
