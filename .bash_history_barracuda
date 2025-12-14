@@ -245,3 +245,31 @@ git commit -m "Apply DeltaQuest glass-morphism styling and fix frontend-backend 
 - Added comprehensive architectural analysis documenting design failures
 - Cleaned up JavaScript event handling and API communication"
 git push origin main
+make build && ./barracuda
+cd /home/joe/projects/go-cuda && git log --oneline -5
+sleep 2 && curl -X GET http://localhost:8080/ | head -10
+cd /home/joe/projects/go-cuda && ./barracuda
+cd /home/joe/projects/go-cuda && pkill -f barracuda && sleep 1 && ./barracuda
+sleep 2 && curl -s http://localhost:8080/ | head -20
+netstat -tlnp | grep :8080
+ss -tlnp | grep :8080
+cd /home/joe/projects/go-cuda && ./barracuda &
+sleep 2 && curl -s -I http://localhost:8080/
+cd /home/joe/projects/go-cuda && go build -o barracuda ./cmd/server
+cd /home/joe/projects/go-cuda && killall barracuda 2>/dev/null; pkill -f "go run" 2>/dev/null; sleep 2 && ./barracuda
+sleep 3 && curl -s http://localhost:8080/ | grep -E "(title|h1|selected-delta|available-cash|expiration-date)" | head -10
+curl -s http://localhost:8080/ | grep -E "(title|selected-delta|available-cash|expiration-date|defaultCash)" | head -5
+curl -s http://localhost:8080/ | head -20
+curl -v http://localhost:8080/ 2>&1 | head -10
+cd /home/joe/projects/go-cuda && ./barracuda 2>&1
+sleep 2 && curl -s -w "%{http_code}" http://localhost:8080/ -o /tmp/response.html && echo " - Response saved"
+curl -s -w "%{http_code}" http://localhost:8080/ -o /tmp/response.html && cat /tmp/response.html | head -10
+cd /home/joe/projects/go-cuda && timeout 30 ./barracuda 2>&1 &
+sleep 3
+curl -v http://localhost:8080/ 2>&1 | head -20
+sleep 5 && curl -v http://localhost:8080/ 2>&1
+curl -s http://localhost:8080/ | grep -E "(selected-delta.*value=|available-cash.*value=|expiration-date.*value=|selectedDelta =)" | head -5
+cd /home/joe/projects/go-cuda && ./barracuda &
+sleep 3
+curl -s http://localhost:8080/ | grep -A1 -B1 "selected-delta\|available-cash\|selectedDelta ="
+sleep 5 && curl -s http://localhost:8080/ | grep -E "value=.*[0-9]|selectedDelta.*[0-9]" | head -5

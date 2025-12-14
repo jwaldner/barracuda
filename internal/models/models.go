@@ -1,5 +1,42 @@
 package models
 
+// FieldValue represents a field with both raw data and formatted display
+type FieldValue struct {
+	Raw     interface{} `json:"raw"`     // For CSV/sorting: 1234.56
+	Display string      `json:"display"` // For UI: "$1,234.56"
+	Type    string      `json:"type"`    // For CSS: "currency"
+}
+
+// FormattedOptionResult represents an option result with formatted fields
+type FormattedOptionResult map[string]FieldValue
+
+// FormattedAnalysisResponse represents the complete API response
+type FormattedAnalysisResponse struct {
+	Success bool                        `json:"success"`
+	Data    FormattedAnalysisData      `json:"data"`
+	Meta    ResponseMetadata           `json:"meta"`
+}
+
+type FormattedAnalysisData struct {
+	Results       []FormattedOptionResult `json:"results"`
+	FieldMetadata map[string]FieldMetadata `json:"field_metadata"`
+}
+
+type FieldMetadata struct {
+	DisplayName string `json:"display_name"`
+	Type        string `json:"type"`
+	Sortable    bool   `json:"sortable"`
+	Alignment   string `json:"alignment"`
+}
+
+type ResponseMetadata struct {
+	Strategy       string  `json:"strategy"`
+	ExpirationDate string  `json:"expiration_date"`
+	Timestamp      string  `json:"timestamp"`
+	ProcessingTime float64 `json:"processing_time"`
+	ProcessingStats string `json:"processing_stats"`
+}
+
 // AnalysisRequest represents a request for options analysis
 type AnalysisRequest struct {
 	Symbols        []string `json:"symbols"`

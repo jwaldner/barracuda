@@ -15,7 +15,6 @@ import (
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/config"
-	"github.com/jwaldner/barracuda/internal/dto"
 	"github.com/jwaldner/barracuda/internal/models"
 )
 
@@ -138,29 +137,79 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 	defaultExpirationDate := config.CalculateDefaultExpirationDate()
 	log.Printf("📅 Default expiration date set to: %s", defaultExpirationDate)
 
-	data := dto.TemplateData{
-		Title:                 "Barracuda Options Analytics",
-		DefaultStocks:         h.config.DefaultStocks,
-		DefaultCash:           h.config.DefaultCash,
-		DefaultStrategy:       h.config.DefaultStrategy,
-		DefaultRiskLevel:      h.config.DefaultRiskLevel,
-		DefaultExpirationDate: defaultExpirationDate,
-		SP500Count:            symbolCount,
-		CUDAAvailable:         h.engine.IsCudaAvailable(),
-		DeviceCount:           h.engine.GetDeviceCount(),
-		PaperTrading:          h.config.AlpacaPaperTrading,
-		WorkloadFactor:        h.config.Engine.WorkloadFactor,
+	// Create template functions that provide ALL frontend data from backend config
+	funcMap := template.FuncMap{
+		// Core app info
+		"appTitle": func() string {
+			return "⚡ Barracuda - Options Analysis"
+		},
+		"appDescription": func() string {
+			return "Options Analysis Platform"
+		},
+		
+		// Table configuration  
+		"tableHeaders": func() []string {
+			return []string{"#", "Ticker", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Cash Needed", "Profit %", "Annualized", "Expiration"}
+		},
+		"tableFieldKeys": func() []string {
+			return []string{"rank", "ticker", "strike", "stock_price", "max_contracts", "premium", "total_premium", "cash_needed", "profit_percentage", "annualized", "expiration"}
+		},
+		
+		// Default values (calculated by backend)
+		"defaultCash": func() int {
+			return h.config.DefaultCash
+		},
+		"defaultExpirationDate": func() string {
+			return defaultExpirationDate
+		},
+		"defaultStocks": func() []string {
+			return h.config.DefaultStocks
+		},
+		"defaultRiskLevel": func() string {
+			return h.config.DefaultRiskLevel
+		},
+		"defaultStrategy": func() string {
+			return h.config.DefaultStrategy
+		},
+		
+		// CSS classes for field types
+		"fieldTypeClasses": func() map[string]string {
+			return map[string]string{
+				"currency":    "text-right font-mono text-green-600 tabular-nums",
+				"percentage":  "text-right font-semibold text-blue-600 tabular-nums",
+				"integer":     "text-right font-mono tabular-nums",
+				"text":        "text-left",
+			}
+		},
+		
+		// System info (for debugging/display)
+		"cudaAvailable": func() bool {
+			return h.engine.IsCudaAvailable()
+		},
+		"deviceCount": func() int {
+			return h.engine.GetDeviceCount()
+		},
+		"paperTrading": func() bool {
+			return h.config.AlpacaPaperTrading
+		},
+		"symbolCount": func() int {
+			return symbolCount
+		},
+		"workloadFactor": func() float64 {
+			return h.config.Engine.WorkloadFactor
+		},
 	}
 
-	// Load template from file (reloaded on each request - NO REBUILD NEEDED for web changes!)
-	tmpl, err := template.ParseFiles("web/templates/home.html")
+	// Load template from file with functions (reloaded on each request - NO REBUILD NEEDED for web changes!)
+	tmpl, err := template.New("home.html").Funcs(funcMap).ParseFiles("web/templates/home.html")
 	if err != nil {
 		log.Printf("❌ Template error: %v", err)
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := tmpl.Execute(w, data); err != nil {
+	// Execute template with no data - everything comes from template functions
+	if err := tmpl.Execute(w, nil); err != nil {
 		log.Printf("❌ Template execution error: %v", err)
 		http.Error(w, "Template execution error: "+err.Error(), http.StatusInternalServerError)
 	} else {
@@ -295,14 +344,25 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		totalSamplesProcessed, len(results), duration.Seconds(), h.engine.IsCudaAvailable())
 	log.Printf(processingStats)
 
-	response := models.AnalysisResponse{
-		Results:         results,
-		RequestedDelta:  req.TargetDelta,
-		Strategy:        req.Strategy,
-		ExpirationDate:  req.ExpirationDate,
-		Timestamp:       time.Now().Format(time.RFC3339),
-		ProcessingTime:  duration.Seconds(),
-		ProcessingStats: processingStats,
+	// Convert to formatted response with dual values
+	var formattedResults []models.FormattedOptionResult
+	for i, result := range results {
+		formattedResults = append(formattedResults, *h.convertToFormattedResult(&result, i+1))
+	}
+
+	response := &models.FormattedAnalysisResponse{
+		Success: true,
+		Data: models.FormattedAnalysisData{
+			Results:       formattedResults,
+			FieldMetadata: h.getFieldMetadata(),
+		},
+		Meta: models.ResponseMetadata{
+			Strategy:        req.Strategy,
+			ExpirationDate:  req.ExpirationDate,
+			Timestamp:       time.Now().Format(time.RFC3339),
+			ProcessingTime:  duration.Seconds(),
+			ProcessingStats: processingStats,
+		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -699,5 +759,88 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 		MaxContracts:          maxContracts,
 		TotalPremium:          totalPremium,
 		CashNeededPerContract: cashNeededPerContract,
+	}
+}
+
+// Formatter methods for dual format response
+func (h *OptionsHandler) formatCurrency(value float64) models.FieldValue {
+	return models.FieldValue{
+		Raw:     value,
+		Display: fmt.Sprintf("$%.2f", value),
+		Type:    "currency",
+	}
+}
+
+func (h *OptionsHandler) formatPercentage(value float64) models.FieldValue {
+	return models.FieldValue{
+		Raw:     value,
+		Display: fmt.Sprintf("%.2f%%", value*100),
+		Type:    "percentage",
+	}
+}
+
+func (h *OptionsHandler) formatInteger(value int) models.FieldValue {
+	return models.FieldValue{
+		Raw:     value,
+		Display: fmt.Sprintf("%d", value),
+		Type:    "integer",
+	}
+}
+
+func (h *OptionsHandler) formatText(value string) models.FieldValue {
+	return models.FieldValue{
+		Raw:     value,
+		Display: value,
+		Type:    "text",
+	}
+}
+
+func (h *OptionsHandler) formatCurrencyLarge(value float64) models.FieldValue {
+	if value >= 1000 {
+		return models.FieldValue{
+			Raw:     value,
+			Display: fmt.Sprintf("$%.1fK", value/1000),
+			Type:    "currency",
+		}
+	}
+	return h.formatCurrency(value)
+}
+
+// convertToFormattedResult converts an OptionResult to formatted dual-value result
+func (h *OptionsHandler) convertToFormattedResult(result *models.OptionResult, rank int) *models.FormattedOptionResult {
+	formatted := models.FormattedOptionResult{
+		"rank":            h.formatInteger(rank),
+		"ticker":          h.formatText(result.Ticker),
+		"strike":          h.formatCurrency(result.Strike),
+		"stock_price":     h.formatCurrency(result.StockPrice),
+		"max_contracts":   h.formatInteger(result.MaxContracts),
+		"premium":         h.formatCurrency(result.Premium),
+		"total_premium":   h.formatCurrency(result.TotalPremium),
+		"cash_needed":     h.formatCurrencyLarge(result.CashNeeded),
+		"profit_percentage": h.formatPercentage(result.ProfitPercentage / 100), // Convert from percentage to decimal
+		"expiration":      h.formatText(result.Expiration),
+	}
+
+	// Calculate annualized return
+	annualized := result.ProfitPercentage * (365.0 / float64(result.DaysToExp))
+	formatted["annualized"] = h.formatPercentage(annualized / 100)
+
+	return &formatted
+}
+
+// getFieldMetadata returns metadata for all fields
+func (h *OptionsHandler) getFieldMetadata() map[string]models.FieldMetadata {
+	return map[string]models.FieldMetadata{
+		"rank":              {DisplayName: "#", Type: "integer", Sortable: true, Alignment: "center"},
+		"ticker":            {DisplayName: "Ticker", Type: "text", Sortable: true, Alignment: "left"},
+		"strike":            {DisplayName: "Strike", Type: "currency", Sortable: true, Alignment: "right"},
+		"stock_price":       {DisplayName: "Stock Price", Type: "currency", Sortable: true, Alignment: "right"},
+		"max_contracts":     {DisplayName: "Max Contracts", Type: "integer", Sortable: true, Alignment: "right"},
+		"premium":           {DisplayName: "Premium", Type: "currency", Sortable: true, Alignment: "right"},
+		"total_premium":     {DisplayName: "Total Premium", Type: "currency", Sortable: true, Alignment: "right"},
+		"cash_needed":       {DisplayName: "Cash Needed", Type: "currency", Sortable: true, Alignment: "right"},
+		"profit_percentage": {DisplayName: "Profit %", Type: "percentage", Sortable: true, Alignment: "right"},
+		"annualized":        {DisplayName: "Annualized", Type: "percentage", Sortable: true, Alignment: "right"},
+		"expiration":        {DisplayName: "Expiration", Type: "text", Sortable: true, Alignment: "center"},
 	}
 }

@@ -1,5 +1,5 @@
 // Global variables
-let selectedDelta = 0.25; // Default delta value
+let selectedDelta; // Will be set from backend template
 
 
 
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Get available cash from the cash input (only updated when analyze is clicked)
         const cashInputEl = document.getElementById('cashAmount');
-        const availableCash = parseInt(cashInputEl ? cashInputEl.value : 0) || 70000;
+        const availableCash = parseInt(cashInputEl ? cashInputEl.value : 0) || parseInt(document.getElementById('available-cash').value) || 0;
         console.log('💰 Using cash amount:', availableCash);
         
         const contractsEl = document.getElementById('contractsProcessed');
@@ -157,20 +157,31 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('exportCSV').addEventListener('click', function() {
         if (!window.lastResults) return;
         
-        const headers = ['Rank', 'Symbol', 'Strike', 'Stock_Price', 'Premium_Per_Contract', 'Max_Contracts', 'Total_Premium', 'Expiration'];
+        const headers = ['Rank', 'Symbol', 'Strike', 'Stock_Price', 'Premium_Per_Contract', 'Max_Contracts', 'Total_Premium', 'Cash_Needed', 'Profit_Percentage', 'Annualized', 'Expiration'];
         let csvContent = headers.join(',') + '\n';
         
+        // Helper function to get raw value for CSV (numbers, not formatted strings)
+        const getRawValue = (field) => {
+            if (!field) return '';
+            if (typeof field === 'object' && field.raw !== undefined) {
+                return field.raw;
+            }
+            return field; // Fallback for old format
+        };
+        
         window.lastResults.forEach((option, index) => {
-            const rank = index + 1;
             const row = [
-                rank,
-                option.ticker,
-                option.strike.toFixed(2),
-                option.stock_price.toFixed(2),
-                option.premium.toFixed(2),
-                option.max_contracts,
-                option.total_premium.toFixed(2),
-                option.expiration || 'N/A'
+                getRawValue(option.rank) || (index + 1),
+                getRawValue(option.ticker),
+                getRawValue(option.strike),
+                getRawValue(option.stock_price),
+                getRawValue(option.premium),
+                getRawValue(option.max_contracts),
+                getRawValue(option.total_premium),
+                getRawValue(option.cash_needed),
+                getRawValue(option.profit_percentage),
+                getRawValue(option.annualized),
+                getRawValue(option.expiration)
             ];
             csvContent += row.join(',') + '\n';
         });
@@ -191,7 +202,10 @@ function displayResults(data) {
         return;
     }
     
-    if (!data.results || data.results.length === 0) {
+    // Handle new API response structure 
+    const results = data.data ? data.data.results : data.results;
+    
+    if (!results || results.length === 0) {
         tbody.innerHTML = '<tr><td colspan="11" class="p-8 text-center text-gray-500">No suitable put options found.</td></tr>';
         if (resultsDiv) {
             resultsDiv.classList.remove('hidden');
@@ -207,35 +221,51 @@ function displayResults(data) {
     if (exportBtn) {
         exportBtn.disabled = false;
     }
-    window.lastResults = data.results;
+    window.lastResults = results;
     if (tbody) {
         tbody.innerHTML = '';
     }
     
-    data.results.forEach((option, index) => {
-        const rank = index + 1;
+    results.forEach((option, index) => {
         const isFirst = index === 0;
         
         const row = document.createElement('tr');
         row.className = isFirst ? 'bg-green-50 border-l-4 border-green-500 hover:bg-green-100' : 'hover:bg-gray-50';
         
-        // Calculate annualized return: (profit_percentage / days) * 365
-        const annualizedReturn = option.profit_percentage && option.days_to_expiration 
-            ? ((option.profit_percentage / option.days_to_expiration) * 365).toFixed(1)
-            : 'N/A';
+        // Helper function to get value from dual format (display for showing, raw for calculations)
+        const getValue = (field, useRaw = false) => {
+            if (!field) return 'N/A';
+            if (typeof field === 'object' && field.display !== undefined) {
+                return useRaw ? field.raw : field.display;
+            }
+            return field; // Fallback for old format
+        };
+
+        // Get CSS class based on field type
+        const getCSSClass = (field, baseClass = '') => {
+            if (typeof field === 'object' && field.type) {
+                switch(field.type) {
+                    case 'currency': return baseClass + ' text-right font-mono text-green-600 tabular-nums';
+                    case 'percentage': return baseClass + ' text-right font-semibold text-blue-600 tabular-nums';
+                    case 'integer': return baseClass + ' text-right font-mono tabular-nums';
+                    default: return baseClass + ' text-left';
+                }
+            }
+            return baseClass;
+        };
 
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${rank}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${option.ticker}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${option.strike.toFixed(2)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${option.stock_price.toFixed(2)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${option.max_contracts}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${option.premium.toFixed(2)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">$${option.total_premium.toLocaleString()}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${(option.cash_needed ? option.cash_needed.toLocaleString() : 'N/A')}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">${(option.profit_percentage ? option.profit_percentage.toFixed(2) + '%' : 'N/A')}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">${annualizedReturn}%</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(option.expiration || 'N/A')}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.rank)}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.ticker)}</td>
+            <td class="${getCSSClass(option.strike, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.strike)}</td>
+            <td class="${getCSSClass(option.stock_price, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.stock_price)}</td>
+            <td class="${getCSSClass(option.max_contracts, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.max_contracts)}</td>
+            <td class="${getCSSClass(option.premium, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.premium)}</td>
+            <td class="${getCSSClass(option.total_premium, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.total_premium)}</td>
+            <td class="${getCSSClass(option.cash_needed, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.cash_needed)}</td>
+            <td class="${getCSSClass(option.profit_percentage, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.profit_percentage)}</td>
+            <td class="${getCSSClass(option.annualized, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.annualized)}</td>
+            <td class="${getCSSClass(option.expiration, 'px-6 py-4 whitespace-nowrap text-sm text-gray-500')}">${getValue(option.expiration)}</td>
         `;
         
         if (tbody) {
@@ -441,7 +471,7 @@ async function handleSubmit(e) {
 
     // Validate selectedDelta before proceeding
     if (isNaN(selectedDelta) || selectedDelta <= 0) {
-        selectedDelta = 0.50;
+        selectedDelta = parseFloat(document.getElementById('selected-delta').value) || 0.50;
     }
 
     // Show loading
