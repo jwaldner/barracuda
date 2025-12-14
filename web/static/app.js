@@ -261,8 +261,12 @@ function displayResults(data) {
         };
 
         // Get company and sector from backend API response (NEW: separate fields)
-        const companyName = getValue(option.company) || getValue(option.ticker, true); // Fallback to ticker
-        const sectorName = getValue(option.sector) || 'Unknown'; // Backend provides sector separately
+        const ticker = getValue(option.ticker, true);
+        const companyName = getValue(option.company) || ticker; // Fallback to ticker
+        
+        // Fix first item tooltip bug - use asset data lookup only
+        const assetInfo = window.assetData && window.assetData[ticker];
+        const sectorName = assetInfo ? assetInfo.sector : '';
         
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.rank)}</td>

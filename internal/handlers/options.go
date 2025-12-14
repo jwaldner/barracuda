@@ -149,15 +149,15 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"appDescription": func() string {
 			return "Options Analysis Platform"
 		},
-		
-		// Table configuration  
+
+		// Table configuration
 		"tableHeaders": func() []string {
 			return []string{"#", "Ticker", "Company", "Sector", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Cash Needed", "Profit %", "Annualized", "Expiration"}
 		},
 		"tableFieldKeys": func() []string {
 			return []string{"rank", "ticker", "company", "sector", "strike", "stock_price", "max_contracts", "premium", "total_premium", "cash_needed", "profit_percentage", "annualized", "expiration"}
 		},
-		
+
 		// Default values (calculated by backend)
 		"defaultCash": func() int {
 			return h.config.DefaultCash
@@ -182,7 +182,7 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return make(map[string]map[string]string)
 			}
-			
+
 			assets := make(map[string]map[string]string)
 			for _, symbol := range symbols {
 				assets[symbol.Symbol] = map[string]string{
@@ -198,17 +198,17 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"defaultStrategy": func() string {
 			return h.config.DefaultStrategy
 		},
-		
+
 		// CSS classes for field types
 		"fieldTypeClasses": func() map[string]string {
 			return map[string]string{
-				"currency":    "text-right font-mono text-green-600 tabular-nums",
-				"percentage":  "text-right font-semibold text-blue-600 tabular-nums",
-				"integer":     "text-right font-mono tabular-nums",
-				"text":        "text-left",
+				"currency":   "text-right font-mono text-green-600 tabular-nums",
+				"percentage": "text-right font-semibold text-blue-600 tabular-nums",
+				"integer":    "text-right font-mono tabular-nums",
+				"text":       "text-left",
 			}
 		},
-		
+
 		// Results page content
 		"resultsTitle": func() string {
 			return "Premium Analysis Results"
@@ -219,11 +219,11 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"exportButtonText": func() string {
 			return "📋 Export CSV"
 		},
-		
+
 		// CSV Headers (backend controlled)
 		"csvHeaders": func() []string {
 			return []string{"Rank", "Ticker", "Company", "Sector", "Strike", "Stock_Price", "Max_Contracts", "Premium", "Total_Premium", "Cash_Needed", "Profit_Percentage", "Annualized", "Expiration"}
-		},		// Form labels (backend controlled)
+		}, // Form labels (backend controlled)
 		"cashLabel": func() string {
 			return "💰 Available Cash"
 		},
@@ -239,32 +239,32 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"analyzeButtonText": func() string {
 			return "🔍 Analyze Options"
 		},
-		
+
 		// Error messages (backend controlled)
 		"errorMessages": func() map[string]string {
 			return map[string]string{
-				"noSymbols":       "Please enter at least one stock symbol",
-				"noExpiration":    "Please select an expiration date", 
-				"invalidCash":     "Available cash must be greater than 0",
-				"copyFailed":      "Failed to copy to clipboard. Please copy manually:",
-				"copySuccess":     "CSV data copied to clipboard",
-				"noResults":       "No suitable put options found.",
-				"analysisError":   "Analysis failed:",
+				"noSymbols":     "Please enter at least one stock symbol",
+				"noExpiration":  "Please select an expiration date",
+				"invalidCash":   "Available cash must be greater than 0",
+				"copyFailed":    "Failed to copy to clipboard. Please copy manually:",
+				"copySuccess":   "CSV data copied to clipboard",
+				"noResults":     "No suitable put options found.",
+				"analysisError": "Analysis failed:",
 			}
 		},
-		
+
 		// UI text labels
 		"riskLevels": func() map[string]string {
 			return map[string]string{
 				"low":  "LOW",
-				"mod":  "MOD", 
+				"mod":  "MOD",
 				"high": "HIGH",
 			}
 		},
 		"loadingText": func() string {
 			return "Fetching live options data..."
 		},
-		
+
 		// System info (for debugging/display)
 		"cudaAvailable": func() bool {
 			return h.engine.IsCudaAvailable()
@@ -514,15 +514,15 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 		log.Printf("🔄 Processing batch %d-%d (%d symbols)", i+1, end, len(batch))
 
 		// Process calls and puts separately for better API performance
-			if req.Strategy == "calls" || req.Strategy == "both" {
-				callResults := h.processBatchOptionsType(batch, stockPrices, req, "calls", companyData)
-				results = append(results, callResults...)
-			}
+		if req.Strategy == "calls" || req.Strategy == "both" {
+			callResults := h.processBatchOptionsType(batch, stockPrices, req, "calls", companyData)
+			results = append(results, callResults...)
+		}
 
-			if req.Strategy == "puts" || req.Strategy == "both" {
-				putResults := h.processBatchOptionsType(batch, stockPrices, req, "puts", companyData)
-				results = append(results, putResults...)
-			}		// Rate limiting between batches
+		if req.Strategy == "puts" || req.Strategy == "both" {
+			putResults := h.processBatchOptionsType(batch, stockPrices, req, "puts", companyData)
+			results = append(results, putResults...)
+		} // Rate limiting between batches
 		if end < len(symbols) {
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -916,18 +916,18 @@ func (h *OptionsHandler) formatCurrencyLarge(value float64) models.FieldValue {
 // convertToFormattedResult converts an OptionResult to formatted dual-value result
 func (h *OptionsHandler) convertToFormattedResult(result *models.OptionResult, rank int) *models.FormattedOptionResult {
 	formatted := models.FormattedOptionResult{
-		"rank":            h.formatInteger(rank),
-		"ticker":          h.formatText(result.Ticker),
-		"company":         h.formatText(result.Company),
-		"sector":          h.formatText(result.Sector),
-		"strike":          h.formatCurrency(result.Strike),
-		"stock_price":     h.formatCurrency(result.StockPrice),
-		"max_contracts":   h.formatInteger(result.MaxContracts),
-		"premium":         h.formatCurrency(result.Premium),
-		"total_premium":   h.formatCurrency(result.TotalPremium),
-		"cash_needed":     h.formatCurrencyLarge(result.CashNeeded),
+		"rank":              h.formatInteger(rank),
+		"ticker":            h.formatText(result.Ticker),
+		"company":           h.formatText(result.Company),
+		"sector":            h.formatText(result.Sector),
+		"strike":            h.formatCurrency(result.Strike),
+		"stock_price":       h.formatCurrency(result.StockPrice),
+		"max_contracts":     h.formatInteger(result.MaxContracts),
+		"premium":           h.formatCurrency(result.Premium),
+		"total_premium":     h.formatCurrency(result.TotalPremium),
+		"cash_needed":       h.formatCurrencyLarge(result.CashNeeded),
 		"profit_percentage": h.formatPercentage(result.ProfitPercentage / 100), // Convert from percentage to decimal
-		"expiration":      h.formatText(result.Expiration),
+		"expiration":        h.formatText(result.Expiration),
 	}
 
 	// Calculate annualized return
