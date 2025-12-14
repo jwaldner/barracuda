@@ -10,6 +10,7 @@ import (
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/handlers"
+	"github.com/jwaldner/barracuda/internal/symbols"
 
 	"github.com/gorilla/mux"
 )
@@ -86,9 +87,12 @@ func main() {
 	log.Println("Creating Alpaca client...")
 	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey, cfg.AlpacaPaperTrading)
 
+	// Create symbol service for company/sector lookups
+	symbolService := symbols.NewSP500Service("assets/symbols")
+
 	// Create options handler with CUDA engine
 	// Initialize handlers
-	optionsHandler := handlers.NewOptionsHandler(alpacaClient, cfg, engine)
+	optionsHandler := handlers.NewOptionsHandler(alpacaClient, cfg, engine, symbolService)
 	sp500Handler := handlers.NewSP500Handler()
 
 	// Setup router

@@ -16,6 +16,7 @@ import (
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/models"
+	"github.com/jwaldner/barracuda/internal/symbols"
 )
 
 // MonteCarloResult holds the results of Monte Carlo computation (matches C++ benchmark)
@@ -108,17 +109,19 @@ func getSymbolCount(info map[string]interface{}) int {
 
 // OptionsHandler handles options analysis requests - DUMB HTTP layer only
 type OptionsHandler struct {
-	alpacaClient *alpaca.Client
-	config       *config.Config
-	engine       *barracuda.BaracudaEngine
+	alpacaClient  *alpaca.Client
+	config        *config.Config
+	engine        *barracuda.BaracudaEngine
+	symbolService *symbols.SP500Service
 }
 
 // NewOptionsHandler creates a new options handler - just HTTP routing
-func NewOptionsHandler(alpacaClient *alpaca.Client, cfg *config.Config, engine *barracuda.BaracudaEngine) *OptionsHandler {
+func NewOptionsHandler(alpacaClient *alpaca.Client, cfg *config.Config, engine *barracuda.BaracudaEngine, symbolService *symbols.SP500Service) *OptionsHandler {
 	return &OptionsHandler{
-		alpacaClient: alpacaClient,
-		config:       cfg,
-		engine:       engine,
+		alpacaClient:  alpacaClient,
+		config:        cfg,
+		engine:        engine,
+		symbolService: symbolService,
 	}
 }
 
@@ -149,10 +152,10 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		
 		// Table configuration  
 		"tableHeaders": func() []string {
-			return []string{"#", "Ticker", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Cash Needed", "Profit %", "Annualized", "Expiration"}
+			return []string{"#", "Ticker", "Company", "Sector", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Cash Needed", "Profit %", "Annualized", "Expiration"}
 		},
 		"tableFieldKeys": func() []string {
-			return []string{"rank", "ticker", "strike", "stock_price", "max_contracts", "premium", "total_premium", "cash_needed", "profit_percentage", "annualized", "expiration"}
+			return []string{"rank", "ticker", "company", "sector", "strike", "stock_price", "max_contracts", "premium", "total_premium", "cash_needed", "profit_percentage", "annualized", "expiration"}
 		},
 		
 		// Default values (calculated by backend)
@@ -163,7 +166,31 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			return defaultExpirationDate
 		},
 		"defaultStocks": func() []string {
+			// Use asset symbols if config is empty, otherwise use config
+			if len(h.config.DefaultStocks) == 0 {
+				// Load from assets
+				symbols, err := h.symbolService.GetSymbolsAsStrings()
+				if err == nil && len(symbols) > 0 {
+					return symbols[:8] // Return first 8 symbols from assets
+				}
+			}
 			return h.config.DefaultStocks
+		},
+		"assetSymbols": func() map[string]map[string]string {
+			// Provide all asset data to frontend (symbol -> {company, sector})
+			symbols, err := h.symbolService.LoadSymbols()
+			if err != nil {
+				return make(map[string]map[string]string)
+			}
+			
+			assets := make(map[string]map[string]string)
+			for _, symbol := range symbols {
+				assets[symbol.Symbol] = map[string]string{
+					"company": symbol.Company,
+					"sector":  symbol.Sector,
+				}
+			}
+			return assets
 		},
 		"defaultRiskLevel": func() string {
 			return h.config.DefaultRiskLevel
@@ -180,6 +207,62 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 				"integer":     "text-right font-mono tabular-nums",
 				"text":        "text-left",
 			}
+		},
+		
+		// Results page content
+		"resultsTitle": func() string {
+			return "Premium Analysis Results"
+		},
+		"resultsSubtitle": func() string {
+			return "Ranked by Total Premium Income"
+		},
+		"exportButtonText": func() string {
+			return "📋 Export CSV"
+		},
+		
+		// CSV Headers (backend controlled)
+		"csvHeaders": func() []string {
+			return []string{"Rank", "Ticker", "Company", "Sector", "Strike", "Stock_Price", "Max_Contracts", "Premium", "Total_Premium", "Cash_Needed", "Profit_Percentage", "Annualized", "Expiration"}
+		},		// Form labels (backend controlled)
+		"cashLabel": func() string {
+			return "💰 Available Cash"
+		},
+		"expirationLabel": func() string {
+			return "📅 Expiration Date"
+		},
+		"symbolsLabel": func() string {
+			return "📊 Stock Symbols (one per line)"
+		},
+		"riskLabel": func() string {
+			return "⚖️ Assignment Risk Level"
+		},
+		"analyzeButtonText": func() string {
+			return "🔍 Analyze Options"
+		},
+		
+		// Error messages (backend controlled)
+		"errorMessages": func() map[string]string {
+			return map[string]string{
+				"noSymbols":       "Please enter at least one stock symbol",
+				"noExpiration":    "Please select an expiration date", 
+				"invalidCash":     "Available cash must be greater than 0",
+				"copyFailed":      "Failed to copy to clipboard. Please copy manually:",
+				"copySuccess":     "CSV data copied to clipboard",
+				"noResults":       "No suitable put options found.",
+				"analysisError":   "Analysis failed:",
+			}
+		},
+		
+		// UI text labels
+		"riskLevels": func() map[string]string {
+			return map[string]string{
+				"low":  "LOW",
+				"mod":  "MOD", 
+				"high": "HIGH",
+			}
+		},
+		"loadingText": func() string {
+			return "Fetching live options data..."
 		},
 		
 		// System info (for debugging/display)
@@ -295,8 +378,22 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	log.Printf("📊 Retrieved %d stock prices", len(stockPrices))
 
+	// Pre-load company/sector info for all symbols (universal lookup)
+	companyData := make(map[string]struct {
+		Company string
+		Sector  string
+	})
+	for _, symbol := range cleanSymbols {
+		company, sector := h.symbolService.GetSymbolInfo(symbol)
+		companyData[symbol] = struct {
+			Company string
+			Sector  string
+		}{Company: company, Sector: sector}
+	}
+	log.Printf("📋 Enriched %d symbols with company/sector data", len(companyData))
+
 	// Process real options data using batch approach
-	results := h.processBatchedRealOptions(stockPrices, req)
+	results := h.processBatchedRealOptions(stockPrices, req, companyData)
 
 	// Apply workload factor using same Monte Carlo calculations as C++ benchmark
 	if h.config.Engine.WorkloadFactor > 0.0 {
@@ -394,7 +491,7 @@ func (h *OptionsHandler) TestConnectionHandler(w http.ResponseWriter, r *http.Re
 }
 
 // processBatchedRealOptions fetches real options with batching and parallel processing
-func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest) []models.OptionResult {
+func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
 
 	// Get symbols list
@@ -417,17 +514,15 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 		log.Printf("🔄 Processing batch %d-%d (%d symbols)", i+1, end, len(batch))
 
 		// Process calls and puts separately for better API performance
-		if req.Strategy == "calls" || req.Strategy == "both" {
-			callResults := h.processBatchOptionsType(batch, stockPrices, req, "calls")
-			results = append(results, callResults...)
-		}
+			if req.Strategy == "calls" || req.Strategy == "both" {
+				callResults := h.processBatchOptionsType(batch, stockPrices, req, "calls", companyData)
+				results = append(results, callResults...)
+			}
 
-		if req.Strategy == "puts" || req.Strategy == "both" {
-			putResults := h.processBatchOptionsType(batch, stockPrices, req, "puts")
-			results = append(results, putResults...)
-		}
-
-		// Rate limiting between batches
+			if req.Strategy == "puts" || req.Strategy == "both" {
+				putResults := h.processBatchOptionsType(batch, stockPrices, req, "puts", companyData)
+				results = append(results, putResults...)
+			}		// Rate limiting between batches
 		if end < len(symbols) {
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -438,7 +533,7 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 }
 
 // processBatchOptionsType processes a batch of symbols for a specific option type (calls/puts)
-func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, optionType string) []models.OptionResult {
+func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, optionType string, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
 
 	log.Printf("🎯 Fetching %s options for batch: %v", optionType, symbols)
@@ -495,8 +590,10 @@ func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices m
 			// Find best option based on target delta and available cash
 			bestContract := h.findBestOptionContract(contracts, stockPx, req.TargetDelta, optionType)
 			if bestContract != nil {
+				// Get company info for this symbol
+				companyInfo := companyData[sym]
 				// Unified calculation - black box handles CUDA/CPU
-				result := h.convertRealOptionToResult(sym, stockPx, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp)
+				result := h.convertRealOptionToResult(sym, stockPx, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp, companyInfo.Company, companyInfo.Sector)
 				if result != nil {
 					resultsChan <- symbolResult{result: result, symbol: sym}
 					log.Printf("✅ Found best %s option for %s: Strike $%.2f, Premium $%.2f", optionType, sym, result.Strike, result.Premium)
@@ -591,7 +688,7 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 }
 
 // convertRealOptionToResult converts real Alpaca option contract to result format (unified CUDA/CPU)
-func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice float64, contract *alpaca.OptionContract, availableCash float64, expirationDate string, timeToExp float64) *models.OptionResult {
+func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice float64, contract *alpaca.OptionContract, availableCash float64, expirationDate string, timeToExp float64, company, sector string) *models.OptionResult {
 	// Parse strike price
 	strikePrice, err := strconv.ParseFloat(contract.StrikePrice, 64)
 	if err != nil {
@@ -652,6 +749,8 @@ func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice flo
 
 	return &models.OptionResult{
 		Ticker:           symbol,
+		Company:          company,
+		Sector:           sector,
 		OptionSymbol:     contract.Symbol,
 		OptionType:       contract.Type,
 		Strike:           strikePrice,
@@ -795,6 +894,14 @@ func (h *OptionsHandler) formatText(value string) models.FieldValue {
 	}
 }
 
+func (h *OptionsHandler) formatTextWithTooltip(value, tooltip string) models.FieldValue {
+	return models.FieldValue{
+		Raw:     value,
+		Display: value,
+		Type:    "text",
+	}
+}
+
 func (h *OptionsHandler) formatCurrencyLarge(value float64) models.FieldValue {
 	if value >= 1000 {
 		return models.FieldValue{
@@ -811,6 +918,8 @@ func (h *OptionsHandler) convertToFormattedResult(result *models.OptionResult, r
 	formatted := models.FormattedOptionResult{
 		"rank":            h.formatInteger(rank),
 		"ticker":          h.formatText(result.Ticker),
+		"company":         h.formatText(result.Company),
+		"sector":          h.formatText(result.Sector),
 		"strike":          h.formatCurrency(result.Strike),
 		"stock_price":     h.formatCurrency(result.StockPrice),
 		"max_contracts":   h.formatInteger(result.MaxContracts),

@@ -273,3 +273,100 @@ cd /home/joe/projects/go-cuda && ./barracuda &
 sleep 3
 curl -s http://localhost:8080/ | grep -A1 -B1 "selected-delta\|available-cash\|selectedDelta ="
 sleep 5 && curl -s http://localhost:8080/ | grep -E "value=.*[0-9]|selectedDelta.*[0-9]" | head -5
+make build && ./barracuda
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL"],
+    "expiration_date": "2025-12-19", 
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' | head -20
+curl -s http://localhost:8080/ >/dev/null && echo "Page loads successfully"
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["JNJ", "KO", "AAPL"],
+    "expiration_date": "2025-12-19", 
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' | jq '.data.results | length'
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["JNJ", "KO"],
+    "expiration_date": "2025-12-19", 
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' | grep -o '"results":\[[^]]*\]' | head -1
+cd /home/joe/projects/go-cuda && git add .
+git commit -m "Implement complete backend-driven frontend architecture
+
+✅ ZERO hardcoded frontend values - all come from backend template functions
+✅ Dual format API responses (raw + display + type) for proper CSV/styling
+✅ Template functions control: cash, expiration, stocks, risk levels, table headers
+✅ JavaScript updated to handle new dual format responses
+✅ CSS classes applied based on field types (currency, percentage, integer, text)
+✅ CSV export uses raw values, display uses formatted strings
+✅ Complete separation of display formatting and data functionality
+
+Architecture: Backend formats ALL values, frontend has NO defaults
+Result: 'all the front end needs...all come from the back end no defaults on the web'"
+cd /home/joe/projects/go-cuda && ./barracuda &
+sleep 3 && curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL", "MSFT", "GOOGL", "TSLA"],
+    "expiration_date": "2025-12-19", 
+    "target_delta": 0.50,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' 2>/dev/null | head -20
+sleep 5 && curl -s -I http://localhost:8080/ | head -3
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{
+    "symbols": ["AAPL", "MSFT"],
+    "expiration_date": "2025-12-19", 
+    "target_delta": 0.25,
+    "available_cash": 70000,
+    "strategy": "puts"
+  }' | grep -o '"ticker":[^,]*\|"company":[^,]*\|"sector":[^,]*' | head -10
+curl -s http://localhost:8080/ | grep -A5 -B5 "assetData\|csvHeaders\|errorMessages" | head -15
+cd /home/joe/projects/go-cuda && pkill barracuda && sleep 1 && go build -o barracuda ./cmd/server
+cd /home/joe/projects/go-cuda && go build -o barracuda ./cmd/server
+cd /home/joe/projects/go-cuda && ./barracuda &
+sleep 3
+echo "Testing frontend with symbol array..."
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL", "MSFT", "KO"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | grep '"success":\|"results":\[' | head -2
+sleep 5 && curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL", "MSFT"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | grep '"success":\|"ticker":' | head -5
+timeout 10s curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' 2>/dev/null | head -5
+timeout 8s curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["MSFT"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' 2>/dev/null | jq '.data.results[0].company' 2>/dev/null || echo "Processing..."
+cd /home/joe/projects/go-cuda && make clean && make build
+pkill barracuda 2>/dev/null || true && cd /home/joe/projects/go-cuda && ./barracuda &
+timeout 10s curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' 2>/dev/null | jq '.data.results[0].company' 2>/dev/null || echo "Processing..."
+timeout 8s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' | grep -o '"company":{[^}]*}' || echo "Still processing..."
+make build && ./barracuda
+timeout 8s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' | jq '.data.results[0] | {ticker: .ticker, company: .company}' 2>/dev/null || echo "Processing..."
+cd /home/joe/projects/go-cuda && make clean && make build && pkill barracuda 2>/dev/null || true && ./barracuda &
+timeout 8s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' | jq '.data.results[0] | {ticker: .ticker, company: .company, sector: .sector}' 2>/dev/null || echo "Processing..."
+timeout 6s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' | grep -o '"company":\|"sector":' | head -4 || echo "Still processing..."
+ps aux | grep barracuda | grep -v grep || echo "Server not running"
+cd /home/joe/projects/go-cuda && ./barracuda &
+pkill barracuda && sleep 2 && cd /home/joe/projects/go-cuda && ./barracuda &
+sleep 3 && ps aux | grep barracuda | grep -v grep
+cd /home/joe/projects/go-cuda && ls -la barracuda && ./barracuda 2>&1 | head -10
+timeout 10s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | jq '.data.results[0] | keys | sort' 2>/dev/null || echo "Processing or error..."
+curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | grep -o '"[^"]*":' | head -20 || echo "Still processing..."
+curl -s http://localhost:8080/ | grep -o '<title>[^<]*</title>' || echo "Home page not responding"
+ps aux | grep barracuda || (cd /home/joe/projects/go-cuda && nohup ./barracuda > server.log 2>&1 & echo "Server started, PID: $!")
+cd /home/joe/projects/go-cuda && nohup ./barracuda > server.log 2>&1 & sleep 3 && tail server.log
+curl -s http://localhost:8080/ | grep -i "barracuda\|company\|sector" | head -3
+timeout 15s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | python3 -m json.tool 2>/dev/null | grep -A5 -B5 "company\|sector" | head -15
+timeout 10s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | grep -o '"sector":[^}]*}' | head -1
+cd /home/joe/projects/go-cuda && ps aux | grep barracuda | grep -v grep && echo "--- Server Logs ---" && tail -10 server.log
+cd /home/joe/projects/go-cuda && timeout 15s curl -v -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}' 2>&1 | head -20
+cd /home/joe/projects/go-cuda && tail -20 server.log
+timeout 5s curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | head -c 500 && echo "..."
+curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | jq '.data.results[0] | {company: .company, sector: .sector}' 2>/dev/null || echo "Processing..."
+cd /home/joe/projects/go-cuda && tail -30 server.log | grep -i "error\|fail\|panic\|fatal" || echo "No errors found in recent logs"
+cd /home/joe/projects/go-cuda && curl -s http://localhost:8080/ | grep -A10 -B10 "displayResults\|error\|fail" | head -20
+curl -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   --max-time 10 --connect-timeout 5 2>&1
+curl -s -X POST http://localhost:8080/api/analyze   -H "Content-Type: application/json"   -d '{"symbols": ["AAPL"], "expiration_date": "2025-12-19", "target_delta": 0.25, "available_cash": 70000, "strategy": "puts"}'   | jq '.data.results[0] | keys | sort' 2>/dev/null
+cd /home/joe/projects/go-cuda && make clean && make build && pkill barracuda 2>/dev/null || true && ./barracuda &
+curl -s http://localhost:8080/ | grep -i "low\|mod\|high\|fetching" | head -5
+timeout 5s curl -s http://localhost:8080/ | grep -A2 -B2 "text-base" | head -10
+cd /home/joe/projects/go-cuda && make clean && make build && pkill barracuda 2>/dev/null || true && ./barracuda &

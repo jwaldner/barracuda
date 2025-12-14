@@ -49,6 +49,8 @@ type AnalysisRequest struct {
 // OptionResult represents the result of analyzing an option
 type OptionResult struct {
 	Ticker           string  `json:"ticker"`
+	Company          string  `json:"company"`          // Company name from SP500 data
+	Sector           string  `json:"sector"`           // Sector from SP500 data
 	OptionSymbol     string  `json:"option_symbol"`
 	OptionType       string  `json:"option_type"`
 	Strike           float64 `json:"strike"`

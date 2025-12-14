@@ -62,13 +62,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 const data = await response.json();
                 if (!data.symbols || data.symbols.length === 0) {
-                    throw new Error('No S&P 500 symbols available');
+                    throw new Error(window.errorMessages?.noResults || 'No S&P 500 symbols available');
                 }
                 symbols = data.symbols.map(s => typeof s === 'string' ? s : s.symbol);
                 console.log('Using ALL S&P 500 symbols:', symbols.length, 'symbols');
             } catch (error) {
                 console.error('Error fetching S&P 500 symbols:', error);
-                alert('Error loading S&P 500 symbols: ' + error.message);
+                alert((window.errorMessages?.analysisError || 'Error loading S&P 500 symbols:') + ' ' + error.message);
                 return;
             }
         } else {
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (!response.ok) {
-                throw new Error(result.error || 'Analysis failed');
+                throw new Error(result.error || (window.errorMessages?.analysisError + ' Analysis failed') || 'Analysis failed');
             }
             
             displayResults(result);
@@ -137,12 +137,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 3000);
             }
         } catch (error) {
-            alert('Error: ' + error.message);
+            alert((window.errorMessages?.analysisError || 'Error:') + ' ' + error.message);
             
             // Update workload status to show error
             const workloadStatus = document.getElementById('workloadStatus');
             if (workloadStatus) {
-                workloadStatus.innerHTML = '<small>🔥 WORKLOAD: ERROR</small>';
+                workloadStatus.innerHTML = '<small>🔥 WORKLOAD: ' + (window.errorMessages?.analysisError?.toUpperCase() || 'ERROR') + '</small>';
                 // No styling - use existing Tailwind classes
             }
         } finally {
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('exportCSV').addEventListener('click', function() {
         if (!window.lastResults) return;
         
-        const headers = ['Rank', 'Symbol', 'Strike', 'Stock_Price', 'Premium_Per_Contract', 'Max_Contracts', 'Total_Premium', 'Cash_Needed', 'Profit_Percentage', 'Annualized', 'Expiration'];
+				const headers = window.csvHeaders || []; // Backend provides headers
         let csvContent = headers.join(',') + '\n';
         
         // Helper function to get raw value for CSV (numbers, not formatted strings)
@@ -170,9 +170,15 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         window.lastResults.forEach((option, index) => {
+            const ticker = getRawValue(option.ticker);
+            const company = getRawValue(option.company) || ticker; // Use backend company data
+            const sector = getRawValue(option.sector) || 'Unknown'; // Use backend sector data
+                
             const row = [
                 getRawValue(option.rank) || (index + 1),
-                getRawValue(option.ticker),
+                ticker,
+                company,
+                sector,
                 getRawValue(option.strike),
                 getRawValue(option.stock_price),
                 getRawValue(option.premium),
@@ -206,7 +212,7 @@ function displayResults(data) {
     const results = data.data ? data.data.results : data.results;
     
     if (!results || results.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="p-8 text-center text-gray-500">No suitable put options found.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="13" class="p-8 text-center text-gray-500">${window.errorMessages?.noResults || 'No suitable put options found.'}</td></tr>`;
         if (resultsDiv) {
             resultsDiv.classList.remove('hidden');
         }
@@ -254,9 +260,15 @@ function displayResults(data) {
             return baseClass;
         };
 
+        // Get company and sector from backend API response (NEW: separate fields)
+        const companyName = getValue(option.company) || getValue(option.ticker, true); // Fallback to ticker
+        const sectorName = getValue(option.sector) || 'Unknown'; // Backend provides sector separately
+        
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.rank)}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.ticker)}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${companyName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${sectorName}</td>
             <td class="${getCSSClass(option.strike, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.strike)}</td>
             <td class="${getCSSClass(option.stock_price, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.stock_price)}</td>
             <td class="${getCSSClass(option.max_contracts, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.max_contracts)}</td>
@@ -294,7 +306,7 @@ function showNotification() {
 async function copyTableToCSV() {
     const table = document.querySelector('#results table');
     if (!table) {
-        alert('No table data available to copy');
+        alert(window.errorMessages?.noResults || 'No table data available to copy');
         return;
     }
 
@@ -354,9 +366,9 @@ async function copyTableToCSV() {
         
         try {
             document.execCommand('copy');
-            alert('CSV data copied to clipboard');
+            alert(window.errorMessages?.copySuccess || 'CSV data copied to clipboard');
         } catch (fallbackErr) {
-            alert('Failed to copy to clipboard. Please copy manually:\\n\\n' + csvString);
+            alert((window.errorMessages?.copyFailed || 'Failed to copy to clipboard. Please copy manually:') + '\n\n' + csvString);
         }
         
         document.body.removeChild(textArea);
@@ -399,7 +411,7 @@ function selectRisk(delta) {
         if (btnDelta === 0.25) {
             btn.classList.add('bg-green-600/40', 'border-2', 'border-green-400', 'hover:bg-green-600/60');
         } else if (btnDelta === 0.50) {
-            btn.classList.add('bg-orange-600/40', 'border-2', 'border-orange-400', 'hover:bg-orange-600/60');
+            btn.classList.add('bg-blue-600/40', 'border-2', 'border-blue-400', 'hover:bg-blue-600/60');
         } else if (btnDelta === 0.75) {
             btn.classList.add('bg-red-600/40', 'border-2', 'border-red-400', 'hover:bg-red-600/60');
         }
@@ -487,13 +499,13 @@ async function handleSubmit(e) {
 
     // Validate required fields
     if (!symbolsValue.trim()) {
-        showError('Please enter at least one stock symbol');
+        		showError(window.errorMessages?.noSymbols || 'Please enter at least one stock symbol');
         document.getElementById('loading').classList.add('hidden');
         return;
     }
 
     if (!expirationValue) {
-        showError('Please select an expiration date');
+        		showError(window.errorMessages?.noExpiration || 'Please select an expiration date');
         document.getElementById('loading').classList.add('hidden');
         return;
     }
@@ -524,7 +536,7 @@ async function handleSubmit(e) {
         displayResults(data);
 
     } catch (error) {
-        showError('Analysis failed: ' + error.message);
+        showError((window.errorMessages?.analysisError || 'Analysis failed:') + ' ' + error.message);
     } finally {
         document.getElementById('loading').classList.add('hidden');
     }
@@ -538,60 +550,6 @@ function showError(message) {
         errorDiv.textContent = message;
         errorDiv.classList.remove('hidden');
         setTimeout(function() { errorDiv.classList.add('hidden'); }, 8000);
-    }
-}
-
-async function copyTableToCSV() {
-    const table = document.querySelector('#results table');
-    if (!table) {
-        alert('No table data available to copy');
-        return;
-    }
-
-    const rows = table.querySelectorAll('tr');
-    const csvContent = [];
-
-    // Process each row
-    rows.forEach(function(row) {
-        const cells = row.querySelectorAll('th, td');
-        const rowData = [];
-        
-        cells.forEach(function(cell) {
-            // Get text content and clean it up
-            let text = cell.textContent.trim();
-            
-            // Remove extra whitespace and newlines
-            text = text.replace(/\s+/g, ' ');
-            
-            // Handle commas in values by wrapping in quotes
-            if (text.includes(',')) {
-                text = '"' + text + '"';
-            }
-            
-            rowData.push(text);
-        });
-        
-        csvContent.push(rowData.join(','));
-    });
-
-    const csvString = csvContent.join('\n');
-
-    try {
-        await navigator.clipboard.writeText(csvString);
-        
-        // Visual feedback
-        const btn = document.getElementById('copy-csv-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '✅ Copied!';
-        btn.classList.add('bg-green-500/40');
-        
-        setTimeout(function() {
-            btn.innerHTML = originalText;
-            btn.classList.remove('bg-green-500/40');
-        }, 2000);
-        
-    } catch (err) {
-        alert('Failed to copy to clipboard');
     }
 }
 

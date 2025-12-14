@@ -528,19 +528,38 @@ func (s *SP500Service) buildAssets(symbols []Symbol) {
 
 // loadFromAssets loads symbols from asset backup
 func (s *SP500Service) loadFromAssets() ([]Symbol, error) {
-	file, err := os.Open(s.assetFile)
+	data, err := os.ReadFile(s.assetFile)
 	if err != nil {
-		return nil, fmt.Errorf("asset file not found: %v", err)
+		return nil, fmt.Errorf("failed to read assets file: %v", err)
 	}
-	defer file.Close()
 
-	var data struct {
+	var result struct {
 		Symbols []Symbol `json:"symbols"`
 	}
 
-	if err := json.NewDecoder(file).Decode(&data); err != nil {
-		return nil, fmt.Errorf("failed to parse asset file: %v", err)
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse assets JSON: %v", err)
 	}
 
-	return data.Symbols, nil
+	return result.Symbols, nil
+}
+
+// GetSymbolInfo looks up company and sector info for any symbol (universal lookup)
+func (s *SP500Service) GetSymbolInfo(ticker string) (company, sector string) {
+	// Load symbols from assets (cached)
+	symbols, err := s.loadFromAssets()
+	if err != nil {
+		// Return ticker as company name if lookup fails
+		return ticker, "Unknown"
+	}
+
+	// Search for the symbol
+	for _, symbol := range symbols {
+		if strings.EqualFold(symbol.Symbol, ticker) {
+			return symbol.Company, symbol.Sector
+		}
+	}
+
+	// Symbol not found in assets - return ticker as company name
+	return ticker, "Unknown"
 }

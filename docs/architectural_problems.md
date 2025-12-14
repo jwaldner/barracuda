@@ -1,3 +1,4 @@
+
 # Barracuda Project: Required Architectural Changes
 
 ## Current Codebase Analysis
