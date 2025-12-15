@@ -129,23 +129,23 @@
                             							{{riskLabel}}
                         </label>
                         <div class="risk-selector">
-                            <div class="grid grid-cols-3 gap-3">
+                            <div class="grid grid-cols-3 gap-2 sm:gap-3">
                                 <button type="button" onclick="selectRisk(0.10)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "LOW"}}bg-green-600 border-green-300 ring-2 ring-green-300{{else}}bg-green-600/40 border-green-400{{end}} border-2 hover:bg-green-600/60 transition-all transform hover:scale-105 duration-300"
+                                    class="risk-btn px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white {{if eq (defaultRiskLevel) "LOW"}}bg-green-600 border-green-300 ring-2 ring-green-300{{else}}bg-green-600/40 border-green-400{{end}} border-2 hover:bg-green-600/60 transition-all transform hover:scale-105 duration-300"
                                     data-delta="0.10">
-                                    <div class="text-base">CONSERVATIVE</div>
+                                    <div class="text-xs sm:text-base"><span class="hidden sm:inline">CONSERVATIVE</span><span class="sm:hidden">LOW</span></div>
                                     <div class="text-xs opacity-80">Δ 0.10</div>
                                 </button>
                                 <button type="button" onclick="selectRisk(0.20)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "MOD"}}bg-orange-500 border-orange-300 ring-2 ring-orange-300{{else}}bg-orange-400 border-orange-300{{end}} border-2 hover:bg-orange-500 transition-all transform hover:scale-105 duration-300"
+                                    class="risk-btn px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white {{if eq (defaultRiskLevel) "MOD"}}bg-orange-500 border-orange-300 ring-2 ring-orange-300{{else}}bg-orange-400 border-orange-300{{end}} border-2 hover:bg-orange-500 transition-all transform hover:scale-105 duration-300"
                                     data-delta="0.20">
-                                    <div class="text-base">MODERATE</div>
+                                    <div class="text-xs sm:text-base"><span class="hidden sm:inline">MODERATE</span><span class="sm:hidden">MED</span></div>
                                     <div class="text-xs opacity-80">Δ 0.20</div>
                                 </button>
                                 <button type="button" onclick="selectRisk(0.30)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "HIGH"}}bg-red-600 border-red-300 ring-2 ring-red-300{{else}}bg-red-600/40 border-red-400{{end}} border-2 hover:bg-red-600/60 transition-all transform hover:scale-105 duration-300"
+                                    class="risk-btn px-2 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white {{if eq (defaultRiskLevel) "HIGH"}}bg-red-600 border-red-300 ring-2 ring-red-300{{else}}bg-red-600/40 border-red-400{{end}} border-2 hover:bg-red-600/60 transition-all transform hover:scale-105 duration-300"
                                     data-delta="0.30">
-                                    <div class="text-base">AGGRESSIVE</div>
+                                    <div class="text-xs sm:text-base"><span class="hidden sm:inline">AGGRESSIVE</span><span class="sm:hidden">HIGH</span></div>
                                     <div class="text-xs opacity-80">Δ 0.30</div>
                                 </button>
                             </div>
