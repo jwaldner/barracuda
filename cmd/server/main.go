@@ -27,9 +27,8 @@ func main() {
 		log.Fatalf("Failed to initialize logging: %v", err)
 	}
 	logger.Info.Printf("📝 Logging system initialized - level: %s -> %s", cfg.Logging.LogLevel, cfg.Logging.LogFile)
-	logger.Info.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
-
-	// Terminal warning if verbose logging is enabled
+	logger.Always.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
+	logger.Always.Printf("⚙️ Configuration loaded") // Terminal warning if verbose logging is enabled
 	if cfg.Logging.LogLevel == "verbose" {
 		fmt.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s\n", cfg.Logging.LogFile)
 	}
@@ -65,6 +64,7 @@ func main() {
 		// Force CPU mode by creating engine differently
 		engine = barracuda.NewBaracudaEngineForced("cpu")
 		log.Println("CPU FORCED MODE: CUDA disabled")
+		logger.Always.Printf("CPU FORCED MODE: CUDA disabled")
 	} else {
 		engine = barracuda.NewBaracudaEngine()
 	}
@@ -84,19 +84,23 @@ func main() {
 	case "cpu":
 		// Force CPU-only mode
 		log.Println("CPU FORCED MODE: CUDA disabled")
+		logger.Always.Printf("CPU FORCED MODE: CUDA disabled")
 	case "auto":
 		fallthrough
 	default:
 		if engine != nil && engine.IsCudaAvailable() {
 			fmt.Printf("🔥 Compute Mode: CUDA (%d devices detected)\n", engine.GetDeviceCount())
+			logger.Always.Printf("🔥 Compute Mode: CUDA (%d devices detected)", engine.GetDeviceCount())
 			logger.Info.Printf("🔥 CUDA engine initialized with %d devices", engine.GetDeviceCount())
 		} else {
 			log.Println("CPU FALLBACK: CUDA not available")
+			logger.Always.Printf("CPU FALLBACK: CUDA not available")
 		}
 	}
 
 	// Create Alpaca client
 	log.Println("📡 Creating Alpaca client...")
+	logger.Always.Printf("📡 Creating Alpaca client")
 	logger.Info.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets")
 
 	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
@@ -128,6 +132,7 @@ func main() {
 
 	// Start server
 	fmt.Printf("🌐 Server starting on http://localhost:%s\n", cfg.Port)
+	logger.Always.Printf("🌐 Server starting on http://localhost:%s", cfg.Port)
 	logger.Info.Printf("🌐 HTTP server started on port %s", cfg.Port)
 
 	// Browser opening can be handled externally via OPEN_BROWSER env var if needed

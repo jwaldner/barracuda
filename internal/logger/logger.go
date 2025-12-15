@@ -12,6 +12,7 @@ var (
 	Debug   *log.Logger
 	Verbose *log.Logger
 	Error   *log.Logger
+	Always  *log.Logger // Always logs to file regardless of log level
 
 	// Current log level for filtering
 	currentLogLevel string
@@ -39,6 +40,7 @@ func InitWithLevel(logLevel string) error {
 	Debug = log.New(getWriter("debug", logFile, nullWriter), "🐛 DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
 	Verbose = log.New(getWriter("verbose", logFile, nullWriter), "🔍 VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
 	Error = log.New(io.MultiWriter(os.Stderr, logFile), "❌ ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Always = log.New(logFile, "📝 ALWAYS: ", log.Ldate|log.Ltime) // Always logs to file, bypasses level filtering
 
 	return nil
 }
