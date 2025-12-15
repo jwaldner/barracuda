@@ -14,7 +14,7 @@ Baracuda is a high-performance options trading and analysis system that combines
 - **Module**: `github.com/jwaldner/barracuda`
 - **Main Server**: Handles HTTP API, CUDA integration, Alpaca data
 - **Port**: Configurable (default 8080)
-- **Environment**: Paper trading vs Live trading support
+- **Environment**: Live trading support
 
 ### CUDA Engine (Baracuda)
 - **Language**: C++ with CUDA kernels
@@ -134,7 +134,7 @@ type VolatilitySkew struct {
 ### Environment Variables
 - `ALPACA_API_KEY` - Alpaca API credentials
 - `ALPACA_SECRET_KEY` - Alpaca secret key  
-- `ALPACA_PAPER_TRADING` - Paper vs live trading
+
 - `PORT` - Server port (default 8080)
 - `DEFAULT_STOCKS` - Default symbol list
 - `DEFAULT_CASH` - Default available cash

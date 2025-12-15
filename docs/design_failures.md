@@ -153,7 +153,7 @@ server:
 
 api:
   alpaca:
-    paper_trading: true
+
 
 defaults:
   cash: 100000

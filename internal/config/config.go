@@ -2,7 +2,6 @@ package config
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -10,6 +9,12 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
+
+// LoggingConfig represents logging configuration
+type LoggingConfig struct {
+	LogLevel string `yaml:"log_level"`
+	LogFile  string `yaml:"log_file"`
+}
 
 type ComputeConfig struct {
 	ExecutionMode         string `yaml:"execution_mode"`
@@ -24,9 +29,8 @@ type Config struct {
 	Port string
 
 	// Alpaca API settings
-	AlpacaAPIKey       string
-	AlpacaSecretKey    string
-	AlpacaPaperTrading bool
+	AlpacaAPIKey    string
+	AlpacaSecretKey string
 
 	// Default application settings
 	DefaultStocks    []string
@@ -34,6 +38,8 @@ type Config struct {
 	DefaultStrategy  string
 	DefaultRiskLevel string
 
+	// Logging settings
+	Logging LoggingConfig `yaml:"logging"`
 	// Engine settings
 	Engine EngineConfig `yaml:"engine"`
 	// Compute settings (legacy)
@@ -55,7 +61,8 @@ type EngineConfig struct {
 }
 
 type YAMLConfig struct {
-	Alpaca AlpacaConfig `yaml:"alpaca"`
+	Alpaca  AlpacaConfig  `yaml:"alpaca"`
+	Logging LoggingConfig `yaml:"logging"`
 
 	Trading struct {
 		DefaultCash      int      `yaml:"default_cash"`
@@ -71,14 +78,19 @@ type YAMLConfig struct {
 
 func Load() *Config {
 	cfg := &Config{
-		Port:               getEnv("PORT", "8080"),
-		AlpacaAPIKey:       getEnv("ALPACA_API_KEY", ""),
-		AlpacaSecretKey:    getEnv("ALPACA_SECRET_KEY", ""),
-		AlpacaPaperTrading: getEnvBool("ALPACA_PAPER_TRADING", false),
-		DefaultStocks:      getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
-		DefaultCash:        getEnvInt("DEFAULT_CASH", 10000),
-		DefaultStrategy:    getEnv("DEFAULT_STRATEGY", "puts"),
-		DefaultRiskLevel:   getEnv("DEFAULT_RISK_LEVEL", "LOW"),
+		Port:             getEnv("PORT", "8080"),
+		AlpacaAPIKey:     getEnv("ALPACA_API_KEY", ""),
+		AlpacaSecretKey:  getEnv("ALPACA_SECRET_KEY", ""),
+		DefaultStocks:    getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
+		DefaultCash:      getEnvInt("DEFAULT_CASH", 10000),
+		DefaultStrategy:  getEnv("DEFAULT_STRATEGY", "puts"),
+		DefaultRiskLevel: getEnv("DEFAULT_RISK_LEVEL", "LOW"),
+
+		// Default logging configuration
+		Logging: LoggingConfig{
+			LogLevel: getEnv("LOG_LEVEL", "info"),
+			LogFile:  getEnv("LOG_FILE", "barracuda.log"),
+		},
 
 		// Default engine configuration
 		Engine: EngineConfig{
@@ -126,6 +138,14 @@ func Load() *Config {
 			cfg.DefaultRiskLevel = yamlCfg.Trading.DefaultRiskLevel
 		}
 
+		// Logging configuration from YAML
+		if yamlCfg.Logging.LogLevel != "" {
+			cfg.Logging.LogLevel = yamlCfg.Logging.LogLevel
+		}
+		if yamlCfg.Logging.LogFile != "" {
+			cfg.Logging.LogFile = yamlCfg.Logging.LogFile
+		}
+
 		// Engine configuration from YAML
 		if yamlCfg.Engine.ExecutionMode != "" {
 			cfg.Engine = yamlCfg.Engine
@@ -153,13 +173,13 @@ func Load() *Config {
 func loadYAMLConfig() *YAMLConfig {
 	data, err := ioutil.ReadFile("config.yaml")
 	if err != nil {
-		log.Printf("Could not read config.yaml: %v", err)
+		// Could not read config.yaml - silently return nil
 		return nil
 	}
 
 	var yamlCfg YAMLConfig
 	if err := yaml.Unmarshal(data, &yamlCfg); err != nil {
-		log.Printf("Could not parse config.yaml: %v", err)
+		// Could not parse config.yaml - silently return nil
 		return nil
 	}
 

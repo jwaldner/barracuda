@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jwaldner/barracuda/internal/logger"
 )
 
 type Client struct {
@@ -18,13 +20,9 @@ type Client struct {
 	HTTPClient *http.Client
 }
 
-func NewClient(apiKey, secretKey string, paperTrading bool) *Client {
+func NewClient(apiKey, secretKey string) *Client {
 	baseURL := "https://api.alpaca.markets"
 	dataURL := "https://data.alpaca.markets"
-
-	if paperTrading {
-		baseURL = "https://paper-api.alpaca.markets"
-	}
 
 	return &Client{
 		APIKey:    apiKey,
@@ -156,7 +154,15 @@ func (c *Client) getStockPricesBatchInternal(symbols []string) (map[string]*Stoc
 	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
 	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
 
+	logger.Verbose.Printf("📡 ALPACA STOCK API CALL: %s", req.URL.String())
+	startTime := time.Now()
 	resp, err := c.HTTPClient.Do(req)
+	callDuration := time.Since(startTime)
+	if err != nil {
+		logger.Verbose.Printf("❌ Stock API call failed after %v: %v", callDuration, err)
+		return nil, err
+	}
+	logger.Verbose.Printf("⏱️ Stock API call completed in %v (status: %d)", callDuration, resp.StatusCode)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +170,7 @@ func (c *Client) getStockPricesBatchInternal(symbols []string) (map[string]*Stoc
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		logger.Verbose.Printf("❌ Alpaca Stock Price API error: Status %d, Body: %s", resp.StatusCode, string(body))
 		return nil, fmt.Errorf("alpaca batch API error: %d - %s", resp.StatusCode, string(body))
 	}
 
@@ -172,6 +179,8 @@ func (c *Client) getStockPricesBatchInternal(symbols []string) (map[string]*Stoc
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Verbose.Printf("📈 Alpaca Stock Price Response for [%s] (%d bytes): %s", strings.Join(symbols, ","), len(body), string(body))
 
 	// Parse the nested structure
 	var batchResp struct {
@@ -280,12 +289,22 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 		// Filter by option type (puts or calls)
 		if strategy == "puts" {
 			q.Add("type", "put")
-			// For puts: only get strikes below stock price
-			q.Add("strike_price_lte", fmt.Sprintf("%.0f", stockPrice-1))
+			// For puts: get wider range to include 25% delta strikes like $265 for AAPL
+			maxStrike := fmt.Sprintf("%.0f", stockPrice*0.98) // 98% of stock price
+			minStrike := fmt.Sprintf("%.0f", stockPrice*0.90) // 90% of stock price
+			q.Add("strike_price_gte", minStrike)
+			q.Add("strike_price_lte", maxStrike)
+			logger.Verbose.Printf("🔍 ALPACA FILTER: %s PUTS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
+				symbol, minStrike, maxStrike, 90.0, 98.0, stockPrice)
 		} else {
 			q.Add("type", "call")
-			// For calls: only get strikes above stock price
-			q.Add("strike_price_gte", fmt.Sprintf("%.0f", stockPrice+1))
+			// For calls: get strikes above stock price
+			minStrike := fmt.Sprintf("%.0f", stockPrice*1.02) // 102% of stock price
+			maxStrike := fmt.Sprintf("%.0f", stockPrice*1.10) // 110% of stock price
+			q.Add("strike_price_gte", minStrike)
+			q.Add("strike_price_lte", maxStrike)
+			logger.Verbose.Printf("🔍 ALPACA FILTER: %s CALLS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
+				symbol, minStrike, maxStrike, 102.0, 110.0, stockPrice)
 		}
 
 		q.Add("limit", "1000")
@@ -294,25 +313,36 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 		req.Header.Add("APCA-API-KEY-ID", c.APIKey)
 		req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
 
+		logger.Verbose.Printf("📡 ALPACA OPTIONS API CALL: %s", req.URL.String())
+		startTime := time.Now()
 		resp, err := c.HTTPClient.Do(req)
+		callDuration := time.Since(startTime)
 		if err != nil {
+			logger.Verbose.Printf("❌ Options API call failed after %v: %v", callDuration, err)
 			continue
 		}
 		defer resp.Body.Close()
+		logger.Verbose.Printf("⏱️ Options API call completed in %v (status: %d)", callDuration, resp.StatusCode)
 
 		body, _ := io.ReadAll(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
+			logger.Verbose.Printf("❌ Alpaca API error for %s: Status %d, Body: %s", symbol, resp.StatusCode, string(body))
 			continue
 		}
+
+		logger.Verbose.Printf("📡 Alpaca API Response for %s (%d bytes): %s", symbol, len(body), string(body))
 
 		// Reset body for JSON decoding
 		resp.Body = io.NopCloser(strings.NewReader(string(body)))
 
 		var alpacaResp AlpacaOptionsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&alpacaResp); err != nil {
+			logger.Verbose.Printf("❌ JSON decode error for %s: %v", symbol, err)
 			continue
 		}
+
+		logger.Verbose.Printf("✅ Parsed %d option contracts for %s", len(alpacaResp.Options), symbol)
 
 		// Convert to pointers and sort by strike price
 		contracts := make([]*OptionContract, len(alpacaResp.Options))
@@ -338,6 +368,43 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 	}
 
 	return contractsBySymbol, nil
+}
+
+// GetOptionQuote gets real-time option quote (bid/ask) from Alpaca
+func (c *Client) GetOptionQuote(optionSymbol string) (*OptionQuote, error) {
+	// Use the data API endpoint for option quotes
+	endpoint := fmt.Sprintf("/v1beta1/options/quotes/latest?symbols=%s", optionSymbol)
+
+	req, err := http.NewRequest("GET", c.DataURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("APCA-API-KEY-ID", c.APIKey)
+	req.Header.Add("APCA-API-SECRET-KEY", c.SecretKey)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("alpaca option quote API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var quoteResp AlpacaOptionQuotesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&quoteResp); err != nil {
+		return nil, err
+	}
+
+	quote, exists := quoteResp.Quotes[optionSymbol]
+	if !exists {
+		return nil, fmt.Errorf("no quote found for option symbol: %s", optionSymbol)
+	}
+
+	return &quote, nil
 }
 
 // TestConnection tests connection to Alpaca API

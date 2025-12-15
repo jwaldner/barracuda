@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/config"
+	"github.com/jwaldner/barracuda/internal/logger"
 	"github.com/jwaldner/barracuda/internal/models"
 	"github.com/jwaldner/barracuda/internal/symbols"
 )
@@ -138,7 +138,7 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Calculate the default expiration date (third Friday) in YYYY-MM-DD format for HTML date input
 	defaultExpirationDate := config.CalculateDefaultExpirationDate()
-	log.Printf("📅 Default expiration date set to: %s", defaultExpirationDate)
+	logger.Info.Printf("📅 Default expiration date set to: %s", defaultExpirationDate)
 
 	// Create template functions that provide ALL frontend data from backend config
 	funcMap := template.FuncMap{
@@ -272,9 +272,6 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		"deviceCount": func() int {
 			return h.engine.GetDeviceCount()
 		},
-		"paperTrading": func() bool {
-			return h.config.AlpacaPaperTrading
-		},
 		"symbolCount": func() int {
 			return symbolCount
 		},
@@ -286,18 +283,26 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 	// Load template from file with functions (reloaded on each request - NO REBUILD NEEDED for web changes!)
 	tmpl, err := template.New("home.html").Funcs(funcMap).ParseFiles("web/templates/home.html")
 	if err != nil {
-		log.Printf("❌ Template error: %v", err)
+		logger.Error.Printf("❌ Template error: %v", err)
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Execute template with no data - everything comes from template functions
 	if err := tmpl.Execute(w, nil); err != nil {
-		log.Printf("❌ Template execution error: %v", err)
+		logger.Error.Printf("❌ Template execution error: %v", err)
 		http.Error(w, "Template execution error: "+err.Error(), http.StatusInternalServerError)
 	} else {
-		log.Printf("📄 Template served with default expiration: %s", defaultExpirationDate)
+		logger.Info.Printf("📄 Template served with default expiration: %s", defaultExpirationDate)
 	}
+}
+
+// max returns the larger of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // AnalyzeHandler handles options analysis requests using simplified Black-Scholes
@@ -321,9 +326,17 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	var req models.AnalysisRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// VERBOSE: Log request parameters
+	logger.Verbose.Printf("=== OPTIONS ANALYSIS REQUEST ===")
+	logger.Verbose.Printf("Symbols: %v", req.Symbols)
+	logger.Verbose.Printf("Expiration Date: %s", req.ExpirationDate)
+	logger.Verbose.Printf("Target Delta: %.2f", req.TargetDelta)
+	logger.Verbose.Printf("Available Cash: $%.2f", req.AvailableCash)
+	logger.Verbose.Printf("Strategy: %s", req.Strategy)
 
 	// Validate request
 	if len(req.Symbols) == 0 {
@@ -340,9 +353,13 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	startTime := time.Now()
-	log.Printf("📊 Analyzing %s options for %d symbols with batch processing", req.Strategy, len(req.Symbols))
+	logger.Info.Printf("📊 Analyzing %s options for %d symbols with batch processing", req.Strategy, len(req.Symbols))
 
 	// Clean and prepare symbols
+	logger.Verbose.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
+		req.Strategy, req.TargetDelta, req.ExpirationDate, req.AvailableCash)
+	logger.Verbose.Printf("🔍 RAW SYMBOLS: %v", req.Symbols)
+
 	cleanSymbols := make([]string, 0, len(req.Symbols))
 	for _, symbol := range req.Symbols {
 		if cleaned := strings.TrimSpace(symbol); cleaned != "" {
@@ -350,8 +367,10 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	logger.Verbose.Printf("🔍 CLEANED SYMBOLS: %v", cleanSymbols)
+
 	if len(cleanSymbols) == 0 {
-		log.Printf("⚠️ No valid symbols provided")
+		logger.Warn.Printf("⚠️ No valid symbols provided")
 		duration := time.Since(startTime)
 		response := models.AnalysisResponse{
 			Results:         []models.OptionResult{},
@@ -368,15 +387,15 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get stock prices in batches (up to 100 symbols per API call)
-	log.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
+	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
 	if err != nil {
-		log.Printf("❌ Error fetching stock prices: %v", err)
+		logger.Error.Printf("❌ Error fetching stock prices: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("📊 Retrieved %d stock prices", len(stockPrices))
+	logger.Info.Printf("📊 Retrieved %d stock prices", len(stockPrices))
 
 	// Pre-load company/sector info for all symbols (universal lookup)
 	companyData := make(map[string]struct {
@@ -390,7 +409,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			Sector  string
 		}{Company: company, Sector: sector}
 	}
-	log.Printf("📋 Enriched %d symbols with company/sector data", len(companyData))
+	logger.Info.Printf("📋 Enriched %d symbols with company/sector data", len(companyData))
 
 	// Process real options data using batch approach
 	results := h.processBatchedRealOptions(stockPrices, req, companyData)
@@ -398,7 +417,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	// Apply workload factor using same Monte Carlo calculations as C++ benchmark
 	if h.config.Engine.WorkloadFactor > 0.0 {
 		workloadStart := time.Now()
-		log.Printf("🔥 Applying workload factor %.1fx - running Monte Carlo calculations...", h.config.Engine.WorkloadFactor)
+		logger.Info.Printf("🔥 Applying workload factor %.1fx - running Monte Carlo calculations...", h.config.Engine.WorkloadFactor)
 
 		// Use same sample calculation as C++ benchmark: base = 5M samples
 		baseSamples := 250000000 // Cut in half from 500M to 250M
@@ -407,20 +426,20 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		// Run appropriate test based on execution mode
 		if h.engine.IsCudaAvailable() {
 			// CUDA mode: run CUDA only
-			log.Printf("⚡ Running CUDA Parallel workload for %d samples...", testSamples)
+			logger.Info.Printf("⚡ Running CUDA Parallel workload for %d samples...", testSamples)
 			cudaResult := monteCarloParallelCUDA(testSamples, h.engine)
-			log.Printf("⚡ CUDA Parallel: processed %d samples in %.2fms | Pi: %.4f",
+			logger.Info.Printf("⚡ CUDA Parallel: processed %d samples in %.2fms | Pi: %.4f",
 				cudaResult.SamplesProcessed, cudaResult.ComputationTimeMs, cudaResult.PiEstimate)
 		} else {
 			// CPU mode: run CPU only
-			log.Printf("🔄 Running CPU Sequential workload for %d samples...", testSamples)
+			logger.Info.Printf("🔄 Running CPU Sequential workload for %d samples...", testSamples)
 			cpuResult := monteCarloSeqCPU(testSamples)
-			log.Printf("🔄 CPU Sequential: processed %d samples in %.2fms | Pi: %.4f",
+			logger.Info.Printf("🔄 CPU Sequential: processed %d samples in %.2fms | Pi: %.4f",
 				cpuResult.SamplesProcessed, cpuResult.ComputationTimeMs, cpuResult.PiEstimate)
 		}
 
 		workloadDuration := time.Since(workloadStart)
-		log.Printf("✅ Workload factor %.1fx: completed Monte Carlo performance test in %v",
+		logger.Info.Printf("✅ Workload factor %.1fx: completed Monte Carlo performance test in %v",
 			h.config.Engine.WorkloadFactor, workloadDuration)
 	}
 
@@ -439,12 +458,23 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	totalSamplesProcessed := int(float64(baseSamples) * h.config.Engine.WorkloadFactor)
 	processingStats := fmt.Sprintf("✅ Processed %d Monte Carlo samples | Returned %d results | %.2f seconds | CUDA: %v",
 		totalSamplesProcessed, len(results), duration.Seconds(), h.engine.IsCudaAvailable())
-	log.Printf(processingStats)
+	logger.Info.Printf(processingStats)
 
 	// Convert to formatted response with dual values
 	var formattedResults []models.FormattedOptionResult
 	for i, result := range results {
 		formattedResults = append(formattedResults, *h.convertToFormattedResult(&result, i+1))
+	}
+
+	// VERBOSE: Final results summary
+	logger.Verbose.Printf("=== ANALYSIS RESULTS SUMMARY ===")
+	logger.Verbose.Printf("Total symbols processed: %d", len(req.Symbols))
+	logger.Verbose.Printf("Options after filtering: %d", len(results))
+	logger.Verbose.Printf("Processing time: %.2f seconds", duration.Seconds())
+	logger.Verbose.Printf("Strategy: %s", req.Strategy)
+	logger.Verbose.Printf("Available cash: $%.2f", req.AvailableCash)
+	if len(results) > 0 {
+		logger.Verbose.Printf("Top result: %s $%.2f premium with %d contracts", results[0].Ticker, results[0].Premium, results[0].MaxContracts)
 	}
 
 	response := &models.FormattedAnalysisResponse{
@@ -500,7 +530,7 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 		symbols = append(symbols, symbol)
 	}
 
-	log.Printf("📊 Fetching real options data for %d symbols in batches...", len(symbols))
+	logger.Info.Printf("📊 Fetching real options data for %d symbols in batches...", len(symbols))
 
 	// Process symbols in batches of 10 to avoid API rate limits
 	batchSize := 10
@@ -511,7 +541,7 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 		}
 
 		batch := symbols[i:end]
-		log.Printf("🔄 Processing batch %d-%d (%d symbols)", i+1, end, len(batch))
+		logger.Info.Printf("🔄 Processing batch %d-%d (%d symbols)", i+1, end, len(batch))
 
 		// Process calls and puts separately for better API performance
 		if req.Strategy == "calls" || req.Strategy == "both" {
@@ -528,7 +558,7 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 		}
 	}
 
-	log.Printf("✅ Processed %d symbol batches, %d total results", (len(symbols)+batchSize-1)/batchSize, len(results))
+	logger.Info.Printf("✅ Processed %d symbol batches, %d total results", (len(symbols)+batchSize-1)/batchSize, len(results))
 	return results
 }
 
@@ -536,25 +566,34 @@ func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpac
 func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, optionType string, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
 
-	log.Printf("🎯 Fetching %s options for batch: %v", optionType, symbols)
+	logger.Info.Printf("🎯 Fetching %s options for batch: %v", optionType, symbols)
+
+	// VERBOSE: Log Alpaca API call details
+	logger.Verbose.Printf("=== ALPACA API CALL ===")
+	logger.Verbose.Printf("Fetching options chain for %d symbols: %v", len(symbols), symbols)
+	logger.Verbose.Printf("Option Type: %s, Expiration: %s", optionType, req.ExpirationDate)
 
 	// Get options chain from Alpaca for this specific type
 	optionsChain, err := h.alpacaClient.GetOptionsChain(symbols, req.ExpirationDate, optionType)
 	if err != nil {
-		log.Printf("❌ Error getting %s options chain: %v", optionType, err)
+		logger.Verbose.Printf("❌ Alpaca API call failed: %v", err)
+		logger.Error.Printf("❌ Error getting %s options chain: %v", optionType, err)
 		return results
 	}
 
+	logger.Verbose.Printf("✅ Retrieved %d total option contracts from Alpaca", len(optionsChain))
+
 	totalContracts := 0
-	for _, contracts := range optionsChain {
+	for symbol, contracts := range optionsChain {
 		totalContracts += len(contracts)
+		logger.Verbose.Printf("Symbol %s: %d %s contracts retrieved", symbol, len(contracts), optionType)
 	}
-	log.Printf("📊 Retrieved %d %s contracts for batch", totalContracts, optionType)
+	logger.Info.Printf("📊 Retrieved %d %s contracts for batch", totalContracts, optionType)
 
 	// Calculate time to expiration once for all contracts
 	expDate, err := time.Parse("2006-01-02", req.ExpirationDate)
 	if err != nil {
-		log.Printf("❌ Invalid expiration date: %v", err)
+		logger.Error.Printf("❌ Invalid expiration date: %v", err)
 		return results
 	}
 	timeToExp := time.Until(expDate).Hours() / (24 * 365.25)
@@ -564,7 +603,7 @@ func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices m
 	if h.engine.IsCudaAvailable() {
 		engineType = "CUDA GPU"
 	}
-	log.Printf("⚡ Processing %d symbols using %s acceleration", len(optionsChain), engineType)
+	logger.Info.Printf("⚡ Processing %d symbols using %s acceleration", len(optionsChain), engineType)
 
 	type symbolResult struct {
 		result *models.OptionResult
@@ -585,7 +624,7 @@ func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices m
 		go func(sym string, contracts []*alpaca.OptionContract, stockPx float64) {
 			defer wg.Done()
 
-			log.Printf("📈 Processing %d %s options for %s (stock: $%.2f)", len(contracts), optionType, sym, stockPx)
+			logger.Verbose.Printf("📈 Processing %d %s options for %s (stock: $%.2f)", len(contracts), optionType, sym, stockPx)
 
 			// Find best option based on target delta and available cash
 			bestContract := h.findBestOptionContract(contracts, stockPx, req.TargetDelta, optionType)
@@ -596,12 +635,12 @@ func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices m
 				result := h.convertRealOptionToResult(sym, stockPx, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp, companyInfo.Company, companyInfo.Sector)
 				if result != nil {
 					resultsChan <- symbolResult{result: result, symbol: sym}
-					log.Printf("✅ Found best %s option for %s: Strike $%.2f, Premium $%.2f", optionType, sym, result.Strike, result.Premium)
+					logger.Verbose.Printf("✅ Found best %s option for %s: Strike $%.2f, Premium $%.2f", optionType, sym, result.Strike, result.Premium)
 				} else {
 					resultsChan <- symbolResult{result: nil, symbol: sym}
 				}
 			} else {
-				log.Printf("⚠️ No suitable %s options found for %s", optionType, sym)
+				logger.Verbose.Printf("⚠️ No suitable %s options found for %s", optionType, sym)
 				resultsChan <- symbolResult{result: nil, symbol: sym}
 			}
 		}(symbol, contracts, stockPrice.Price)
@@ -626,8 +665,12 @@ func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices m
 // findBestOptionContract finds the best option contract based on criteria
 func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContract, stockPrice float64, targetDelta float64, strategy string) *alpaca.OptionContract {
 	if len(contracts) == 0 {
+		logger.Verbose.Printf("🔍 CONTRACT FILTER: No contracts provided")
 		return nil
 	}
+
+	logger.Verbose.Printf("🔍 CONTRACT FILTER: Evaluating %d contracts for %s strategy, target delta %.3f",
+		len(contracts), strategy, targetDelta)
 
 	// For puts, find contracts with strikes near the target delta range
 	var bestContract *alpaca.OptionContract
@@ -692,7 +735,7 @@ func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice flo
 	// Parse strike price
 	strikePrice, err := strconv.ParseFloat(contract.StrikePrice, 64)
 	if err != nil {
-		log.Printf("❌ %s: Invalid strike price: %s", symbol, contract.StrikePrice)
+		logger.Verbose.Printf("❌ %s: Invalid strike price: %s", symbol, contract.StrikePrice)
 		return nil
 	}
 
@@ -707,19 +750,47 @@ func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice flo
 		return nil
 	}
 
-	// Config controls CUDA vs CPU - that's it!
-	riskFreeRate := 0.05
-	volatility := 0.25
+	// Use real market price from Alpaca close_price, fallback to theoretical pricing
 	var optionPrice, delta float64
 
-	// Config decides: auto/cuda = try CUDA first, cpu = CPU only
-	if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
-		// Use CUDA
-		optionPrice, delta = h.calculateWithCUDA(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type)
-	} else {
-		// Use CPU
-		optionPrice = h.estimateOptionPrice(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
-		delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
+	// First try to use the close_price from the contract data
+	if contract.ClosePrice != nil {
+		if closePriceStr, ok := contract.ClosePrice.(string); ok {
+			if closePrice, err := strconv.ParseFloat(closePriceStr, 64); err == nil && closePrice > 0 {
+				optionPrice = closePrice
+				logger.Verbose.Printf("📊 %s: Using REAL market close price: $%.2f", symbol, optionPrice)
+
+				// For real market data, estimate delta using Black-Scholes for Greeks calculation
+				riskFreeRate := 0.05
+				volatility := 0.25 // Default volatility for delta estimation
+				delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
+			}
+		} else if closePriceFloat, ok := contract.ClosePrice.(float64); ok && closePriceFloat > 0 {
+			optionPrice = closePriceFloat
+			logger.Verbose.Printf("📊 %s: Using REAL market close price: $%.2f", symbol, optionPrice)
+
+			// For real market data, estimate delta using Black-Scholes for Greeks calculation
+			riskFreeRate := 0.05
+			volatility := 0.25 // Default volatility for delta estimation
+			delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
+		}
+	}
+
+	// If no valid close price, fallback to theoretical pricing
+	if optionPrice == 0 {
+		logger.Verbose.Printf("⚠️ %s: No market close price available, using theoretical pricing", symbol)
+		riskFreeRate := 0.05
+		volatility := 0.25
+
+		// Use CUDA or CPU for theoretical calculation based on config
+		if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
+			// Use CUDA
+			optionPrice, delta = h.calculateWithCUDA(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type)
+		} else {
+			// Use CPU
+			optionPrice = h.estimateOptionPrice(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
+			delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
+		}
 	}
 
 	// Use centralized contract calculation
@@ -730,11 +801,11 @@ func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice flo
 	if h.engine.IsCudaAvailable() {
 		engineType = "CUDA"
 	}
-	log.Printf("🔍 %s %s: Strike=%.2f, Premium=%.2f, MaxContracts=%d (%s, cash needed: %.2f per contract)",
+	logger.Verbose.Printf("🔍 %s %s: Strike=%.2f, Premium=%.2f, MaxContracts=%d (%s, cash needed: %.2f per contract)",
 		symbol, contract.Type, strikePrice, calc.Premium, calc.MaxContracts, engineType, calc.CashNeededPerContract)
 
 	if calc.MaxContracts <= 0 {
-		log.Printf("⚠️ %s: Premium %.2f too high for available cash %.0f", symbol, calc.Premium, availableCash)
+		logger.Verbose.Printf("⚠️ %s: Premium %.2f too high for available cash %.0f", symbol, calc.Premium, availableCash)
 		return nil
 	}
 
@@ -840,15 +911,20 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 		// For puts: need cash = strike price × 100 (obligation to buy 100 shares at strike)
 		cashNeededPerContract = strikePrice * 100
 		maxContracts = int(availableCash / cashNeededPerContract)
+		logger.Verbose.Printf("🔍 CASH CALC: PUT - Strike=%.2f, Cash needed per contract=%.2f, Available=%.2f, Max contracts=%d",
+			strikePrice, cashNeededPerContract, availableCash, maxContracts)
 	} else {
 		// For calls: only pay the premium upfront
 		cashNeededPerContract = premium
 		maxContracts = int(availableCash / premium)
+		logger.Verbose.Printf("🔍 CASH CALC: CALL - Premium=%.2f per contract, Available=%.2f, Max contracts=%d",
+			premium, availableCash, maxContracts)
 	}
 
 	// Ensure at least 0 contracts
 	if maxContracts < 0 {
 		maxContracts = 0
+		logger.Verbose.Printf("🔍 CASH CALC: Insufficient funds - set max contracts to 0")
 	}
 
 	totalPremium := float64(maxContracts) * premium

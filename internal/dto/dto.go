@@ -11,7 +11,6 @@ type TemplateData struct {
 	SP500Count            int
 	CUDAAvailable         bool
 	DeviceCount           int
-	PaperTrading          bool
 	WorkloadFactor        float64
 	SymbolSource          string
 }

@@ -23,7 +23,7 @@ func main() {
 	}
 
 	// Create Alpaca client
-	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey, cfg.AlpacaPaperTrading)
+	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
 
 	// Create handlers with config
 	handler := handlers.NewHandler(alpacaClient, cfg)
@@ -46,11 +46,7 @@ func main() {
 	fmt.Printf("⚡ Assembly calculator available at /calculate\n")
 	fmt.Printf("📉 Volatility API available at /api/analyze-volatility\n")
 
-	if cfg.AlpacaPaperTrading {
-		fmt.Printf("📝 Using Alpaca Paper Trading environment\n")
-	} else {
-		fmt.Printf("💸 Using Alpaca LIVE Trading environment\n")
-	}
+	fmt.Printf("💸 Using Alpaca LIVE Trading environment\n")
 
 	if err := http.ListenAndServe("0.0.0.0:"+cfg.Port, nil); err != nil {
 		log.Fatal("Server failed to start:", err)
@@ -721,7 +717,7 @@ type Config struct {
     // Alpaca API settings
     AlpacaAPIKey      string
     AlpacaSecretKey   string
-    AlpacaPaperTrading bool
+
     
     // Default application settings
     DefaultStocks   []string
@@ -734,7 +730,7 @@ func Load() *Config {
         Port:              getEnv("PORT", "8080"),
         AlpacaAPIKey:      getEnv("ALPACA_API_KEY", ""),
         AlpacaSecretKey:   getEnv("ALPACA_SECRET_KEY", ""),
-        AlpacaPaperTrading: getEnvBool("ALPACA_PAPER_TRADING", true),
+
         DefaultStocks:     getEnvStringSlice("DEFAULT_STOCKS", []string{"AAPL", "MSFT", "GOOGL"}),
         DefaultCash:       getEnvInt("DEFAULT_CASH", 10000),
         DefaultStrategy:   getEnv("DEFAULT_STRATEGY", "puts"),

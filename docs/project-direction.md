@@ -376,7 +376,7 @@ Project uses Alpaca API credentials configured via environment variables:
 ```bash
 ALPACA_API_KEY=AKAH5A3VGCR3S9FNWIVC
 ALPACA_SECRET_KEY=dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy
-ALPACA_PAPER_TRADING=false  # Live trading keys require false
+
 ```
 
 ### Headers

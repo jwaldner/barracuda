@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
@@ -22,12 +22,17 @@ func main() {
 	cfg := config.Load()
 	log.Println("⚙️  Configuration loaded")
 
-	// Initialize proper logging
-	if err := logger.Init(); err != nil {
+	// Initialize proper logging with config level
+	if err := logger.InitWithLevel(cfg.Logging.LogLevel); err != nil {
 		log.Fatalf("Failed to initialize logging: %v", err)
 	}
-	logger.Info.Println("📝 Logging system initialized - debug/warnings -> barracuda.log")
-	logger.Debug.Printf("Config: Port=%s, Paper Trading=%v", cfg.Port, cfg.AlpacaPaperTrading)
+	logger.Info.Printf("📝 Logging system initialized - level: %s -> %s", cfg.Logging.LogLevel, cfg.Logging.LogFile)
+	logger.Info.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
+
+	// Terminal warning if verbose logging is enabled
+	if cfg.Logging.LogLevel == "verbose" {
+		fmt.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s\n", cfg.Logging.LogFile)
+	}
 
 	// Validate required config after loading from YAML
 	if cfg.AlpacaAPIKey == "" {
@@ -46,8 +51,6 @@ func main() {
 		cfg.AlpacaSecretKey == "YOUR_SECRET_KEY" || cfg.AlpacaSecretKey == "REPLACE_ME" {
 		log.Fatal("❌ Secret key appears to be a placeholder - please set real credentials")
 	}
-
-	log.Printf("🔑 Alpaca API configured (key: %s...)", cfg.AlpacaAPIKey[:8])
 
 	// Initialize engine based on configuration
 	var engine *barracuda.BaracudaEngine
@@ -85,8 +88,8 @@ func main() {
 		fallthrough
 	default:
 		if engine != nil && engine.IsCudaAvailable() {
-			log.Printf("🔥 Compute Mode: CUDA (%d devices detected)", engine.GetDeviceCount())
-			logger.Debug.Printf("CUDA engine initialized with %d devices", engine.GetDeviceCount())
+			fmt.Printf("🔥 Compute Mode: CUDA (%d devices detected)\n", engine.GetDeviceCount())
+			logger.Info.Printf("🔥 CUDA engine initialized with %d devices", engine.GetDeviceCount())
 		} else {
 			log.Println("CPU FALLBACK: CUDA not available")
 		}
@@ -94,8 +97,9 @@ func main() {
 
 	// Create Alpaca client
 	log.Println("📡 Creating Alpaca client...")
-	logger.Debug.Printf("Alpaca client configuration: BaseURL=%s, PaperTrading=%v", "https://paper-api.alpaca.markets", cfg.AlpacaPaperTrading)
-	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey, cfg.AlpacaPaperTrading)
+	logger.Info.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets")
+
+	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
 
 	// Create symbol service for company/sector lookups
 	symbolService := symbols.NewSP500Service("assets/symbols")
@@ -123,13 +127,10 @@ func main() {
 	r.HandleFunc("/api/sp500/top25", sp500Handler.GetTop25Handler).Methods("GET")
 
 	// Start server
-	log.Printf("🌐 Server starting on http://localhost:%s", cfg.Port)
-	logger.Debug.Printf("Server routes configured, listening on port %s", cfg.Port)
+	fmt.Printf("🌐 Server starting on http://localhost:%s\n", cfg.Port)
+	logger.Info.Printf("🌐 HTTP server started on port %s", cfg.Port)
 
-	// Check if we should open browser
-	if os.Getenv("OPEN_BROWSER") == "true" {
-		// Opening browser
-	}
+	// Browser opening can be handled externally via OPEN_BROWSER env var if needed
 
 	if err := http.ListenAndServe("0.0.0.0:"+cfg.Port, r); err != nil {
 		log.Fatal("Server failed to start:", err)

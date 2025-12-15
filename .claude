@@ -75,7 +75,7 @@ ps aux | grep barracuda
 3. **Alpaca Market Integration** (`internal/alpaca/`)
    - Real-time stock prices and options chains
    - Historical data for volatility analysis
-   - Paper trading and live trading support
+   - Live trading support
 
 4. **HTTP API Server** (`main.go`)
    - CUDA-accelerated endpoints (`/cuda/*`)
@@ -98,7 +98,7 @@ ps aux | grep barracuda
 4. **Results**: Processed data → JSON API → Client applications
 
 ## Configuration
-Environment variables control API keys, trading mode (paper/live), default settings, and server configuration.
+Environment variables control API keys, default settings, and server configuration.
 
 ## Performance
 - CUDA processing: ~175ms for 503 symbols

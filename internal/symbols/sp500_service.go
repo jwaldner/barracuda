@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jwaldner/barracuda/internal/logger"
 )
 
 // Symbol represents a single S&P 500 stock symbol with metadata
@@ -63,12 +64,12 @@ func (s *SP500Service) UpdateSymbols() error {
 		// Fallback to GitHub CSV
 		symbols, err = s.fetchFromGitHubCSV()
 		if err != nil {
-			log.Printf("📦 All fetch sources failed, loading from assets...")
+			logger.Warn.Printf("📦 All fetch sources failed, loading from assets...")
 			symbols, err = s.loadFromAssets()
 			if err != nil || len(symbols) == 0 {
 				return fmt.Errorf("fetch failed and no assets available: %v", err)
 			}
-			log.Printf("✅ Loaded %d symbols from assets", len(symbols))
+			logger.Info.Printf("✅ Loaded %d symbols from assets", len(symbols))
 		} else {
 			// Success! Build new assets
 			s.buildAssets(symbols)
@@ -92,7 +93,7 @@ func (s *SP500Service) UpdateSymbols() error {
 		return fmt.Errorf("failed to save symbols: %v", err)
 	}
 
-	log.Printf("✅ Successfully updated %d S&P 500 symbols", len(symbols))
+	logger.Info.Printf("✅ Successfully updated %d S&P 500 symbols", len(symbols))
 	return nil
 }
 
@@ -101,7 +102,7 @@ func (s *SP500Service) fetchFromSPDowJones() ([]Symbol, error) {
 	// Note: S&P Dow Jones official sources are complex (Excel files, web scraping)
 	// For now, we use GitHub CSV which is sourced from S&P quarterly updates
 	// This gives us the quarterly accuracy you remember without parsing complexity
-	log.Printf("📊 Using S&P-sourced GitHub CSV (reflects quarterly S&P updates)")
+	logger.Info.Printf("📊 Using S&P-sourced GitHub CSV (reflects quarterly S&P updates)")
 	return s.fetchFromGitHubCSV()
 }
 
@@ -116,7 +117,7 @@ func (s *SP500Service) fetchFromGitHubCSV() ([]Symbol, error) {
 	for _, url := range urls {
 		symbols, err := s.fetchCSVSource(url)
 		if err != nil {
-			log.Printf("GitHub CSV failed from %s: %v", url, err)
+			logger.Warn.Printf("GitHub CSV failed from %s: %v", url, err)
 			continue
 		}
 		return symbols, nil
@@ -476,7 +477,7 @@ func (s *SP500Service) AutoUpdate(maxAge time.Duration) error {
 	}
 
 	if !info["exists"].(bool) {
-		log.Printf("📋 No S&P 500 symbols found, fetching for the first time...")
+		logger.Info.Printf("📋 No S&P 500 symbols found, fetching for the first time...")
 		return s.UpdateSymbols()
 	}
 
@@ -491,11 +492,11 @@ func (s *SP500Service) AutoUpdate(maxAge time.Duration) error {
 	}
 
 	if time.Since(updateTime) > maxAge {
-		log.Printf("📋 S&P 500 symbols are %v old, updating...", time.Since(updateTime))
+		logger.Info.Printf("📋 S&P 500 symbols are %v old, updating...", time.Since(updateTime))
 		return s.UpdateSymbols()
 	}
 
-	log.Printf("📋 S&P 500 symbols are up to date (%v old)", time.Since(updateTime))
+	logger.Info.Printf("📋 S&P 500 symbols are up to date (%v old)", time.Since(updateTime))
 	return nil
 }
 
@@ -512,7 +513,7 @@ func (s *SP500Service) buildAssets(symbols []Symbol) {
 
 	file, err := os.Create(s.assetFile)
 	if err != nil {
-		log.Printf("⚠️ Failed to create asset file: %v", err)
+		logger.Warn.Printf("⚠️ Failed to create asset file: %v", err)
 		return
 	}
 	defer file.Close()
@@ -520,9 +521,9 @@ func (s *SP500Service) buildAssets(symbols []Symbol) {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(data); err != nil {
-		log.Printf("⚠️ Failed to write asset file: %v", err)
+		logger.Warn.Printf("⚠️ Failed to write asset file: %v", err)
 	} else {
-		log.Printf("📦 Built asset backup with %d symbols", len(symbols))
+		logger.Info.Printf("📦 Built asset backup with %d symbols", len(symbols))
 	}
 }
 

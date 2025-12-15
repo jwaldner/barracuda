@@ -96,16 +96,6 @@ curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
 
 ## Testing Commands
 
-### Test Paper Trading (Will Fail)
-**Description**: This will return 401 unauthorized because we're using Live API keys.
-
-```bash
-curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
-     -H "APCA-API-SECRET-KEY: dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy" \
-     "https://paper-api.alpaca.markets/v2/account"
-```
-
-**Response**: `{"code":40110000,"message":"request is not authorized"}`
 
 ### Verbose Test for Debugging
 **Description**: Uses `-v` flag to show detailed request/response information.
@@ -122,9 +112,9 @@ curl -v -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
 
 ## Key Discoveries
 
-1. **API Keys**: Our keys start with "AK" = Live Trading keys (not Paper Trading)
+1. **API Keys**: Our keys start with "AK" = Live Trading keys
 2. **Options Enabled**: Account has `options_approved_level: 1` and `options_trading_level: 1`
-3. **Working Endpoints**: Live API (`https://api.alpaca.markets`) works, Paper API fails
+3. **Working Endpoints**: Live API (`https://api.alpaca.markets`) works
 4. **Stock Data**: Real-time quotes working via `https://data.alpaca.markets`
 5. **Options Data**: Options contracts and quotes accessible via Live API
 
@@ -133,7 +123,6 @@ curl -v -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
 ```bash
 ALPACA_API_KEY=AKAH5A3VGCR3S9FNWIVC
 ALPACA_SECRET_KEY=dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy
-ALPACA_PAPER_TRADING=false  # Must be false for these keys
 
 
 # Test account connection
@@ -158,6 +147,6 @@ curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
 
 curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
      -H "APCA-API-SECRET-KEY: dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy" \
-     "https://api.alpaca.markets/v2/options/contracts?underlying_symbols=AFL&expiration_date=2025-07-18&type=put&strike_price_lte=90"
+     "https://api.alpaca.markets/v2/options/contracts?underlying_symbols=AAPL&expiration_date=2026-01-16&type=put&strike_price_lte=265"
 
 ```

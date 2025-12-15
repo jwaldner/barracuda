@@ -86,7 +86,7 @@
         <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 mb-8">
             <form id="analysis-form" class="space-y-6">
                 <!-- Hidden field for selected delta -->
-                <input type="hidden" id="selected-delta" name="delta" value="{{if eq (defaultRiskLevel) "LOW"}}0.25{{else if eq (defaultRiskLevel) "MOD"}}0.50{{else}}0.75{{end}}">
+                <input type="hidden" id="selected-delta" name="delta" value="{{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}}">
 
                 <!-- Settings Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -130,23 +130,23 @@
                         </label>
                         <div class="risk-selector">
                             <div class="grid grid-cols-3 gap-3">
-                                <button type="button" onclick="selectRisk(0.25)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-green-600/40 border-2 border-green-400 hover:bg-green-600/60 transition-all transform hover:scale-105 duration-300"
-                                    data-delta="0.25">
-                                    <div class="text-base">{{(riskLevels).low}}</div>
-                                    <div class="text-xs opacity-80">Δ 0.25</div>
+                                <button type="button" onclick="selectRisk(0.10)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "LOW"}}bg-green-600 border-green-300 ring-2 ring-green-300{{else}}bg-green-600/40 border-green-400{{end}} border-2 hover:bg-green-600/60 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.10">
+                                    <div class="text-base">CONSERVATIVE</div>
+                                    <div class="text-xs opacity-80">Δ 0.10</div>
                                 </button>
-                                <button type="button" onclick="selectRisk(0.50)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-orange-400 border-2 border-orange-300 hover:bg-orange-500 transition-all transform hover:scale-105 duration-300"
-                                    data-delta="0.50">
-                                    <div class="text-base">{{(riskLevels).mod}}</div>
-                                    <div class="text-xs opacity-80">Δ 0.50</div>
+                                <button type="button" onclick="selectRisk(0.20)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "MOD"}}bg-orange-500 border-orange-300 ring-2 ring-orange-300{{else}}bg-orange-400 border-orange-300{{end}} border-2 hover:bg-orange-500 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.20">
+                                    <div class="text-base">MODERATE</div>
+                                    <div class="text-xs opacity-80">Δ 0.20</div>
                                 </button>
-                                <button type="button" onclick="selectRisk(0.75)"
-                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white bg-red-600/40 border-2 border-red-400 hover:bg-red-600/60 transition-all transform hover:scale-105 duration-300"
-                                    data-delta="0.75">
-                                    <div class="text-base">{{(riskLevels).high}}</div>
-                                    <div class="text-xs opacity-80">Δ 0.75</div>
+                                <button type="button" onclick="selectRisk(0.30)"
+                                    class="risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white {{if eq (defaultRiskLevel) "HIGH"}}bg-red-600 border-red-300 ring-2 ring-red-300{{else}}bg-red-600/40 border-red-400{{end}} border-2 hover:bg-red-600/60 transition-all transform hover:scale-105 duration-300"
+                                    data-delta="0.30">
+                                    <div class="text-base">AGGRESSIVE</div>
+                                    <div class="text-xs opacity-80">Δ 0.30</div>
                                 </button>
                             </div>
                         </div>
@@ -224,7 +224,7 @@
 
             // Validate selectedDelta before proceeding
             if (isNaN(selectedDelta) || selectedDelta <= 0) {
-                selectedDelta = parseFloat(document.getElementById('selected-delta').value) || {{if eq (defaultRiskLevel) "LOW"}}0.25{{else if eq (defaultRiskLevel) "MOD"}}0.50{{else}}0.75{{end}};
+                selectedDelta = parseFloat(document.getElementById('selected-delta').value) || {{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}};
             }
 
             console.log('Using delta:', selectedDelta);
@@ -420,7 +420,7 @@
     <!-- Initialize JavaScript defaults from backend -->
     <script>
         // ALL defaults come from backend - NO hardcoded values in JavaScript!
-        selectedDelta = {{if eq (defaultRiskLevel) "LOW"}}0.25{{else if eq (defaultRiskLevel) "MOD"}}0.50{{else}}0.75{{end}};
+        selectedDelta = {{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}};
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Barracuda initialized with backend defaults');
@@ -443,9 +443,9 @@
             const riskButtons = document.querySelectorAll('.risk-btn');
             riskButtons.forEach(btn => {
                 const delta = parseFloat(btn.dataset.delta);
-                if ((defaultRiskLevel === 'LOW' && delta === 0.25) ||
-                    (defaultRiskLevel === 'MOD' && delta === 0.50) ||
-                    (defaultRiskLevel === 'HIGH' && delta === 0.75)) {
+                if ((defaultRiskLevel === 'LOW' && delta === 0.10) ||
+                    (defaultRiskLevel === 'MOD' && delta === 0.20) ||
+                    (defaultRiskLevel === 'HIGH' && delta === 0.30)) {
                     btn.classList.add('ring-4', 'ring-white/50');
                 }
             });

@@ -6,19 +6,29 @@ alpaca:
   api_key: "<ALPACA_API_KEY>"  # string (replace locally)
   # Alpaca secret key. Best practice: set via env var `ALPACA_SECRET_KEY`.
   secret_key: "<ALPACA_SECRET_KEY>"  # string (keep out of VCS)
-  # Use paper trading endpoint (true for testing, false for live trading)
-  paper_trading: true       # Use paper trading API (bool)
+
+# Logging Configuration
+logging:
+  log_level: "info"          # Log level: error, warn, info, debug, verbose (verbose details only in log file)
+  log_file: "barracuda.log"  # Log file path (default: barracuda.log)
 
 # Trading Configuration
 trading:
   default_cash: 70000       # Available cash for analysis (number)
-  target_delta: 0.25        # Target delta for puts (float, e.g. 0.25)
-  max_results: 25           # Number of top results to return (int)
-  default_stocks: []        # Optional list of stock symbols; empty = use S&P 500
+  # Risk-based option selection with 3 levels of assignment probability
+  # LOW (0.10): Far OTM, ~10% assignment chance, 15% from stock price
+  # MOD (0.20): Medium OTM, ~20% assignment chance, 8% from stock price  
+  # HIGH (0.30): Closer to ATM, ~30% assignment chance, 5% from stock price
+  default_risk_level: "LOW"   # Default button selection: "LOW", "MOD", or "HIGH"
+  max_results: 25            # Number of top results to display (0 = show all)
+  
+  default_stocks: []         # Optional list of stock symbols; empty = use S&P 500
+ 
+  benchmark_stocks: ["TSLA", "NVDA"] # Optional list of benchmark stock symbols log position[s] of these stocks with results; empty = off
 
 # Engine Configuration
 engine:
-  execution_mode: "auto"   # "auto" or "manual" - controls automatic execution
+  execution_mode: "auto"   # "auto" or "manual" or "cpu" or "cuda" - controls execution mode
   batch_size: 1000          # Number of items processed per batch (int)
   enable_benchmarks: true   # Enable benchmark logging (bool)
   
@@ -30,14 +40,9 @@ engine:
   # - Simulate heavy computational scenarios
   # How it works: Acts as a MULTIPLIER - 0.0 = OFF (default), 1.0 = baseline work,
   # 2.0 = double work, 0.5 = half work, 5.0 = extreme stress
-  # NOTE: Currently configured but not fully implemented in calculation engine
-  workload_factor: 0.0      # 0.0 = OFF (default) (float)
+  workload_factor: 0.0      # 1.0 = baseline test (matches C++ benchmark) (float)
 
 # S&P 500 Configuration
 sp500:
-  # When true the application attempts to refresh the S&P 500 symbol list
-  # automatically on startup and according to `update_interval_hours`.
-  # Set to `false` to disable automatic symbol updates (recommended by default).
-  auto_update: false        # Auto-update symbols on startup (bool)
   update_interval_hours: 168 # Hours between updates; 168 = weekly (int)
   data_source: "github_csv" # Data source for S&P 500 symbols (string)

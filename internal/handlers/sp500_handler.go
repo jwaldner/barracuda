@@ -3,10 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/jwaldner/barracuda/internal/logger"
 	"github.com/jwaldner/barracuda/internal/symbols"
 )
 
@@ -24,14 +24,14 @@ func NewSP500Handler() *SP500Handler {
 
 // UpdateSymbolsHandler manually triggers symbol update
 func (h *SP500Handler) UpdateSymbolsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("📡 Manual S&P 500 symbol update requested")
+	logger.Info.Printf("📡 Manual S&P 500 symbol update requested")
 
 	startTime := time.Now()
 	err := h.symbolService.UpdateSymbols()
 	duration := time.Since(startTime)
 
 	if err != nil {
-		log.Printf("❌ Symbol update failed: %v", err)
+		logger.Error.Printf("❌ Symbol update failed: %v", err)
 		http.Error(w, fmt.Sprintf("Update failed: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -50,14 +50,14 @@ func (h *SP500Handler) UpdateSymbolsHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("✅ Symbol update completed in %v", duration)
+	logger.Info.Printf("✅ Symbol update completed in %v", duration)
 }
 
 // GetSymbolsHandler returns current S&P 500 symbols
 func (h *SP500Handler) GetSymbolsHandler(w http.ResponseWriter, r *http.Request) {
 	// Auto-update if symbols are older than 7 days
 	if err := h.symbolService.AutoUpdate(7 * 24 * time.Hour); err != nil {
-		log.Printf("⚠️ Auto-update failed: %v", err)
+		logger.Warn.Printf("⚠️ Auto-update failed: %v", err)
 	}
 
 	symbols, err := h.symbolService.LoadSymbols()
@@ -80,7 +80,7 @@ func (h *SP500Handler) GetSymbolsHandler(w http.ResponseWriter, r *http.Request)
 func (h *SP500Handler) GetSymbolListHandler(w http.ResponseWriter, r *http.Request) {
 	// Auto-update if needed
 	if err := h.symbolService.AutoUpdate(7 * 24 * time.Hour); err != nil {
-		log.Printf("⚠️ Auto-update failed: %v", err)
+		logger.Warn.Printf("⚠️ Auto-update failed: %v", err)
 	}
 
 	tickers, err := h.symbolService.GetSymbolsAsStrings()
