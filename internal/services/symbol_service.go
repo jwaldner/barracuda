@@ -29,19 +29,14 @@ func (s *SymbolService) GetAnalysisSymbols() ([]string, error) {
 		return s.config.DefaultStocks, nil
 	}
 
-	// Fallback to S&P 500 symbols
+	// Fallback to S&P 500 symbols - use ALL symbols for comprehensive analysis
 	sp500Symbols, err := s.sp500Service.GetSymbolsAsStrings()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get S&P 500 symbols: %w", err)
 	}
 
-	// Limit to top 25 for performance
-	const maxSymbols = 25
-	if len(sp500Symbols) > maxSymbols {
-		sp500Symbols = sp500Symbols[:maxSymbols]
-	}
-
-	// Using S&P 500 symbols
+	// Return ALL S&P 500 symbols - results will be limited by max_results config
+	// Using full S&P 500 symbols for analysis
 	return sp500Symbols, nil
 }
 
@@ -50,5 +45,5 @@ func (s *SymbolService) GetSymbolSource() string {
 	if len(s.config.DefaultStocks) > 0 {
 		return fmt.Sprintf("%d Configured: %v", len(s.config.DefaultStocks), s.config.DefaultStocks)
 	}
-	return "Top 25 S&P 500 (no default_stocks configured)"
+	return "Full S&P 500 (~500 symbols, results limited by max_results config)"
 }

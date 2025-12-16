@@ -116,6 +116,79 @@ __global__ void monte_carlo_pi_kernel(int* inside, int samples_per_thread, curan
     states[idx] = local_state;
 }
 
+// CUDA kernel for parallel implied volatility calculation
+__global__ void implied_volatility_kernel(
+    OptionContract* contracts,
+    double* market_prices,
+    int num_contracts) {
+    
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_contracts) return;
+    
+    OptionContract& opt = contracts[idx];
+    double market_price = market_prices[idx];
+    
+    if (market_price <= 0) {
+        opt.volatility = 0.25; // Default volatility
+        return;
+    }
+    
+    // Newton-Raphson method for implied volatility
+    const double tolerance = 1e-6;
+    const int max_iterations = 50; // Reduced for GPU
+    double vol = 0.25; // Initial guess
+    
+    double S = opt.underlying_price;
+    double K = opt.strike_price;
+    double T = opt.time_to_expiration;
+    double r = opt.risk_free_rate;
+    
+    for (int i = 0; i < max_iterations; i++) {
+        double d1 = (log(S / K) + (r + 0.5 * vol * vol) * T) / (vol * sqrt(T));
+        double d2 = d1 - vol * sqrt(T);
+        
+        // Standard normal CDF approximation
+        auto norm_cdf = [](double x) -> double {
+            return 0.5 * (1.0 + erf(x / sqrt(2.0)));
+        };
+        
+        // Standard normal PDF
+        auto norm_pdf = [](double x) -> double {
+            return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
+        };
+        
+        double Nd1 = norm_cdf(d1);
+        double Nd2 = norm_cdf(d2);
+        double nd1 = norm_pdf(d1);
+        
+        double theoretical_price;
+        if (opt.option_type == 'C') {
+            theoretical_price = S * Nd1 - K * exp(-r * T) * Nd2;
+        } else {
+            theoretical_price = K * exp(-r * T) * (1.0 - Nd2) - S * (1.0 - Nd1);
+        }
+        
+        double vega = S * nd1 * sqrt(T);
+        double price_diff = theoretical_price - market_price;
+        
+        if (abs(price_diff) < tolerance) {
+            break;
+        }
+        
+        if (vega < 1e-10) {
+            break; // Avoid division by zero
+        }
+        
+        vol -= price_diff / vega;
+        
+        // Keep volatility in reasonable bounds
+        if (vol < 0.001) vol = 0.001;
+        if (vol > 5.0) vol = 5.0;
+    }
+    
+    opt.volatility = vol;
+}
+
 // Initialize cuRAND states
 __global__ void setup_kernel(curandState* state, unsigned long seed, int num_paths) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -161,6 +234,16 @@ extern "C" {
         int blocksPerGrid = (num_threads + threadsPerBlock - 1) / threadsPerBlock;
         
         monte_carlo_pi_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_inside, samples_per_thread, d_states);
+        
+        cudaDeviceSynchronize();
+    }
+    
+    void launch_implied_volatility_kernel(OptionContract* d_contracts, double* d_market_prices, int num_contracts) {
+        int threadsPerBlock = 256;
+        int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
+        
+        implied_volatility_kernel<<<blocksPerGrid, threadsPerBlock>>>(
+            d_contracts, d_market_prices, num_contracts);
         
         cudaDeviceSynchronize();
     }

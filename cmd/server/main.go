@@ -22,8 +22,8 @@ func main() {
 	cfg := config.Load()
 	log.Println("⚙️  Configuration loaded")
 
-	// Initialize proper logging with config level
-	if err := logger.InitWithLevel(cfg.Logging.LogLevel); err != nil {
+	// Initialize proper logging with config level and file path
+	if err := logger.InitWithConfig(cfg.Logging.LogLevel, cfg.Logging.LogFile); err != nil {
 		log.Fatalf("Failed to initialize logging: %v", err)
 	}
 	logger.Info.Printf("📝 Logging system initialized - level: %s -> %s", cfg.Logging.LogLevel, cfg.Logging.LogFile)

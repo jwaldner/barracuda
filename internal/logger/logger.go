@@ -23,10 +23,14 @@ func Init() error {
 }
 
 func InitWithLevel(logLevel string) error {
+	return InitWithConfig(logLevel, "barracuda.log")
+}
+
+func InitWithConfig(logLevel, logFilePath string) error {
 	currentLogLevel = logLevel
 
 	// Open log file
-	logFile, err := os.OpenFile("barracuda.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}

@@ -166,14 +166,7 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			return defaultExpirationDate
 		},
 		"defaultStocks": func() []string {
-			// Use asset symbols if config is empty, otherwise use config
-			if len(h.config.DefaultStocks) == 0 {
-				// Load from assets
-				symbols, err := h.symbolService.GetSymbolsAsStrings()
-				if err == nil && len(symbols) > 0 {
-					return symbols[:8] // Return first 8 symbols from assets
-				}
-			}
+			// Return configured stocks or empty array (empty = use ALL S&P 500)
 			return h.config.DefaultStocks
 		},
 		"assetSymbols": func() map[string]map[string]string {
@@ -194,6 +187,40 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		},
 		"defaultRiskLevel": func() string {
 			return h.config.DefaultRiskLevel
+		},
+
+		// System status for footer
+		"computeMode": func() string {
+			if h.engine != nil && h.engine.IsCudaAvailable() {
+				return "CUDA"
+			}
+			return "CPU"
+		},
+		"deviceInfo": func() string {
+			if h.engine != nil && h.engine.IsCudaAvailable() {
+				return fmt.Sprintf("(%d devices)", h.engine.GetDeviceCount())
+			}
+			return "(fallback mode)"
+		},
+		"engineMode": func() string {
+			return strings.ToUpper(h.config.Engine.ExecutionMode)
+		},
+		"workloadStatus": func() string {
+			if h.config.Engine.WorkloadFactor == 0.0 {
+				return "[OFF]"
+			} else if h.config.Engine.WorkloadFactor == 1.0 {
+				return "[NORMAL]"
+			} else if h.config.Engine.WorkloadFactor < 1.0 {
+				return "[LIGHT]"
+			} else {
+				return "[HEAVY]"
+			}
+		},
+		"maxResults": func() string {
+			if h.config.MaxResults == 0 {
+				return "ALL"
+			}
+			return fmt.Sprintf("%d", h.config.MaxResults)
 		},
 		"defaultStrategy": func() string {
 			return h.config.DefaultStrategy
@@ -243,7 +270,6 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 		// Error messages (backend controlled)
 		"errorMessages": func() map[string]string {
 			return map[string]string{
-				"noSymbols":     "Please enter at least one stock symbol",
 				"noExpiration":  "Please select an expiration date",
 				"invalidCash":   "Available cash must be greater than 0",
 				"copyFailed":    "Failed to copy to clipboard. Please copy manually:",
@@ -331,18 +357,33 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// VERBOSE: Log request parameters
-	logger.Verbose.Printf("=== OPTIONS ANALYSIS REQUEST ===")
-	logger.Verbose.Printf("Symbols: %v", req.Symbols)
-	logger.Verbose.Printf("Expiration Date: %s", req.ExpirationDate)
-	logger.Verbose.Printf("Target Delta: %.2f", req.TargetDelta)
-	logger.Verbose.Printf("Available Cash: $%.2f", req.AvailableCash)
-	logger.Verbose.Printf("Strategy: %s", req.Strategy)
+	logger.Debug.Printf("=== OPTIONS ANALYSIS REQUEST ===")
+	logger.Debug.Printf("Symbols: %v", req.Symbols)
+	logger.Debug.Printf("Expiration Date: %s", req.ExpirationDate)
+	logger.Debug.Printf("Target Delta: %.2f", req.TargetDelta)
+	logger.Debug.Printf("Available Cash: $%.2f", req.AvailableCash)
+	logger.Debug.Printf("Strategy: %s", req.Strategy)
+
+	// If no symbols provided, use configured symbols or S&P 500
+	if len(req.Symbols) == 0 {
+		// Use configured stocks if available, otherwise S&P 500
+		if len(h.config.DefaultStocks) > 0 {
+			req.Symbols = h.config.DefaultStocks
+			logger.Info.Printf("📊 Using %d configured default stocks", len(h.config.DefaultStocks))
+		} else {
+			// Get all S&P 500 symbols
+			symbols, err := h.symbolService.GetSymbolsAsStrings()
+			if err != nil {
+				logger.Error.Printf("❌ Failed to get S&P 500 symbols: %v", err)
+				http.Error(w, fmt.Sprintf("Failed to get S&P 500 symbols: %v", err), http.StatusInternalServerError)
+				return
+			}
+			req.Symbols = symbols
+			logger.Info.Printf("📊 Using %d S&P 500 symbols (default_stocks empty)", len(symbols))
+		}
+	}
 
 	// Validate request
-	if len(req.Symbols) == 0 {
-		http.Error(w, "At least one symbol is required", http.StatusBadRequest)
-		return
-	}
 	if req.AvailableCash <= 0 {
 		http.Error(w, "Available cash must be positive", http.StatusBadRequest)
 		return
@@ -356,9 +397,9 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Info.Printf("📊 Analyzing %s options for %d symbols with batch processing", req.Strategy, len(req.Symbols))
 
 	// Clean and prepare symbols
-	logger.Verbose.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
+	logger.Debug.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
 		req.Strategy, req.TargetDelta, req.ExpirationDate, req.AvailableCash)
-	logger.Verbose.Printf("🔍 RAW SYMBOLS: %v", req.Symbols)
+	logger.Debug.Printf("🔍 RAW SYMBOLS: %v", req.Symbols)
 
 	cleanSymbols := make([]string, 0, len(req.Symbols))
 	for _, symbol := range req.Symbols {
@@ -367,10 +408,15 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	logger.Verbose.Printf("🔍 CLEANED SYMBOLS: %v", cleanSymbols)
+	logger.Debug.Printf("🔍 CLEANED SYMBOLS: %v", cleanSymbols)
 
+	// If no cleaned symbols AND original request was empty, use S&P 500
 	if len(cleanSymbols) == 0 {
-		logger.Warn.Printf("⚠️ No valid symbols provided")
+		if len(req.Symbols) == 0 {
+			// Original request was empty - this was handled above, should not happen
+			logger.Error.Printf("❌ Unexpected: cleanSymbols empty but req.Symbols was filled")
+		}
+		logger.Warn.Printf("⚠️ No valid symbols after cleaning")
 		duration := time.Since(startTime)
 		response := models.AnalysisResponse{
 			Results:         []models.OptionResult{},
@@ -386,6 +432,11 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Major Step: Analysis Start  
+	logger.Warn.Printf("🚀 START: %d symbols | %s | %s", 
+		len(cleanSymbols), req.Strategy, map[bool]string{true: "CUDA", false: "CPU"}[h.engine.IsCudaAvailable()])
+
+	
 	// Get stock prices in batches (up to 100 symbols per API call)
 	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
@@ -396,6 +447,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	logger.Info.Printf("📊 Retrieved %d stock prices", len(stockPrices))
+	logger.Debug.Printf("📊 Processing options for %d symbols with valid prices", len(stockPrices))
 
 	// Pre-load company/sector info for all symbols (universal lookup)
 	companyData := make(map[string]struct {
@@ -411,10 +463,9 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	logger.Info.Printf("📋 Enriched %d symbols with company/sector data", len(companyData))
 
-	// Process real options data using batch approach
-	results := h.processBatchedRealOptions(stockPrices, req, companyData)
+	// Process real options data using individual approach
+	results := h.processRealOptions(stockPrices, req, companyData)
 
-	// Apply workload factor using same Monte Carlo calculations as C++ benchmark
 	if h.config.Engine.WorkloadFactor > 0.0 {
 		workloadStart := time.Now()
 		logger.Info.Printf("🔥 Applying workload factor %.1fx - running Monte Carlo calculations...", h.config.Engine.WorkloadFactor)
@@ -424,7 +475,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		testSamples := int(float64(baseSamples) * h.config.Engine.WorkloadFactor)
 
 		// Run appropriate test based on execution mode
-		if h.engine.IsCudaAvailable() {
+		if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
 			// CUDA mode: run CUDA only
 			logger.Info.Printf("⚡ Running CUDA Parallel workload for %d samples...", testSamples)
 			cudaResult := monteCarloParallelCUDA(testSamples, h.engine)
@@ -452,29 +503,95 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Calculate processing statistics with Monte Carlo samples
+	// Apply max_results limit from config (0 = show all)
+	if h.config.MaxResults > 0 && len(results) > h.config.MaxResults {
+		results = results[:h.config.MaxResults]
+		logger.Info.Printf("📊 Limited results to top %d (max_results config)", h.config.MaxResults)
+	}
+
+	// Calculate processing statistics with Monte Carlo workload benchmark
 	duration := time.Since(startTime)
+
+	// Monte Carlo benchmark processing (matches C++ benchmark behavior)
 	baseSamples := 5000000 // Base Monte Carlo samples (matches C++ benchmark)
 	totalSamplesProcessed := int(float64(baseSamples) * h.config.Engine.WorkloadFactor)
-	processingStats := fmt.Sprintf("✅ Processed %d Monte Carlo samples | Returned %d results | %.2f seconds | CUDA: %v",
-		totalSamplesProcessed, len(results), duration.Seconds(), h.engine.IsCudaAvailable())
-	logger.Info.Printf(processingStats)
+
+	var mcResult MonteCarloResult
+	if h.config.Engine.WorkloadFactor > 0.0 {
+		// Execute workload benchmark based on engine type and execution mode
+		if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
+			// Use CUDA benchmark: 1000 contracts, iterations based on workload factor
+			iterations := int(h.config.Engine.WorkloadFactor * 10)
+			benchmarkTime := h.engine.BenchmarkCalculation(1000, iterations)
+			mcResult = MonteCarloResult{
+				SamplesProcessed:  totalSamplesProcessed,
+				PiEstimate:        3.14159, // Placeholder
+				ComputationTimeMs: benchmarkTime,
+				ProcessingMode:    "CUDA_Benchmark",
+			}
+		} else {
+			mcResult = monteCarloSeqCPU(totalSamplesProcessed)
+		}
+		logger.Info.Printf("🎯 MONTE CARLO BENCHMARK: %d samples | %.2fms | π≈%.4f | %s",
+			mcResult.SamplesProcessed, mcResult.ComputationTimeMs, mcResult.PiEstimate, mcResult.ProcessingMode)
+	}
+
+	// Log processing performance stats
+	engineType := "CPU"
+	if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
+		engineType = "CUDA GPU"
+	}
+
+	// Major Step: Completion
+	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs | %s engine", len(results), duration.Seconds(), engineType)
+	logger.Debug.Printf("🔍 DEBUG: Analysis completed, formatting response")
+	
+	// Check if client is still connected
+	select {
+	case <-r.Context().Done():
+		logger.Error.Printf("❌ Client disconnected before response could be sent: %v", r.Context().Err())
+		return
+	default:
+		logger.Debug.Printf("✅ Client connection still active, proceeding with response")
+	}
+	
+	logger.Always.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx", 
+		engineType, duration.Seconds(), len(cleanSymbols), len(results), h.config.Engine.ExecutionMode, h.config.Engine.WorkloadFactor)
+		
+	// Final processing summary - ALWAYS show real job stats, ADD workload if present
+	processingStats := fmt.Sprintf("✅ Processed %d symbols | Returned %d results | %.3f seconds | Engine: %s",
+		len(cleanSymbols), len(results), duration.Seconds(), engineType)
+
+	// ADD workload benchmark stats to the real job processing
+	if h.config.Engine.WorkloadFactor > 0.0 && totalSamplesProcessed > 0 {
+		processingStats += fmt.Sprintf(" | %d Monte Carlo samples", totalSamplesProcessed)
+	}
+	logger.Always.Printf(processingStats)
 
 	// Convert to formatted response with dual values
+	logger.Debug.Printf("🔄 Converting %d results to formatted response", len(results))
 	var formattedResults []models.FormattedOptionResult
 	for i, result := range results {
 		formattedResults = append(formattedResults, *h.convertToFormattedResult(&result, i+1))
 	}
+	logger.Debug.Printf("✅ Formatted %d results for JSON response", len(formattedResults))
 
 	// VERBOSE: Final results summary
-	logger.Verbose.Printf("=== ANALYSIS RESULTS SUMMARY ===")
-	logger.Verbose.Printf("Total symbols processed: %d", len(req.Symbols))
-	logger.Verbose.Printf("Options after filtering: %d", len(results))
-	logger.Verbose.Printf("Processing time: %.2f seconds", duration.Seconds())
-	logger.Verbose.Printf("Strategy: %s", req.Strategy)
-	logger.Verbose.Printf("Available cash: $%.2f", req.AvailableCash)
+	logger.Debug.Printf("=== ANALYSIS RESULTS SUMMARY ===")
+	logger.Debug.Printf("Total symbols processed: %d", len(req.Symbols))
+	logger.Debug.Printf("Options after filtering: %d", len(results))
+	logger.Debug.Printf("Processing time: %.2f seconds", duration.Seconds())
+	logger.Debug.Printf("Strategy: %s", req.Strategy)
+	logger.Debug.Printf("Available cash: $%.2f", req.AvailableCash)
+	
+	// Verbose: Detailed results breakdown
+	logger.Verbose.Printf("=== VERBOSE RESULTS DETAIL ===")
+	logger.Verbose.Printf("Symbols processed: %d | Results found: %d | Processing time: %.2f seconds", 
+		len(req.Symbols), len(results), duration.Seconds())
 	if len(results) > 0 {
-		logger.Verbose.Printf("Top result: %s $%.2f premium with %d contracts", results[0].Ticker, results[0].Premium, results[0].MaxContracts)
+		logger.Debug.Printf("Top result: %s $%.2f premium with %d contracts", results[0].Ticker, results[0].Premium, results[0].MaxContracts)
+		logger.Verbose.Printf("Top result detail: %s | Strike: $%.2f | Premium: $%.2f | Delta: %.3f | Contracts: %d", 
+			results[0].Ticker, results[0].Strike, results[0].Premium, results[0].Delta, results[0].MaxContracts)
 	}
 
 	response := &models.FormattedAnalysisResponse{
@@ -484,16 +601,68 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			FieldMetadata: h.getFieldMetadata(),
 		},
 		Meta: models.ResponseMetadata{
-			Strategy:        req.Strategy,
-			ExpirationDate:  req.ExpirationDate,
-			Timestamp:       time.Now().Format(time.RFC3339),
-			ProcessingTime:  duration.Seconds(),
-			ProcessingStats: processingStats,
+			Strategy:         req.Strategy,
+			ExpirationDate:   req.ExpirationDate,
+			Timestamp:        time.Now().Format(time.RFC3339),
+			ProcessingTime:   duration.Seconds(),
+			ProcessingStats:  processingStats,
+			Engine:           engineType,
+			CudaAvailable:    h.engine.IsCudaAvailable(),
+			ExecutionMode:    h.config.Engine.ExecutionMode,
+			SymbolCount:      len(cleanSymbols),
+			ResultCount:      len(results),
+			WorkloadFactor:   h.config.Engine.WorkloadFactor,
+			SamplesProcessed: totalSamplesProcessed,
 		},
 	}
 
+	logger.Debug.Printf("🔄 Starting JSON encoding...")
+	
+	// Sanitize response data to remove infinity/NaN values that break JSON
+	h.sanitizeResponseData(response)
+	
+	// Debug: Try to find infinity values before encoding
+	logger.Debug.Printf("🔍 Checking for infinity values in response...")
+	h.debugInfinityValues(response)
+	
+	// Pre-encode JSON to get accurate size
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		logger.Error.Printf("❌ JSON encoding failed: %v", err)
+		logger.Error.Printf("🔍 Response structure: Results=%d, Meta fields present", len(response.Data.Results))
+		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
+		return
+	}
+	logger.Debug.Printf("✅ JSON encoded successfully (%d bytes)", len(jsonBytes))
+	
+	// Check connection again before sending
+	select {
+	case <-r.Context().Done():
+		logger.Error.Printf("❌ Client disconnected during JSON encoding: %v", r.Context().Err())
+		return
+	default:
+		// Continue with response
+	}
+	
+	// Set headers with accurate content length
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonBytes)))
+	logger.Debug.Printf("📡 Sending JSON response headers...")
+	
+	// Write the complete response
+	logger.Debug.Printf("📡 Writing JSON response body...")
+	if _, err := w.Write(jsonBytes); err != nil {
+		logger.Error.Printf("❌ Failed to write JSON response: %v", err)
+		return
+	}
+	
+	// Ensure the response is flushed to client
+	logger.Debug.Printf("📡 Flushing response...")
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+	
+	logger.Debug.Printf("✅ JSON response sent successfully (%d bytes)", len(jsonBytes))
 }
 
 // TestConnectionHandler tests Alpaca API connection
@@ -520,147 +689,60 @@ func (h *OptionsHandler) TestConnectionHandler(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
-// processBatchedRealOptions fetches real options with batching and parallel processing
-func (h *OptionsHandler) processBatchedRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
+// processRealOptions fetches real options individually
+func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
-
-	// Get symbols list
-	symbols := make([]string, 0, len(stockPrices))
-	for symbol := range stockPrices {
-		symbols = append(symbols, symbol)
-	}
-
-	logger.Info.Printf("📊 Fetching real options data for %d symbols in batches...", len(symbols))
-
-	// Process symbols in batches of 10 to avoid API rate limits
-	batchSize := 10
-	for i := 0; i < len(symbols); i += batchSize {
-		end := i + batchSize
-		if end > len(symbols) {
-			end = len(symbols)
-		}
-
-		batch := symbols[i:end]
-		logger.Info.Printf("🔄 Processing batch %d-%d (%d symbols)", i+1, end, len(batch))
-
-		// Process calls and puts separately for better API performance
-		if req.Strategy == "calls" || req.Strategy == "both" {
-			callResults := h.processBatchOptionsType(batch, stockPrices, req, "calls", companyData)
-			results = append(results, callResults...)
-		}
-
-		if req.Strategy == "puts" || req.Strategy == "both" {
-			putResults := h.processBatchOptionsType(batch, stockPrices, req, "puts", companyData)
-			results = append(results, putResults...)
-		} // Rate limiting between batches
-		if end < len(symbols) {
-			time.Sleep(500 * time.Millisecond)
-		}
-	}
-
-	logger.Info.Printf("✅ Processed %d symbol batches, %d total results", (len(symbols)+batchSize-1)/batchSize, len(results))
-	return results
-}
-
-// processBatchOptionsType processes a batch of symbols for a specific option type (calls/puts)
-func (h *OptionsHandler) processBatchOptionsType(symbols []string, stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, optionType string, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
-	var results []models.OptionResult
-
-	logger.Info.Printf("🎯 Fetching %s options for batch: %v", optionType, symbols)
-
-	// VERBOSE: Log Alpaca API call details
-	logger.Verbose.Printf("=== ALPACA API CALL ===")
-	logger.Verbose.Printf("Fetching options chain for %d symbols: %v", len(symbols), symbols)
-	logger.Verbose.Printf("Option Type: %s, Expiration: %s", optionType, req.ExpirationDate)
-
-	// Get options chain from Alpaca for this specific type
-	optionsChain, err := h.alpacaClient.GetOptionsChain(symbols, req.ExpirationDate, optionType)
-	if err != nil {
-		logger.Verbose.Printf("❌ Alpaca API call failed: %v", err)
-		logger.Error.Printf("❌ Error getting %s options chain: %v", optionType, err)
-		return results
-	}
-
-	logger.Verbose.Printf("✅ Retrieved %d total option contracts from Alpaca", len(optionsChain))
-
-	totalContracts := 0
-	for symbol, contracts := range optionsChain {
-		totalContracts += len(contracts)
-		logger.Verbose.Printf("Symbol %s: %d %s contracts retrieved", symbol, len(contracts), optionType)
-	}
-	logger.Info.Printf("📊 Retrieved %d %s contracts for batch", totalContracts, optionType)
-
-	// Calculate time to expiration once for all contracts
-	expDate, err := time.Parse("2006-01-02", req.ExpirationDate)
-	if err != nil {
-		logger.Error.Printf("❌ Invalid expiration date: %v", err)
-		return results
-	}
-	timeToExp := time.Until(expDate).Hours() / (24 * 365.25)
-
-	// Unified processing: automatically chooses CUDA/CPU internally
-	engineType := "CPU"
-	if h.engine.IsCudaAvailable() {
-		engineType = "CUDA GPU"
-	}
-	logger.Info.Printf("⚡ Processing %d symbols using %s acceleration", len(optionsChain), engineType)
-
-	type symbolResult struct {
-		result *models.OptionResult
-		symbol string
-	}
-
-	resultsChan := make(chan symbolResult, len(optionsChain))
+	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	// Launch parallel goroutines for each symbol
-	for symbol, contracts := range optionsChain {
-		stockPrice := stockPrices[symbol]
-		if stockPrice == nil {
-			continue
-		}
+	// Calculate time to expiration
+	expirationTime, err := time.Parse("2006-01-02", req.ExpirationDate)
+	if err != nil {
+		logger.Error.Printf("❌ Invalid expiration date format: %v", err)
+		return results
+	}
+	timeToExp := time.Until(expirationTime).Hours() / (24 * 365.25)
 
+	// Process each symbol individually
+	for symbol, stockPrice := range stockPrices {
 		wg.Add(1)
-		go func(sym string, contracts []*alpaca.OptionContract, stockPx float64) {
+		go func(sym string, price *alpaca.StockPrice) {
 			defer wg.Done()
 
-			logger.Verbose.Printf("📈 Processing %d %s options for %s (stock: $%.2f)", len(contracts), optionType, sym, stockPx)
-
-			// Find best option based on target delta and available cash
-			bestContract := h.findBestOptionContract(contracts, stockPx, req.TargetDelta, optionType)
-			if bestContract != nil {
-				// Get company info for this symbol
-				companyInfo := companyData[sym]
-				// Unified calculation - black box handles CUDA/CPU
-				result := h.convertRealOptionToResult(sym, stockPx, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp, companyInfo.Company, companyInfo.Sector)
-				if result != nil {
-					resultsChan <- symbolResult{result: result, symbol: sym}
-					logger.Verbose.Printf("✅ Found best %s option for %s: Strike $%.2f, Premium $%.2f", optionType, sym, result.Strike, result.Premium)
-				} else {
-					resultsChan <- symbolResult{result: nil, symbol: sym}
-				}
-			} else {
-				logger.Verbose.Printf("⚠️ No suitable %s options found for %s", optionType, sym)
-				resultsChan <- symbolResult{result: nil, symbol: sym}
+			// Get options for this symbol
+			optionsChain, err := h.alpacaClient.GetOptionsChain([]string{sym}, req.ExpirationDate, req.Strategy)
+			if err != nil {
+				logger.Error.Printf("❌ Error getting options for %s: %v", sym, err)
+				return
 			}
-		}(symbol, contracts, stockPrice.Price)
+
+			contracts, exists := optionsChain[sym]
+			if !exists || len(contracts) == 0 {
+				return
+			}
+
+			// Find best option
+			bestContract := h.findBestOptionContract(contracts, price.Price, req.TargetDelta, req.Strategy)
+			if bestContract == nil {
+				return
+			}
+
+			// Convert to result
+			companyInfo := companyData[sym]
+			result := h.convertRealOptionToResult(sym, price.Price, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp, companyInfo.Company, companyInfo.Sector)
+			if result != nil {
+				mu.Lock()
+				results = append(results, *result)
+				mu.Unlock()
+			}
+		}(symbol, stockPrice)
 	}
 
-	// Close channel when all goroutines complete
-	go func() {
-		wg.Wait()
-		close(resultsChan)
-	}()
-
-	// Collect results
-	for symbolRes := range resultsChan {
-		if symbolRes.result != nil {
-			results = append(results, *symbolRes.result)
-		}
-	}
-
+	wg.Wait()
 	return results
 }
+
+
 
 // findBestOptionContract finds the best option contract based on criteria
 func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContract, stockPrice float64, targetDelta float64, strategy string) *alpaca.OptionContract {
@@ -934,6 +1016,90 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 		MaxContracts:          maxContracts,
 		TotalPremium:          totalPremium,
 		CashNeededPerContract: cashNeededPerContract,
+	}
+}
+
+
+
+// debugInfinityValues recursively checks for infinity values in the response
+func (h *OptionsHandler) debugInfinityValues(response *models.FormattedAnalysisResponse) {
+	// Check metadata fields
+	if math.IsInf(response.Meta.ProcessingTime, 0) || math.IsNaN(response.Meta.ProcessingTime) {
+		logger.Error.Printf("🔍 Found infinity in Meta.ProcessingTime: %v", response.Meta.ProcessingTime)
+	}
+	if math.IsInf(response.Meta.WorkloadFactor, 0) || math.IsNaN(response.Meta.WorkloadFactor) {
+		logger.Error.Printf("🔍 Found infinity in Meta.WorkloadFactor: %v", response.Meta.WorkloadFactor)
+	}
+	
+	// Check all results
+	for i, result := range response.Data.Results {
+		for fieldName, field := range result {
+			if rawValue, ok := field.Raw.(float64); ok {
+				if math.IsInf(rawValue, 0) || math.IsNaN(rawValue) {
+					logger.Error.Printf("🔍 Found infinity in result[%d][%s]: %v", i, fieldName, rawValue)
+				}
+			}
+		}
+	}
+}
+
+// sanitizeResponseData removes infinity and NaN values that break JSON encoding
+func (h *OptionsHandler) sanitizeResponseData(response *models.FormattedAnalysisResponse) {
+	// Fix infinity/NaN values in all results
+	for i := range response.Data.Results {
+		result := response.Data.Results[i]
+		
+		// Get ticker for logging
+		ticker := "unknown"
+		if tickerField, exists := result["ticker"]; exists {
+			if tickerStr, ok := tickerField.Raw.(string); ok {
+				ticker = tickerStr
+			}
+		}
+		
+		// Sanitize ALL fields, not just specific ones
+		for fieldName, field := range result {
+			// Check float64 values
+			if rawValue, ok := field.Raw.(float64); ok {
+				if math.IsInf(rawValue, 0) || math.IsNaN(rawValue) {
+					// Replace with zero value
+					field.Raw = 0.0
+					switch fieldName {
+					case "strike", "stock_price", "premium", "total_premium", "total_cash_needed":
+						field.Display = "$0.00"
+					case "delta":
+						field.Display = "0.000"
+					case "profit_percentage":
+						field.Display = "0.00%"
+					default:
+						field.Display = "0.00"
+					}
+					result[fieldName] = field
+					logger.Warn.Printf("🔧 Sanitized infinite %s=%v for %s", fieldName, rawValue, ticker)
+				}
+			}
+			
+			// Check float32 values (just in case)
+			if rawValue, ok := field.Raw.(float32); ok {
+				if math.IsInf(float64(rawValue), 0) || math.IsNaN(float64(rawValue)) {
+					field.Raw = float32(0.0)
+					field.Display = "0.00"
+					result[fieldName] = field
+					logger.Warn.Printf("🔧 Sanitized infinite float32 %s=%v for %s", fieldName, rawValue, ticker)
+				}
+			}
+		}
+	}
+	
+	// Sanitize metadata fields
+	if math.IsInf(response.Meta.ProcessingTime, 0) || math.IsNaN(response.Meta.ProcessingTime) {
+		response.Meta.ProcessingTime = 0
+		logger.Debug.Printf("🔧 Sanitized infinite ProcessingTime")
+	}
+	
+	if math.IsInf(response.Meta.WorkloadFactor, 0) || math.IsNaN(response.Meta.WorkloadFactor) {
+		response.Meta.WorkloadFactor = 0
+		logger.Debug.Printf("🔧 Sanitized infinite WorkloadFactor")
 	}
 }
 

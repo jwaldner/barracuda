@@ -37,6 +37,7 @@ type Config struct {
 	DefaultCash      int
 	DefaultStrategy  string
 	DefaultRiskLevel string
+	MaxResults       int
 
 	// Logging settings
 	Logging LoggingConfig `yaml:"logging"`
@@ -85,8 +86,7 @@ func Load() *Config {
 		DefaultCash:      getEnvInt("DEFAULT_CASH", 10000),
 		DefaultStrategy:  getEnv("DEFAULT_STRATEGY", "puts"),
 		DefaultRiskLevel: getEnv("DEFAULT_RISK_LEVEL", "LOW"),
-
-		// Default logging configuration
+		MaxResults:       getEnvInt("MAX_RESULTS", 25), // Default logging configuration
 		Logging: LoggingConfig{
 			LogLevel: getEnv("LOG_LEVEL", "info"),
 			LogFile:  getEnv("LOG_FILE", "barracuda.log"),
@@ -137,6 +137,8 @@ func Load() *Config {
 		if yamlCfg.Trading.DefaultRiskLevel != "" {
 			cfg.DefaultRiskLevel = yamlCfg.Trading.DefaultRiskLevel
 		}
+		// Always use YAML max_results value (0 = show all)
+		cfg.MaxResults = yamlCfg.Trading.MaxResults
 
 		// Logging configuration from YAML
 		if yamlCfg.Logging.LogLevel != "" {

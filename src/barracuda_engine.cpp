@@ -46,26 +46,77 @@ bool BarracudaEngine::InitializeCUDA() {
 std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
     const std::vector<OptionContract>& contracts) {
     
-    if (!cuda_available_) {
-        std::cerr << "CUDA not available for calculations" << std::endl;
-        return contracts;
-    }
-    
     std::vector<OptionContract> results = contracts;
     
-    // Allocate device memory
-    OptionContract* d_contracts;
-    size_t size = contracts.size() * sizeof(OptionContract);
-    
-    cudaMalloc(&d_contracts, size);
-    cudaMemcpy(d_contracts, results.data(), size, cudaMemcpyHostToDevice);
-    
-    // Launch kernel via wrapper function
-    launch_black_scholes_kernel(d_contracts, contracts.size());
-    
-    // Copy results back
-    cudaMemcpy(results.data(), d_contracts, size, cudaMemcpyDeviceToHost);
-    cudaFree(d_contracts);
+    // Choose execution path based on CUDA availability and execution mode
+    if (cuda_available_ && 
+        (execution_mode_ == ExecutionModeAuto || execution_mode_ == ExecutionModeCUDA)) {
+        
+        // CUDA PARALLEL PATH
+        OptionContract* d_contracts;
+        size_t size = contracts.size() * sizeof(OptionContract);
+        
+        cudaMalloc(&d_contracts, size);
+        cudaMemcpy(d_contracts, results.data(), size, cudaMemcpyHostToDevice);
+        
+        // Launch kernel via wrapper function
+        launch_black_scholes_kernel(d_contracts, contracts.size());
+        
+        // Copy results back
+        cudaMemcpy(results.data(), d_contracts, size, cudaMemcpyDeviceToHost);
+        cudaFree(d_contracts);
+        
+    } else {
+        
+        // CPU SEQUENTIAL PATH  
+        for (auto& contract : results) {
+            // Black-Scholes parameters
+            double S = contract.underlying_price;
+            double K = contract.strike_price;
+            double T = contract.time_to_expiration;
+            double r = contract.risk_free_rate;
+            double sigma = contract.volatility;
+            
+            // Calculate d1 and d2
+            double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
+            double d2 = d1 - sigma * sqrt(T);
+            
+            // Standard normal CDF approximation
+            auto norm_cdf = [](double x) -> double {
+                return 0.5 * (1.0 + erf(x / sqrt(2.0)));
+            };
+            
+            // Standard normal PDF
+            auto norm_pdf = [](double x) -> double {
+                return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
+            };
+            
+            double Nd1 = norm_cdf(d1);
+            double Nd2 = norm_cdf(d2);
+            double nd1 = norm_pdf(d1);
+            
+            if (contract.option_type == 'C') {
+                // Call option
+                contract.theoretical_price = S * Nd1 - K * exp(-r * T) * Nd2;
+                contract.delta = Nd1;
+            } else {
+                // Put option
+                contract.theoretical_price = K * exp(-r * T) * (1.0 - Nd2) - S * (1.0 - Nd1);
+                contract.delta = Nd1 - 1.0;
+            }
+            
+            // Greeks calculations
+            contract.gamma = nd1 / (S * sigma * sqrt(T));
+            contract.theta = -(S * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2;
+            contract.vega = S * nd1 * sqrt(T);
+            contract.rho = K * T * exp(-r * T) * Nd2;
+            
+            if (contract.option_type == 'P') {
+                contract.theta += r * K * exp(-r * T);
+                contract.rho = -contract.rho;
+            }
+        }
+    }
     
     return results;
 }
@@ -127,6 +178,225 @@ VolatilitySkew BarracudaEngine::Calculate25DeltaSkew(
     skew.atm_iv = (best_put_iv + best_call_iv) / 2.0;
     
     return skew;
+}
+
+// Newton-Raphson method for implied volatility calculation
+double BarracudaEngine::CalculateImpliedVolatility(
+    double market_price, double stock_price, double strike_price,
+    double time_to_expiration, double risk_free_rate, char option_type) {
+    
+    const double tolerance = 1e-6;
+    const int max_iterations = 100;
+    double vol = 0.25; // Initial guess: 25%
+    
+    for (int i = 0; i < max_iterations; i++) {
+        // Calculate theoretical price and vega using Black-Scholes
+        double d1 = (log(stock_price / strike_price) + (risk_free_rate + 0.5 * vol * vol) * time_to_expiration) / (vol * sqrt(time_to_expiration));
+        double d2 = d1 - vol * sqrt(time_to_expiration);
+        
+        auto norm_cdf = [](double x) -> double {
+            return 0.5 * (1.0 + erf(x / sqrt(2.0)));
+        };
+        
+        auto norm_pdf = [](double x) -> double {
+            return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
+        };
+        
+        double Nd1 = norm_cdf(d1);
+        double Nd2 = norm_cdf(d2);
+        double nd1 = norm_pdf(d1);
+        
+        double theoretical_price;
+        if (option_type == 'C') {
+            theoretical_price = stock_price * Nd1 - strike_price * exp(-risk_free_rate * time_to_expiration) * Nd2;
+        } else {
+            theoretical_price = strike_price * exp(-risk_free_rate * time_to_expiration) * (1.0 - Nd2) - stock_price * (1.0 - Nd1);
+        }
+        
+        double vega = stock_price * nd1 * sqrt(time_to_expiration);
+        
+        double price_diff = theoretical_price - market_price;
+        
+        if (abs(price_diff) < tolerance) {
+            return vol;
+        }
+        
+        if (vega < 1e-10) {
+            break; // Avoid division by zero
+        }
+        
+        vol -= price_diff / vega;
+        
+        // Keep volatility in reasonable bounds
+        if (vol < 0.001) vol = 0.001;
+        if (vol > 5.0) vol = 5.0;
+    }
+    
+    return vol; // Return best estimate even if not converged
+}
+
+// Main batch processing function - routes to CUDA or CPU
+std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatch(
+    const std::vector<std::string>& symbols,
+    const std::map<std::string, double>& stock_prices,
+    const std::map<std::string, std::vector<OptionContract>>& options_chains,
+    const std::string& expiration_date) {
+    
+    if (cuda_available_) {
+        return AnalyzeSymbolsBatchParallel(symbols, stock_prices, options_chains, expiration_date);
+    } else {
+        return AnalyzeSymbolsBatchSequential(symbols, stock_prices, options_chains, expiration_date);
+    }
+}
+
+// CUDA parallel processing implementation
+std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatchParallel(
+    const std::vector<std::string>& symbols,
+    const std::map<std::string, double>& stock_prices,
+    const std::map<std::string, std::vector<OptionContract>>& options_chains,
+    const std::string& expiration_date) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::vector<SymbolAnalysisResult> results;
+    
+    for (const auto& symbol : symbols) {
+        SymbolAnalysisResult result;
+        result.symbol = symbol;
+        result.expiration = expiration_date;
+        result.execution_mode = "CUDA";
+        
+        auto stock_it = stock_prices.find(symbol);
+        auto options_it = options_chains.find(symbol);
+        
+        if (stock_it == stock_prices.end() || options_it == options_chains.end()) {
+            continue;
+        }
+        
+        result.stock_price = stock_it->second;
+        const auto& options = options_it->second;
+        
+        // Separate puts and calls with market prices
+        std::vector<OptionContract> puts, calls;
+        for (const auto& option : options) {
+            option.underlying_price = result.stock_price;
+            if (option.option_type == 'P') {
+                puts.push_back(option);
+            } else {
+                calls.push_back(option);
+            }
+        }
+        
+        // PARALLEL: Calculate all options using CUDA
+        if (!puts.empty()) {
+            result.puts_with_iv = CalculateBlackScholes(puts);
+            // TODO: Add parallel implied volatility calculation for puts
+        }
+        if (!calls.empty()) {
+            result.calls_with_iv = CalculateBlackScholes(calls);
+            // TODO: Add parallel implied volatility calculation for calls
+        }
+        
+        // Calculate 25-delta skew
+        if (!result.puts_with_iv.empty() && !result.calls_with_iv.empty()) {
+            result.volatility_skew = Calculate25DeltaSkew(result.puts_with_iv, result.calls_with_iv, expiration_date);
+        }
+        
+        result.total_options_processed = puts.size() + calls.size();
+        results.push_back(result);
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    // Set timing for all results
+    for (auto& result : results) {
+        result.calculation_time_ms = duration.count() / 1000.0;
+    }
+    
+    return results;
+}
+
+// CPU sequential processing implementation
+std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatchSequential(
+    const std::vector<std::string>& symbols,
+    const std::map<std::string, double>& stock_prices,
+    const std::map<std::string, std::vector<OptionContract>>& options_chains,
+    const std::string& expiration_date) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::vector<SymbolAnalysisResult> results;
+    
+    // SEQUENTIAL: Process each symbol one at a time
+    for (const auto& symbol : symbols) {
+        SymbolAnalysisResult result;
+        result.symbol = symbol;
+        result.expiration = expiration_date;
+        result.execution_mode = "CPU";
+        
+        auto stock_it = stock_prices.find(symbol);
+        auto options_it = options_chains.find(symbol);
+        
+        if (stock_it == stock_prices.end() || options_it == options_chains.end()) {
+            continue;
+        }
+        
+        result.stock_price = stock_it->second;
+        const auto& options = options_it->second;
+        
+        // SEQUENTIAL: Process each option contract one by one
+        for (const auto& option : options) {
+            OptionContract processed_option = option;
+            processed_option.underlying_price = result.stock_price;
+            
+            // Calculate time to expiration (simplified)
+            processed_option.time_to_expiration = 0.25; // TODO: Calculate from expiration_date
+            processed_option.risk_free_rate = 0.05; // TODO: Get from config
+            
+            // SEQUENTIAL: Calculate implied volatility one option at a time
+            if (processed_option.theoretical_price > 0) { // If we have market price
+                processed_option.volatility = CalculateImpliedVolatility(
+                    processed_option.theoretical_price, // Using as market price
+                    processed_option.underlying_price,
+                    processed_option.strike_price,
+                    processed_option.time_to_expiration,
+                    processed_option.risk_free_rate,
+                    processed_option.option_type
+                );
+            } else {
+                processed_option.volatility = 0.25; // Default volatility
+            }
+            
+            // Calculate Greeks using Black-Scholes
+            std::vector<OptionContract> single_option = {processed_option};
+            auto calculated = CalculateBlackScholes(single_option);
+            
+            if (!calculated.empty()) {
+                if (processed_option.option_type == 'P') {
+                    result.puts_with_iv.push_back(calculated[0]);
+                } else {
+                    result.calls_with_iv.push_back(calculated[0]);
+                }
+            }
+        }
+        
+        // Calculate 25-delta skew
+        if (!result.puts_with_iv.empty() && !result.calls_with_iv.empty()) {
+            result.volatility_skew = Calculate25DeltaSkew(result.puts_with_iv, result.calls_with_iv, expiration_date);
+        }
+        
+        result.total_options_processed = result.puts_with_iv.size() + result.calls_with_iv.size();
+        results.push_back(result);
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    // Set timing for all results
+    for (auto& result : results) {
+        result.calculation_time_ms = duration.count() / 1000.0;
+    }
+    
+    return results;
 }
 
 std::vector<double> BarracudaEngine::CalculateRollingVolatility(

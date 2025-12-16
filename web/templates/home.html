@@ -80,11 +80,27 @@
             <p class="text-xl text-blue-100 font-medium">
                 {{appDescription}}
             </p>
+            
+            <!-- System Status Display -->
+            <div class="mt-4 flex justify-center space-x-6 text-sm text-blue-200">
+                <span class="bg-white/10 px-3 py-1 rounded-full">
+                    🔥 {{computeMode}} {{deviceInfo}}
+                </span>
+                <span class="bg-white/10 px-3 py-1 rounded-full">
+                    ⚙️ Mode: {{engineMode}}
+                </span>
+                <span class="bg-white/10 px-3 py-1 rounded-full">
+                    🎯 Workload: {{workloadStatus}}
+                </span>
+                <span class="bg-white/10 px-3 py-1 rounded-full">
+                    📊 Results: {{maxResults}}
+                </span>
+            </div>
         </div>
 
         <!-- Main Form -->
         <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 mb-8">
-            <form id="analysis-form" class="space-y-6">
+            <form id="analysis-form" class="space-y-6" novalidate>
                 <!-- Hidden field for selected delta -->
                 <input type="hidden" id="selected-delta" name="delta" value="{{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}}">
 
@@ -205,251 +221,44 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
-    <script>
-        console.log('Barracuda initialized');        function setDefaultDate() {
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
-            const nextFriday = new Date(today);
-            nextFriday.setDate(today.getDate() + daysUntilFriday);
-
-            document.getElementById('expiration-date').value = nextFriday.toISOString().split('T')[0];
-        }
-
-        async function handleSubmit(e) {
-            console.log('Form submission started');
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Validate selectedDelta before proceeding
-            if (isNaN(selectedDelta) || selectedDelta <= 0) {
-                selectedDelta = parseFloat(document.getElementById('selected-delta').value) || {{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}};
-            }
-
-            console.log('Using delta:', selectedDelta);
-
-            // Show loading
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('error-message').classList.add('hidden');
-
-            // Get form values
-            const symbolsValue = document.getElementById('symbols').value;
-            const expirationValue = document.getElementById('expiration-date').value;
-            const cashValue = parseFloat(document.getElementById('available-cash').value);
-
-            console.log('Form values:', {
-                symbols: symbolsValue,
-                expiration: expirationValue,
-                cash: cashValue,
-                delta: selectedDelta
-            });
-
-            // Validate required fields
-            if (!symbolsValue.trim()) {
-				showError(window.errorMessages.noSymbols || 'Please enter at least one stock symbol');
-                document.getElementById('loading').classList.add('hidden');
-                return;
-            }
-
-            if (!expirationValue) {
-                showError(window.errorMessages?.noExpiration || 'Please select an expiration date');
-                document.getElementById('loading').classList.add('hidden');
-                return;
-            }
-
-            if (cashValue <= 0) {
-                showError(window.errorMessages?.invalidCash || 'Available cash must be greater than 0');
-                document.getElementById('loading').classList.add('hidden');
-                return;
-            }
-
-            // Parse symbols into array
-            const symbolsArray = symbolsValue.split('\n')
-                .map(s => s.trim().toUpperCase())
-                .filter(s => s.length > 0);
-
-            // Create JSON request data to match backend API
-            const requestData = {
-                symbols: symbolsArray,
-                expiration_date: expirationValue,
-                target_delta: selectedDelta,
-                available_cash: cashValue,
-                strategy: "puts"  // Always puts since user only trades puts
-            };
-
-            console.log('Sending request:', requestData);
-
-            try {
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                console.log('Response status:', response.status);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error((window.errorMessages?.analysisError || 'HTTP error!') + ' status: ' + response.status + ', message: ' + errorText);
-                }
-
-                const data = await response.json();
-                console.log('Response data:', data);
-                displayResults(data);
-
-            } catch (error) {
-                console.error('Analysis failed:', error);
-                showError((window.errorMessages?.analysisError || 'Analysis failed:') + ' ' + error.message);
-            } finally {
-                document.getElementById('loading').classList.add('hidden');
-            }
-        }
+    <script src="/static/app.js?v=20251216-footer-stats"></script>
 
 
-
-        // One-step analysis function (calls /stock-history endpoint)
-        async function analyzeDrops(symbol) {
-            const dropPercentage = document.getElementById('drop-percentage').value;
-            
-            try {
-                console.log(`Analyzing ${symbol} for ${dropPercentage}% drops...`);
-                
-                const response = await fetch(`/stock-history?symbol=${symbol}&drop=${dropPercentage}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    alert((window.errorMessages?.analysisError || 'Error:') + ' ' + data.error);
-                    return;
-                }
-                
-                let message = `${data.analysis}\n`;
-                if (data.average_days > 0) {
-                    message += `Average days between ${data.drop_threshold}% drops: ${data.average_days.toFixed(0)} days\n`;
-                    message += `\nCalculated using assembly calculator for financial precision\n`;
-                    message += `Drop intervals: ${data.drop_intervals.join(', ')} days`;
-                } else {
-                    message += `No ${data.drop_threshold}% drops found in the data period.`;
-                }
-                
-                alert(message);
-                
-            } catch (error) {
-                alert((window.errorMessages?.analysisError || 'Analysis error:') + ' ' + error.message);
-            }
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-            setTimeout(() => errorDiv.classList.add('hidden'), 8000);
-        }
-
-        async function copyTableToCSV() {
-            const table = document.querySelector('#results table');
-            if (!table) {
-                alert(window.errorMessages?.noResults || 'No table data available to copy');
-                return;
-            }
-
-            const rows = table.querySelectorAll('tr');
-            const csvContent = [];
-
-            // Process each row
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('th, td');
-                const rowData = [];
-                
-                cells.forEach(cell => {
-                    // Get text content and clean it up
-                    let text = cell.textContent.trim();
-                    
-                    // Remove extra whitespace and newlines
-                    text = text.replace(/\s+/g, ' ');
-                    
-                    // Handle commas in values by wrapping in quotes
-                    if (text.includes(',')) {
-                        text = `"${text}"`;
-                    }
-                    
-                    rowData.push(text);
-                });
-                
-                csvContent.push(rowData.join(','));
-            });
-
-            const csvString = csvContent.join('\n');
-
-            try {
-                await navigator.clipboard.writeText(csvString);
-                
-                // Visual feedback
-                const btn = document.getElementById('copy-csv-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '✅ Copied!';
-                btn.classList.add('bg-green-500/40');
-                
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('bg-green-500/40');
-                }, 2000);
-                
-            } catch (err) {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = csvString;
-                document.body.appendChild(textArea);
-                textArea.select();
-                
-                try {
-                    document.execCommand('copy');
-                    alert(window.errorMessages?.copySuccess || 'CSV data copied to clipboard');
-                } catch (fallbackErr) {
-                    					alert((window.errorMessages.copyFailed || 'Failed to copy to clipboard. Please copy manually:') + '\n\n' + csvString);
-                }
-                
-                document.body.removeChild(textArea);
-            }
+    <!-- Backend data passed to JavaScript via data attributes -->
+    <script type="application/json" id="backend-config">
+        {
+            "defaultCash": {{defaultCash}},
+            "defaultExpirationDate": "{{defaultExpirationDate}}",
+            "defaultRiskLevel": "{{defaultRiskLevel}}",
+            "defaultStocks": {{defaultStocks}},
+            "assetSymbols": {{assetSymbols}},
+            "csvHeaders": {{csvHeaders}},
+            "errorMessages": {{errorMessages}}
         }
     </script>
 
-    <!-- Initialize JavaScript defaults from backend -->
-    <script>
-        // ALL defaults come from backend - NO hardcoded values in JavaScript!
-        selectedDelta = {{if eq (defaultRiskLevel) "LOW"}}0.10{{else if eq (defaultRiskLevel) "MOD"}}0.20{{else}}0.30{{end}};
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Barracuda initialized with backend defaults');
-            console.log('📊 Default Cash:', {{defaultCash}});
-            console.log('📅 Default Expiration:', '{{defaultExpirationDate}}');
-            console.log('🎯 Default Risk Level:', '{{defaultRiskLevel}}');
-            console.log('⚖️ Default Delta:', selectedDelta);
-            console.log('📈 Default Stocks:', {{defaultStocks}});
+    <!-- System Status Footer -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 py-2 px-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center text-xs text-gray-300">
+            <!-- Left: System Info -->
+            <div class="flex space-x-4">
+                <span>🔥 {{computeMode}} {{deviceInfo}}</span>
+                <span>⚙️ {{engineMode}}</span>
+                <span>🎯 {{workloadStatus}}</span>
+            </div>
             
-			// Load asset data for company names and sector tooltips
-			window.assetData = {{assetSymbols}};
-			console.log('🏢 Loaded asset data for', Object.keys(window.assetData).length, 'symbols');
-			
-			// CSV headers from backend (no hardcoded values)
-			window.csvHeaders = {{csvHeaders}};
-			
-			// Error messages from backend (no hardcoded values)
-			window.errorMessages = {{errorMessages}};            // Set active risk level button based on backend default
-            const defaultRiskLevel = '{{defaultRiskLevel}}';
-            const riskButtons = document.querySelectorAll('.risk-btn');
-            riskButtons.forEach(btn => {
-                const delta = parseFloat(btn.dataset.delta);
-                if ((defaultRiskLevel === 'LOW' && delta === 0.10) ||
-                    (defaultRiskLevel === 'MOD' && delta === 0.20) ||
-                    (defaultRiskLevel === 'HIGH' && delta === 0.30)) {
-                    btn.classList.add('ring-4', 'ring-white/50');
-                }
-            });
-        });
-    </script>
+            <!-- Center: Dynamic Status -->
+            <span id="workloadStatus" class="text-sm font-semibold text-white">
+                🔥 WORKLOAD: IDLE
+            </span>
+            
+            <!-- Right: Config Info -->
+            <div class="flex space-x-4">
+                <span>📊 Max: {{maxResults}}</span>
+                <span>💰 ${{defaultCash}}</span>
+            </div>
+        </div>
+    </footer>
+
 </body>
 </html>

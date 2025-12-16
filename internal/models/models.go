@@ -12,13 +12,13 @@ type FormattedOptionResult map[string]FieldValue
 
 // FormattedAnalysisResponse represents the complete API response
 type FormattedAnalysisResponse struct {
-	Success bool                        `json:"success"`
-	Data    FormattedAnalysisData      `json:"data"`
-	Meta    ResponseMetadata           `json:"meta"`
+	Success bool                  `json:"success"`
+	Data    FormattedAnalysisData `json:"data"`
+	Meta    ResponseMetadata      `json:"meta"`
 }
 
 type FormattedAnalysisData struct {
-	Results       []FormattedOptionResult `json:"results"`
+	Results       []FormattedOptionResult  `json:"results"`
 	FieldMetadata map[string]FieldMetadata `json:"field_metadata"`
 }
 
@@ -30,11 +30,18 @@ type FieldMetadata struct {
 }
 
 type ResponseMetadata struct {
-	Strategy       string  `json:"strategy"`
-	ExpirationDate string  `json:"expiration_date"`
-	Timestamp      string  `json:"timestamp"`
-	ProcessingTime float64 `json:"processing_time"`
-	ProcessingStats string `json:"processing_stats"`
+	Strategy         string  `json:"strategy"`
+	ExpirationDate   string  `json:"expiration_date"`
+	Timestamp        string  `json:"timestamp"`
+	ProcessingTime   float64 `json:"processing_time"`
+	ProcessingStats  string  `json:"processing_stats"`
+	Engine           string  `json:"engine"`
+	CudaAvailable    bool    `json:"cuda_available"`
+	ExecutionMode    string  `json:"execution_mode"`
+	SymbolCount      int     `json:"symbol_count"`
+	ResultCount      int     `json:"result_count"`
+	WorkloadFactor   float64 `json:"workload_factor"`
+	SamplesProcessed int     `json:"samples_processed"`
 }
 
 // AnalysisRequest represents a request for options analysis
@@ -49,8 +56,8 @@ type AnalysisRequest struct {
 // OptionResult represents the result of analyzing an option
 type OptionResult struct {
 	Ticker           string  `json:"ticker"`
-	Company          string  `json:"company"`          // Company name from SP500 data
-	Sector           string  `json:"sector"`           // Sector from SP500 data
+	Company          string  `json:"company"` // Company name from SP500 data
+	Sector           string  `json:"sector"`  // Sector from SP500 data
 	OptionSymbol     string  `json:"option_symbol"`
 	OptionType       string  `json:"option_type"`
 	Strike           float64 `json:"strike"`

@@ -1,9 +1,45 @@
 // Global variables
-let selectedDelta; // Will be set from backend template
+let selectedDelta;
+let backendConfig;
 
-
+// Load backend configuration from JSON script tag
+function loadBackendConfig() {
+    const configElement = document.getElementById('backend-config');
+    if (configElement) {
+        try {
+            backendConfig = JSON.parse(configElement.textContent);
+            
+            // Set global variables from backend config
+            const riskLevel = backendConfig.defaultRiskLevel || 'LOW';
+            selectedDelta = (riskLevel === 'LOW') ? 0.10 : 
+                          (riskLevel === 'MOD') ? 0.20 : 0.30;
+            
+            // Make backend data available globally
+            window.assetData = backendConfig.assetSymbols || {};
+            window.csvHeaders = backendConfig.csvHeaders || [];
+            window.errorMessages = backendConfig.errorMessages || {};
+            
+            console.log('🚀 Barracuda initialized with backend defaults');
+            console.log('📊 Default Cash:', backendConfig.defaultCash);
+            console.log('📅 Default Expiration:', backendConfig.defaultExpirationDate);
+            console.log('🎯 Default Risk Level:', backendConfig.defaultRiskLevel);
+            console.log('⚖️ Default Delta:', selectedDelta);
+            console.log('📈 Default Stocks:', backendConfig.defaultStocks);
+            console.log('🏢 Loaded asset data for', Object.keys(window.assetData).length, 'symbols');
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to load backend config:', error);
+            return false;
+        }
+    }
+    console.warn('⚠️ Backend config not found');
+    return false;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Load backend configuration first
+    loadBackendConfig();
     // ✅ THIS JAVASCRIPT CHANGE REQUIRES NO REBUILD!
     console.log('🚀 Web assets loaded - no rebuild needed for web changes!');
     
@@ -29,132 +65,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup risk selector event listeners
     setupRiskSelector();
     
-    // Set default risk level from config
-    const runButton = document.getElementById('runAnalysis');
-    if (runButton) {
-        const defaultRisk = runButton.dataset.defaultRisk || 'LOW';
-        setDefaultRiskLevel(defaultRisk);
-        
-        runButton.addEventListener('click', async function(e) {
-        e.preventDefault();
-        
-        const loadingDiv = document.getElementById('loading');
-        const resultsDiv = document.getElementById('results');
-        
-        if (loadingDiv) {
-            loadingDiv.classList.remove('hidden');
-        }
-        if (resultsDiv) {
-            resultsDiv.classList.add('hidden');
-        }
-        
-                // Get symbols - either from config or S&P 500 assets
-        let symbols;
-        const symbolsData = e.target.dataset.symbols;
-        const useSP500 = e.target.dataset.useSp500 === 'true';
-        
-        if (useSP500 || !symbolsData || !symbolsData.trim()) {
-            // Empty config list - get ALL S&P 500 symbols from assets
-            try {
-                const response = await fetch('/api/sp500/symbols');
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                const data = await response.json();
-                if (!data.symbols || data.symbols.length === 0) {
-                    throw new Error(window.errorMessages?.noResults || 'No S&P 500 symbols available');
-                }
-                symbols = data.symbols.map(s => typeof s === 'string' ? s : s.symbol);
-                console.log('Using ALL S&P 500 symbols:', symbols.length, 'symbols');
-            } catch (error) {
-                console.error('Error fetching S&P 500 symbols:', error);
-                alert((window.errorMessages?.analysisError || 'Error loading S&P 500 symbols:') + ' ' + error.message);
-                return;
-            }
-        } else {
-            // Use configured symbol list (your 8 stocks)
-            symbols = symbolsData.split(',').map(s => s.trim()).filter(s => s);
-            console.log('Using configured symbols:', symbols);
-        }
-        // Get available cash from the cash input (only updated when analyze is clicked)
-        const cashInputEl = document.getElementById('cashAmount');
-        const availableCash = parseInt(cashInputEl ? cashInputEl.value : 0) || parseInt(document.getElementById('available-cash').value) || 0;
-        console.log('💰 Using cash amount:', availableCash);
-        
-        const contractsEl = document.getElementById('contractsProcessed');
-        if (contractsEl && contractsEl.querySelector('p')) {
-            contractsEl.querySelector('p').textContent = symbols.length;
-        }
-        
-        // Update workload status to show processing
-        document.getElementById('workloadStatus').innerHTML = '<small>🔥 WORKLOAD: ACTIVE - Processing ' + symbols.length + ' symbols</small>';
-        // No styling - use existing Tailwind classes
-        
-        // Get expiration date from date picker (set by backend)
-        const datePickerEl = document.getElementById('expirationDate');
-        const selectedDate = datePickerEl ? datePickerEl.value : '';
-        
-        const analysisData = {
-            symbols: symbols,
-            expiration_date: selectedDate,
-            target_delta: selectedDelta,
-            available_cash: availableCash,
-            strategy: "puts"
-        };
-        
-        console.log('Sending analysis request with delta:', selectedDelta, 'data:', analysisData);
-        
-        try {
-            const response = await fetch('/api/analyze', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(analysisData)
-            });
-            
-            const result = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(result.error || (window.errorMessages?.analysisError + ' Analysis failed') || 'Analysis failed');
-            }
-            
-            displayResults(result);
-            
-            // Update workload status to show completion
-            const workloadStatus = document.getElementById('workloadStatus');
-            if (workloadStatus && result.processing_time) {
-                workloadStatus.innerHTML = '<small>🔥 WORKLOAD: COMPLETED (' + result.processing_time.toFixed(2) + 's) - IDLE</small>';
-                // No styling - use existing Tailwind classes
-                
-                // Reset to idle after 3 seconds
-                setTimeout(() => {
-                    const workloadStatusTimeout = document.getElementById('workloadStatus');
-                    if (workloadStatusTimeout) {
-                        workloadStatusTimeout.innerHTML = '<small>🔥 WORKLOAD: IDLE</small>';
-                        // No styling - use existing Tailwind classes
-                    }
-                }, 3000);
-            }
-        } catch (error) {
-            alert((window.errorMessages?.analysisError || 'Error:') + ' ' + error.message);
-            
-            // Update workload status to show error
-            const workloadStatus = document.getElementById('workloadStatus');
-            if (workloadStatus) {
-                workloadStatus.innerHTML = '<small>🔥 WORKLOAD: ' + (window.errorMessages?.analysisError?.toUpperCase() || 'ERROR') + '</small>';
-                // No styling - use existing Tailwind classes
-            }
-        } finally {
-            if (loadingDiv) {
-                loadingDiv.classList.add('hidden');
-            }
-        }
-        });
+    // Set default risk level from backend config
+    if (backendConfig && backendConfig.defaultRiskLevel) {
+        setDefaultRiskLevel(backendConfig.defaultRiskLevel);
     }
     
     // CSV Export functionality
-    document.getElementById('exportCSV').addEventListener('click', function() {
+    const exportCSVBtn = document.getElementById('exportCSV');
+    if (exportCSVBtn) {
+        exportCSVBtn.addEventListener('click', function() {
         if (!window.lastResults) return;
         
 				const headers = window.csvHeaders || []; // Backend provides headers
@@ -196,7 +115,8 @@ document.addEventListener('DOMContentLoaded', function() {
         navigator.clipboard.writeText(csvContent).then(function() {
             showNotification();
         });
-    });
+        });
+    }
 });
 
 function displayResults(data) {
@@ -291,6 +211,30 @@ function displayResults(data) {
     
     if (resultsDiv) {
         resultsDiv.classList.remove('hidden');
+    }
+    
+    // Update footer with completion stats (reappear after analysis!)
+    const workloadStatus = document.getElementById('workloadStatus');
+    if (workloadStatus && data.meta && data.meta.processing_time) {
+        const processingTime = data.meta.processing_time.toFixed(3);
+        const resultCount = results ? results.length : 0;
+        const executionMode = data.meta.execution_mode ? data.meta.execution_mode.toUpperCase() : 'UNKNOWN';
+        const workloadFactor = data.meta.workload_factor || 0.0;
+        const samplesProcessed = data.meta.samples_processed || 0;
+        
+        // ALWAYS show processing time and options processed, ADD workload info if present
+        let footerContent = `🔥 ${executionMode} | ⏱️ ${processingTime}s | 📈 ${resultCount} OPTIONS`;
+        
+        // ADD workload benchmark info to the real job stats when workload factor > 0
+        if (workloadFactor > 0.0 && samplesProcessed > 0) {
+            const samples = (samplesProcessed / 1000000).toFixed(1); // Convert to millions
+            footerContent += ` | 🎯 ${samples}M SAMPLES`;
+        }
+        
+        workloadStatus.innerHTML = footerContent;
+        
+        // Make footer visible again (major feature restoration!)
+        workloadStatus.style.display = 'inline';
     }
 }
 
@@ -428,14 +372,26 @@ function selectRisk(delta) {
 }
 
 function setDefaultRiskLevel(riskLevel) {
+    // Use same delta mapping as backend
     const deltaMap = {
-        'LOW': 0.25,
-        'MOD': 0.50,
-        'HIGH': 0.75
+        'LOW': 0.10,
+        'MOD': 0.20,
+        'HIGH': 0.30
     };
     
-    const delta = deltaMap[riskLevel] || 0.25;
-    selectRisk(delta);
+    const delta = deltaMap[riskLevel] || 0.10;
+    selectedDelta = delta; // Update global variable
+    
+    // Set visual button state
+    const riskButtons = document.querySelectorAll('.risk-btn');
+    riskButtons.forEach(btn => {
+        const btnDelta = parseFloat(btn.dataset.delta);
+        if (btnDelta === delta) {
+            btn.classList.add('ring-4', 'ring-white/50');
+        } else {
+            btn.classList.remove('ring-4', 'ring-white/50');
+        }
+    });
 }
 
 // DeltaQuest-specific functions
@@ -483,6 +439,7 @@ function selectRiskDeltaQuest(delta) {
 }
 
 async function handleSubmit(e) {
+    console.log('🚀 handleSubmit called - ALLOWS EMPTY SYMBOLS FOR S&P 500!');
     e.preventDefault();
 
     // Validate selectedDelta before proceeding
@@ -490,23 +447,25 @@ async function handleSubmit(e) {
         selectedDelta = parseFloat(document.getElementById('selected-delta').value) || 0.50;
     }
 
-    // Show loading
+    // Show loading and hide footer during processing
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
     const errorEl = document.getElementById('error-message');
     if (errorEl) errorEl.classList.add('hidden');
+    
+    // Hide footer workload status during analysis (major feature!)
+    const workloadStatus = document.getElementById('workloadStatus');
+    if (workloadStatus) {
+        workloadStatus.style.display = 'none';
+    }
 
     // Get form values
     const symbolsValue = document.getElementById('symbols').value;
     const expirationValue = document.getElementById('expiration-date').value;
     const cashValue = document.getElementById('available-cash').value;
 
-    // Validate required fields
-    if (!symbolsValue.trim()) {
-        		showError(window.errorMessages?.noSymbols || 'Please enter at least one stock symbol');
-        document.getElementById('loading').classList.add('hidden');
-        return;
-    }
+    // Allow empty symbols - backend will use S&P 500 when empty
+    // No validation needed for symbols
 
     if (!expirationValue) {
         		showError(window.errorMessages?.noExpiration || 'Please select an expiration date');
@@ -514,21 +473,27 @@ async function handleSubmit(e) {
         return;
     }
 
-    // Create form data
-    const params = new URLSearchParams();
-    params.append('symbols', symbolsValue);
-    params.append('expiration_date', expirationValue);
-    params.append('target_delta', selectedDelta.toString());
-    params.append('available_cash', cashValue);
-    params.append('strategy', currentStrategy);
+    // Parse symbols into array (allow empty for S&P 500)
+    const symbolsArray = symbolsValue.split('\n')
+        .map(s => s.trim().toUpperCase())
+        .filter(s => s.length > 0);
+    
+    // Create JSON request data
+    const requestData = {
+        symbols: symbolsArray,
+        expiration_date: expirationValue,
+        target_delta: selectedDelta,
+        available_cash: parseFloat(cashValue),
+        strategy: currentStrategy
+    };
 
     try {
-        const response = await fetch('/analyze', {
+        const response = await fetch('/api/analyze', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: params.toString()
+            body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
@@ -536,11 +501,31 @@ async function handleSubmit(e) {
             throw new Error('HTTP error! status: ' + response.status + ', message: ' + errorText);
         }
 
-        const data = await response.json();
+        // Get the response text first to debug JSON parsing issues
+        const responseText = await response.text();
+        console.log('📡 Response size:', responseText.length, 'characters');
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (jsonError) {
+            console.error('❌ JSON Parse Error:', jsonError.message);
+            console.error('📄 Response preview (first 500 chars):', responseText.substring(0, 500));
+            console.error('📄 Response ending (last 500 chars):', responseText.substring(responseText.length - 500));
+            throw new Error('JSON parsing failed: ' + jsonError.message + ' (Response size: ' + responseText.length + ' chars)');
+        }
+        
         displayResults(data);
 
     } catch (error) {
         showError((window.errorMessages?.analysisError || 'Analysis failed:') + ' ' + error.message);
+        
+        // Show footer again even on error
+        const workloadStatus = document.getElementById('workloadStatus');
+        if (workloadStatus) {
+            workloadStatus.style.display = 'inline';
+            workloadStatus.innerHTML = '🔥 WORKLOAD: ERROR';
+        }
     } finally {
         document.getElementById('loading').classList.add('hidden');
     }

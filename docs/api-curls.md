@@ -149,4 +149,15 @@ curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
      -H "APCA-API-SECRET-KEY: dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy" \
      "https://api.alpaca.markets/v2/options/contracts?underlying_symbols=AAPL&expiration_date=2026-01-16&type=put&strike_price_lte=265"
 
+### Get Complete AAPL Options Chain for All Delta Levels (10Δ, 25Δ, 50Δ)
+**Description**: Retrieves ALL AAPL options (puts AND calls) for Jan 16, 2026 expiration to capture 10-delta, 25-delta, and 50-delta strikes for volume-weighted pricing analysis.
+
+```bash
+curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
+     -H "APCA-API-SECRET-KEY: dI2ack52IQtNdtiJuGBfvdKHvWxZewtwBcjdb5oy" \
+     "https://api.alpaca.markets/v2/options/contracts?underlying_symbols=AAPL&expiration_date=2026-01-16&limit=100"
+```
+
+**Response**: Returns complete options chain with puts/calls, all strikes, close prices, and open interest for delta-based mock data construction.
+
 ```

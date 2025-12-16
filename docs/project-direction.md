@@ -904,14 +904,6 @@ for i := 0; i < len(allResults); i++ {
 
 ## Form Submission Process
 
-### 1. User Input Validation
-```javascript
-// Validate required fields
-if (!symbolsValue.trim()) {
-    showError('Please enter at least one stock symbol');
-    return;
-}
-
 if (!expirationValue) {
     showError('Please select an expiration date');
     return;

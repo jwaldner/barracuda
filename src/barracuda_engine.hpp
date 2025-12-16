@@ -43,6 +43,26 @@ struct VolatilitySkew {
     double atm_iv;
 };
 
+struct SymbolAnalysisResult {
+    std::string symbol;
+    double stock_price;
+    std::string expiration;
+    
+    // Options data with calculated implied volatilities
+    std::vector<OptionContract> puts_with_iv;
+    std::vector<OptionContract> calls_with_iv;
+    
+    // 25-delta analysis
+    VolatilitySkew volatility_skew;
+    OptionContract best_25d_put;
+    OptionContract best_25d_call;
+    
+    // Performance metadata
+    double calculation_time_ms;
+    std::string execution_mode;  // "CUDA" or "CPU"
+    int total_options_processed;
+};
+
 class BarracudaEngine {
 private:
     bool cuda_available_;
@@ -69,6 +89,32 @@ public:
         const std::vector<OptionContract>& puts,
         const std::vector<OptionContract>& calls,
         const std::string& expiration);
+    
+    // Comprehensive batch processing - automatically chooses CUDA or CPU
+    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatch(
+        const std::vector<std::string>& symbols,
+        const std::map<std::string, double>& stock_prices,
+        const std::map<std::string, std::vector<OptionContract>>& options_chains,
+        const std::string& expiration_date);
+    
+    // CUDA parallel processing
+    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatchParallel(
+        const std::vector<std::string>& symbols,
+        const std::map<std::string, double>& stock_prices,
+        const std::map<std::string, std::vector<OptionContract>>& options_chains,
+        const std::string& expiration_date);
+    
+    // CPU sequential processing
+    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatchSequential(
+        const std::vector<std::string>& symbols,
+        const std::map<std::string, double>& stock_prices,
+        const std::map<std::string, std::vector<OptionContract>>& options_chains,
+        const std::string& expiration_date);
+    
+    // Implied volatility calculation
+    double CalculateImpliedVolatility(
+        double market_price, double stock_price, double strike_price,
+        double time_to_expiration, double risk_free_rate, char option_type);
     
     // Market data analysis
     std::vector<double> CalculateRollingVolatility(
