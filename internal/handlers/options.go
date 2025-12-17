@@ -859,10 +859,10 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 		sc := selectedContracts[i]
 		strikePrice, _ := strconv.ParseFloat(sc.contract.StrikePrice, 64)
 
-		// Calculate contracts that can be purchased
+		// Calculate contracts from available cash and strike price
 		premium := calcContract.TheoreticalPrice
-		maxContracts := int(req.AvailableCash / (premium * 100))
-		if maxContracts <= 0 {
+		calc := h.calculateContractMetrics(premium, strikePrice, req.Strategy, req.AvailableCash)
+		if calc.MaxContracts <= 0 {
 			continue
 		}
 
@@ -879,9 +879,9 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 			Strike:           strikePrice,
 			StockPrice:       sc.stockPrice,
 			Premium:          premium,
-			MaxContracts:     maxContracts,
-			TotalPremium:     float64(maxContracts) * premium * 100,
-			CashNeeded:       float64(maxContracts) * premium * 100,
+			MaxContracts:     calc.MaxContracts,
+			TotalPremium:     calc.TotalPremium,
+			CashNeeded:       float64(calc.MaxContracts) * calc.CashNeededPerContract,
 			ProfitPercentage: (premium / strikePrice) * 100,
 			Delta:            calcContract.Delta,
 			Gamma:            calcContract.Gamma,
@@ -966,166 +966,6 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 	return bestContract
 }
 
-// convertRealOptionToResult converts real Alpaca option contract to result format (unified CUDA/CPU)
-func (h *OptionsHandler) convertRealOptionToResult(symbol string, stockPrice float64, contract *alpaca.OptionContract, availableCash float64, expirationDate string, timeToExp float64, company, sector string) *models.OptionResult {
-	// Parse strike price
-	strikePrice, err := strconv.ParseFloat(contract.StrikePrice, 64)
-	if err != nil {
-		logger.Verbose.Printf("❌ %s: Invalid strike price: %s", symbol, contract.StrikePrice)
-		return nil
-	}
-
-	// Calculate time to expiration in days
-	expDate, err := time.Parse("2006-01-02", expirationDate)
-	if err != nil {
-		return nil
-	}
-	daysToExp := int(time.Until(expDate).Hours() / 24)
-
-	if timeToExp <= 0 {
-		return nil
-	}
-
-	// Use real market price from Alpaca close_price, fallback to theoretical pricing
-	var optionPrice, delta float64
-
-	// First try to use the close_price from the contract data
-	if contract.ClosePrice != nil {
-		if closePriceStr, ok := contract.ClosePrice.(string); ok {
-			if closePrice, err := strconv.ParseFloat(closePriceStr, 64); err == nil && closePrice > 0 {
-				optionPrice = closePrice
-				logger.Verbose.Printf("📊 %s: Using REAL market close price: $%.2f", symbol, optionPrice)
-
-				// For real market data, estimate delta using Black-Scholes for Greeks calculation
-				riskFreeRate := 0.05
-				volatility := 0.25 // Default volatility for delta estimation
-				delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
-			}
-		} else if closePriceFloat, ok := contract.ClosePrice.(float64); ok && closePriceFloat > 0 {
-			optionPrice = closePriceFloat
-			logger.Verbose.Printf("📊 %s: Using REAL market close price: $%.2f", symbol, optionPrice)
-
-			// For real market data, estimate delta using Black-Scholes for Greeks calculation
-			riskFreeRate := 0.05
-			volatility := 0.25 // Default volatility for delta estimation
-			delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
-		}
-	}
-
-	// If no valid close price, fallback to theoretical pricing
-	if optionPrice == 0 {
-		logger.Verbose.Printf("⚠️ %s: No market close price available, using theoretical pricing", symbol)
-		riskFreeRate := 0.05
-		volatility := 0.25
-
-		// Use CUDA or CPU for theoretical calculation based on config
-		if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
-			// Use CUDA
-			optionPrice, delta = h.calculateWithCUDA(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type)
-		} else {
-			// Use CPU
-			optionPrice = h.estimateOptionPrice(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
-			delta = h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, contract.Type == "call")
-		}
-	}
-
-	// Use centralized contract calculation
-	calc := h.calculateContractMetrics(optionPrice, strikePrice, contract.Type, availableCash)
-
-	// Debug logging with engine type
-	engineType := "CPU"
-	if h.engine.IsCudaAvailable() {
-		engineType = "CUDA"
-	}
-	logger.Verbose.Printf("🔍 %s %s: Strike=%.2f, Premium=%.2f, MaxContracts=%d (%s, cash needed: %.2f per contract)",
-		symbol, contract.Type, strikePrice, calc.Premium, calc.MaxContracts, engineType, calc.CashNeededPerContract)
-
-	if calc.MaxContracts <= 0 {
-		logger.Verbose.Printf("⚠️ %s: Premium %.2f too high for available cash %.0f", symbol, calc.Premium, availableCash)
-		return nil
-	}
-
-	// Calculate profit percentage: (premium / cash needed) * 100
-	profitPercentage := 0.0
-	if calc.CashNeededPerContract > 0 {
-		profitPercentage = (calc.Premium / calc.CashNeededPerContract) * 100
-	}
-
-	// Total cash needed for all contracts
-	totalCashNeeded := calc.CashNeededPerContract * float64(calc.MaxContracts)
-
-	return &models.OptionResult{
-		Ticker:           symbol,
-		Company:          company,
-		Sector:           sector,
-		OptionSymbol:     contract.Symbol,
-		OptionType:       contract.Type,
-		Strike:           strikePrice,
-		StockPrice:       stockPrice,
-		Premium:          calc.Premium,
-		MaxContracts:     calc.MaxContracts,
-		TotalPremium:     calc.TotalPremium,
-		CashNeeded:       totalCashNeeded,
-		ProfitPercentage: profitPercentage,
-		Delta:            delta,
-		Expiration:       expirationDate,
-		DaysToExp:        daysToExp,
-	}
-}
-
-// estimateOptionPrice calculates Black-Scholes option price (helper method)
-func (h *OptionsHandler) estimateOptionPrice(S, K, T, r, sigma float64, isCall bool) float64 {
-	d1 := (math.Log(S/K) + (r+0.5*sigma*sigma)*T) / (sigma * math.Sqrt(T))
-	d2 := d1 - sigma*math.Sqrt(T)
-
-	if isCall {
-		return S*h.normalCDF(d1) - K*math.Exp(-r*T)*h.normalCDF(d2)
-	} else {
-		return K*math.Exp(-r*T)*h.normalCDF(-d2) - S*h.normalCDF(-d1)
-	}
-}
-
-// estimateDelta calculates option delta (helper method)
-func (h *OptionsHandler) estimateDelta(S, K, T, r, sigma float64, isCall bool) float64 {
-	d1 := (math.Log(S/K) + (r+0.5*sigma*sigma)*T) / (sigma * math.Sqrt(T))
-
-	if isCall {
-		return h.normalCDF(d1)
-	} else {
-		return h.normalCDF(d1) - 1
-	}
-}
-
-// normalCDF approximates the cumulative distribution function of standard normal distribution
-func (h *OptionsHandler) normalCDF(x float64) float64 {
-	return 0.5 * (1.0 + math.Erf(x/math.Sqrt2))
-}
-
-// calculateWithCUDA is a simple CUDA wrapper
-func (h *OptionsHandler) calculateWithCUDA(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility float64, optionType string) (float64, float64) {
-	var engineOptionType byte = 'P'
-	if optionType == "call" {
-		engineOptionType = 'C'
-	}
-
-	contract := barracuda.OptionContract{
-		Symbol:           "CALC",
-		StrikePrice:      strikePrice,
-		UnderlyingPrice:  stockPrice,
-		TimeToExpiration: timeToExp,
-		RiskFreeRate:     riskFreeRate,
-		Volatility:       volatility,
-		OptionType:       engineOptionType,
-	}
-
-	results, err := h.engine.CalculateBlackScholes([]barracuda.OptionContract{contract})
-	if err != nil || len(results) == 0 {
-		// Fallback to CPU
-		return h.estimateOptionPrice(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, optionType == "call"),
-			h.estimateDelta(stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, optionType == "call")
-	}
-	return results[0].TheoreticalPrice, results[0].Delta
-}
 
 // ContractCalculation holds all contract-related calculations
 type ContractCalculation struct {
@@ -1137,24 +977,24 @@ type ContractCalculation struct {
 
 // calculateContractMetrics centralizes all contract calculations
 func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePrice float64, optionType string, availableCash float64) *ContractCalculation {
-	// Calculate premium per contract (options control 100 shares)
-	premium := optionPrice * 100
+	// Premium per share (optionPrice is already per share)
+	premiumPerShare := optionPrice
 
 	var cashNeededPerContract float64
 	var maxContracts int
 
-	if optionType == "put" {
+	if optionType == "put" || optionType == "puts" {
 		// For puts: need cash = strike price × 100 (obligation to buy 100 shares at strike)
 		cashNeededPerContract = strikePrice * 100
 		maxContracts = int(availableCash / cashNeededPerContract)
 		logger.Verbose.Printf("🔍 CASH CALC: PUT - Strike=%.2f, Cash needed per contract=%.2f, Available=%.2f, Max contracts=%d",
 			strikePrice, cashNeededPerContract, availableCash, maxContracts)
 	} else {
-		// For calls: only pay the premium upfront
-		cashNeededPerContract = premium
-		maxContracts = int(availableCash / premium)
-		logger.Verbose.Printf("🔍 CASH CALC: CALL - Premium=%.2f per contract, Available=%.2f, Max contracts=%d",
-			premium, availableCash, maxContracts)
+		// For calls: pay premium × 100 per contract
+		cashNeededPerContract = premiumPerShare * 100
+		maxContracts = int(availableCash / cashNeededPerContract)
+		logger.Verbose.Printf("🔍 CASH CALC: CALL - Premium per share=%.2f, Cash needed per contract=%.2f, Available=%.2f, Max contracts=%d",
+			premiumPerShare, cashNeededPerContract, availableCash, maxContracts)
 	}
 
 	// Ensure at least 0 contracts
@@ -1163,10 +1003,10 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 		logger.Verbose.Printf("🔍 CASH CALC: Insufficient funds - set max contracts to 0")
 	}
 
-	totalPremium := float64(maxContracts) * premium
+	totalPremium := float64(maxContracts) * premiumPerShare * 100
 
 	return &ContractCalculation{
-		Premium:               premium,
+		Premium:               premiumPerShare * 100,
 		MaxContracts:          maxContracts,
 		TotalPremium:          totalPremium,
 		CashNeededPerContract: cashNeededPerContract,
