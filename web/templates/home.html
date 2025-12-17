@@ -83,11 +83,11 @@
             
             <!-- System Status Display -->
             <div class="mt-4 flex justify-center space-x-6 text-sm text-blue-200">
-                <span class="bg-white/10 px-3 py-1 rounded-full">
-                    🔥 {{computeMode}} {{deviceInfo}}
+                <span class="px-3 py-1 rounded-full font-bold text-black {{if (cudaHardwareAvailable)}}bg-yellow-400{{else}}bg-gray-400{{end}}">
+                    {{cudaHardwareText}}
                 </span>
-                <span class="bg-white/10 px-3 py-1 rounded-full">
-                    ⚙️ Mode: {{engineMode}}
+                <span id="headerModeIndicator" class="px-3 py-1 rounded-full font-bold text-black {{if eq (computeMode) "CUDA"}}bg-yellow-400{{else}}bg-green-400{{end}}">
+                    {{activeModeText}}
                 </span>
                 <span class="bg-white/10 px-3 py-1 rounded-full">
                     🎯 Workload: {{workloadStatus}}
@@ -233,29 +233,36 @@
             "defaultStocks": {{defaultStocks}},
             "assetSymbols": {{assetSymbols}},
             "csvHeaders": {{csvHeaders}},
-            "errorMessages": {{errorMessages}}
+            "errorMessages": {{errorMessages}},
+            "systemStatus": {
+                "computeMode": "{{computeMode}}",
+                "deviceInfo": "{{deviceInfo}}",
+                "engineMode": "{{engineMode}}",
+                "workloadStatus": "{{workloadStatus}}",
+                "cudaHardwareAvailable": {{cudaHardwareAvailable}}
+            }
         }
     </script>
 
     <!-- System Status Footer -->
-    <footer class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 py-2 px-4">
-        <div class="max-w-6xl mx-auto flex justify-between items-center text-xs text-gray-300">
+    <footer id="statusFooter" class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 py-3 px-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center text-sm">
             <!-- Left: System Info -->
-            <div class="flex space-x-4">
-                <span>🔥 {{computeMode}} {{deviceInfo}}</span>
-                <span>⚙️ {{engineMode}}</span>
-                <span>🎯 {{workloadStatus}}</span>
+            <div class="flex space-x-3 items-center">
+                <span id="modeIndicator" class="px-3 py-1 rounded-full font-bold text-black {{if eq (computeMode) "CUDA"}}bg-yellow-400{{else}}bg-green-400{{end}}">
+                    {{activeModeText}}
+                </span>
+                <span class="text-gray-300">🎯 {{workloadStatus}}</span>
             </div>
             
             <!-- Center: Dynamic Status -->
-            <span id="workloadStatus" class="text-sm font-semibold text-white">
+            <span id="workloadStatus" class="text-lg font-bold text-white bg-blue-600 px-4 py-1 rounded-full">
                 🔥 WORKLOAD: IDLE
             </span>
             
             <!-- Right: Config Info -->
-            <div class="flex space-x-4">
+            <div class="flex space-x-3 items-center text-gray-300">
                 <span>📊 Max: {{maxResults}}</span>
-                <span>💰 ${{defaultCash}}</span>
             </div>
         </div>
     </footer>

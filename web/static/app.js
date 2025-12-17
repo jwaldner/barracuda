@@ -70,6 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
         setDefaultRiskLevel(backendConfig.defaultRiskLevel);
     }
     
+    // Mode indicator is handled by backend template functions only
+    
     // CSV Export functionality
     const exportCSVBtn = document.getElementById('exportCSV');
     if (exportCSVBtn) {
@@ -103,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getRawValue(option.premium),
                 getRawValue(option.max_contracts),
                 getRawValue(option.total_premium),
-                getRawValue(option.cash_needed),
+
                 getRawValue(option.profit_percentage),
                 getRawValue(option.annualized),
                 getRawValue(option.expiration)
@@ -198,7 +200,7 @@ function displayResults(data) {
             <td class="${getCSSClass(option.max_contracts, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.max_contracts)}</td>
             <td class="${getCSSClass(option.premium, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.premium)}</td>
             <td class="${getCSSClass(option.total_premium, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.total_premium)}</td>
-            <td class="${getCSSClass(option.cash_needed, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.cash_needed)}</td>
+
             <td class="${getCSSClass(option.profit_percentage, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.profit_percentage)}</td>
             <td class="${getCSSClass(option.annualized, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.annualized)}</td>
             <td class="${getCSSClass(option.expiration, 'px-6 py-4 whitespace-nowrap text-sm text-gray-500')}">${getValue(option.expiration)}</td>
@@ -222,19 +224,44 @@ function displayResults(data) {
         const workloadFactor = data.meta.workload_factor || 0.0;
         const samplesProcessed = data.meta.samples_processed || 0;
         
-        // ALWAYS show processing time and options processed, ADD workload info if present
-        let footerContent = `🔥 ${executionMode} | ⏱️ ${processingTime}s | 📈 ${resultCount} OPTIONS`;
+        // Use actual records processed from backend
+        const contractsProcessed = data.meta.contracts_processed || 0;
         
-        // ADD workload benchmark info to the real job stats when workload factor > 0
+        // Start with actual contracts processed, ADD workload samples if present
+        let totalRecords = contractsProcessed; // Actual option contracts processed by CUDA/CPU
         if (workloadFactor > 0.0 && samplesProcessed > 0) {
-            const samples = (samplesProcessed / 1000000).toFixed(1); // Convert to millions
+            totalRecords += samplesProcessed; // ADD Monte Carlo workload samples
+        }
+        
+        // Show processing time and records processed with prominent duration  
+        let footerContent = `🔥 ${executionMode} | ⏰ ${processingTime}s | 📊 ${totalRecords.toLocaleString()} RECORDS`;
+        
+        // ADD workload benchmark info when present
+        if (workloadFactor > 0.0 && samplesProcessed > 0) {
+            const samples = (samplesProcessed / 1000000).toFixed(1);
             footerContent += ` | 🎯 ${samples}M SAMPLES`;
         }
         
         workloadStatus.innerHTML = footerContent;
         
-        // Make footer visible again (major feature restoration!)
+        // Set workload status color based on execution mode
+        if (executionMode === 'CUDA') {
+            workloadStatus.className = 'text-lg font-bold text-black bg-yellow-400 px-4 py-1 rounded-full';
+        } else {
+            workloadStatus.className = 'text-lg font-bold text-white bg-green-600 px-4 py-1 rounded-full';
+        }
+        
+        // Update BOTH header and footer mode indicators to keep them synced
+        updateAllModeIndicators(executionMode);
+        
+        // Make footer visible again
         workloadStatus.style.display = 'inline';
+        
+        // Restore footer when job completes
+        const statusFooter = document.getElementById('statusFooter');
+        if (statusFooter) {
+            statusFooter.style.display = 'block';
+        }
     }
 }
 
@@ -394,6 +421,47 @@ function setDefaultRiskLevel(riskLevel) {
     });
 }
 
+function updateAllModeIndicators(executionMode) {
+    // Use execution mode from parameter or backend config (should only be CUDA or CPU, never AUTO)
+    const mode = executionMode || (backendConfig?.systemStatus?.computeMode);
+    const deviceInfo = backendConfig?.systemStatus?.deviceInfo || '';
+    
+    // Debug what mode we're getting
+    console.log('🔍 Mode received:', mode, 'ExecutionMode param:', executionMode);
+    
+    // Ensure we never see AUTO mode in web interface
+    if (mode === 'AUTO') {
+        console.error('❌ AUTO mode should never reach the web interface!');
+        return;
+    }
+    
+    // Update footer mode indicator
+    const footerModeIndicator = document.getElementById('modeIndicator');
+    if (footerModeIndicator) {
+        if (mode === 'CUDA') {
+            footerModeIndicator.className = 'px-3 py-1 rounded-full font-bold text-black';
+            footerModeIndicator.style.backgroundColor = '#FBBF24'; // Force yellow color
+            footerModeIndicator.innerHTML = '⚡ ACTIVE: CUDA';
+        } else {
+            footerModeIndicator.className = 'px-3 py-1 rounded-full font-bold text-black';
+            footerModeIndicator.style.backgroundColor = '#4ADE80'; // Force green color  
+            footerModeIndicator.innerHTML = '🔧 ACTIVE: CPU';
+        }
+    }
+    
+    // Update header mode indicator by ID
+    const headerModeIndicator = document.getElementById('headerModeIndicator');
+    if (headerModeIndicator) {
+        if (mode === 'CUDA') {
+            headerModeIndicator.className = 'px-3 py-1 rounded-full font-bold text-black bg-yellow-400';
+            headerModeIndicator.innerHTML = '⚡ ACTIVE: CUDA';
+        } else {
+            headerModeIndicator.className = 'px-3 py-1 rounded-full font-bold text-black bg-green-400';
+            headerModeIndicator.innerHTML = '🔧 ACTIVE: CPU';
+        }
+    }
+}
+
 // DeltaQuest-specific functions
 // Global strategy state - puts only
 let currentStrategy = 'puts';
@@ -453,10 +521,10 @@ async function handleSubmit(e) {
     const errorEl = document.getElementById('error-message');
     if (errorEl) errorEl.classList.add('hidden');
     
-    // Hide footer workload status during analysis (major feature!)
-    const workloadStatus = document.getElementById('workloadStatus');
-    if (workloadStatus) {
-        workloadStatus.style.display = 'none';
+    // Hide footer when job starts
+    const statusFooter = document.getElementById('statusFooter');
+    if (statusFooter) {
+        statusFooter.style.display = 'none';
     }
 
     // Get form values

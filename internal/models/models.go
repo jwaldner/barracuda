@@ -30,18 +30,19 @@ type FieldMetadata struct {
 }
 
 type ResponseMetadata struct {
-	Strategy         string  `json:"strategy"`
-	ExpirationDate   string  `json:"expiration_date"`
-	Timestamp        string  `json:"timestamp"`
-	ProcessingTime   float64 `json:"processing_time"`
-	ProcessingStats  string  `json:"processing_stats"`
-	Engine           string  `json:"engine"`
-	CudaAvailable    bool    `json:"cuda_available"`
-	ExecutionMode    string  `json:"execution_mode"`
-	SymbolCount      int     `json:"symbol_count"`
-	ResultCount      int     `json:"result_count"`
-	WorkloadFactor   float64 `json:"workload_factor"`
-	SamplesProcessed int     `json:"samples_processed"`
+	Strategy           string  `json:"strategy"`
+	ExpirationDate     string  `json:"expiration_date"`
+	Timestamp          string  `json:"timestamp"`
+	ProcessingTime     float64 `json:"processing_time"`
+	ProcessingStats    string  `json:"processing_stats"`
+	Engine             string  `json:"engine"`
+	CudaAvailable      bool    `json:"cuda_available"`
+	ExecutionMode      string  `json:"execution_mode"`
+	SymbolCount        int     `json:"symbol_count"`
+	ResultCount        int     `json:"result_count"`
+	WorkloadFactor     float64 `json:"workload_factor"`
+	SamplesProcessed   int     `json:"samples_processed"`
+	ContractsProcessed int     `json:"contracts_processed"`
 }
 
 // AnalysisRequest represents a request for options analysis

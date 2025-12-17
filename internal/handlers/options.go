@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
@@ -109,10 +108,11 @@ func getSymbolCount(info map[string]interface{}) int {
 
 // OptionsHandler handles options analysis requests - DUMB HTTP layer only
 type OptionsHandler struct {
-	alpacaClient  *alpaca.Client
-	config        *config.Config
-	engine        *barracuda.BaracudaEngine
-	symbolService *symbols.SP500Service
+	alpacaClient            *alpaca.Client
+	config                  *config.Config
+	engine                  *barracuda.BaracudaEngine
+	symbolService           *symbols.SP500Service
+	contractsProcessedCount int
 }
 
 // NewOptionsHandler creates a new options handler - just HTTP routing
@@ -152,10 +152,10 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Table configuration
 		"tableHeaders": func() []string {
-			return []string{"#", "Ticker", "Company", "Sector", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Cash Needed", "Profit %", "Annualized", "Expiration"}
+			return []string{"#", "Ticker", "Company", "Sector", "Strike", "Stock Price", "Max Contracts", "Premium", "Total Premium", "Profit %", "Annualized", "Expiration"}
 		},
 		"tableFieldKeys": func() []string {
-			return []string{"rank", "ticker", "company", "sector", "strike", "stock_price", "max_contracts", "premium", "total_premium", "cash_needed", "profit_percentage", "annualized", "expiration"}
+			return []string{"rank", "ticker", "company", "sector", "strike", "stock_price", "max_contracts", "premium", "total_premium", "profit_percentage", "annualized", "expiration"}
 		},
 
 		// Default values (calculated by backend)
@@ -189,13 +189,45 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			return h.config.DefaultRiskLevel
 		},
 
-		// System status for footer
-		"computeMode": func() string {
+		// CUDA Hardware Status
+		"cudaHardwareAvailable": func() bool {
+			return h.engine != nil && h.engine.IsCudaAvailable()
+		},
+		"cudaHardwareText": func() string {
 			if h.engine != nil && h.engine.IsCudaAvailable() {
+				return "🔥 CUDA AVAILABLE"
+			}
+			return "🙅 NO CUDA"
+		},
+
+		// Active Execution Mode
+		"computeMode": func() string {
+			mode := strings.ToUpper(h.config.Engine.ExecutionMode)
+			if mode == "AUTO" {
+				if h.engine != nil && h.engine.IsCudaAvailable() {
+					return "CUDA"
+				}
+				return "CPU"
+			}
+			if mode == "CUDA" {
 				return "CUDA"
 			}
 			return "CPU"
 		},
+		"activeModeText": func() string {
+			mode := strings.ToUpper(h.config.Engine.ExecutionMode)
+			if mode == "AUTO" {
+				if h.engine != nil && h.engine.IsCudaAvailable() {
+					return "⚡ ACTIVE: CUDA"
+				}
+				return "🔧 ACTIVE: CPU"
+			}
+			if mode == "CUDA" {
+				return "⚡ ACTIVE: CUDA"
+			}
+			return "🔧 ACTIVE: CPU"
+		},
+
 		"deviceInfo": func() string {
 			if h.engine != nil && h.engine.IsCudaAvailable() {
 				return fmt.Sprintf("(%d devices)", h.engine.GetDeviceCount())
@@ -203,7 +235,15 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			return "(fallback mode)"
 		},
 		"engineMode": func() string {
-			return strings.ToUpper(h.config.Engine.ExecutionMode)
+			// Return resolved execution mode, never AUTO
+			mode := strings.ToUpper(h.config.Engine.ExecutionMode)
+			if mode == "AUTO" {
+				if h.engine != nil && h.engine.IsCudaAvailable() {
+					return "CUDA"
+				}
+				return "CPU"
+			}
+			return mode
 		},
 		"workloadStatus": func() string {
 			if h.config.Engine.WorkloadFactor == 0.0 {
@@ -249,7 +289,7 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 
 		// CSV Headers (backend controlled)
 		"csvHeaders": func() []string {
-			return []string{"Rank", "Ticker", "Company", "Sector", "Strike", "Stock_Price", "Max_Contracts", "Premium", "Total_Premium", "Cash_Needed", "Profit_Percentage", "Annualized", "Expiration"}
+			return []string{"Rank", "Ticker", "Company", "Sector", "Strike", "Stock_Price", "Max_Contracts", "Premium", "Total_Premium", "Profit_Percentage", "Annualized", "Expiration"}
 		}, // Form labels (backend controlled)
 		"cashLabel": func() string {
 			return "💰 Available Cash"
@@ -383,6 +423,9 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// Initialize contracts processed counter
+	h.contractsProcessedCount = 0
+
 	// Validate request
 	if req.AvailableCash <= 0 {
 		http.Error(w, "Available cash must be positive", http.StatusBadRequest)
@@ -432,11 +475,10 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Major Step: Analysis Start  
-	logger.Warn.Printf("🚀 START: %d symbols | %s | %s", 
+	// Major Step: Analysis Start
+	logger.Warn.Printf("🚀 START: %d symbols | %s | %s",
 		len(cleanSymbols), req.Strategy, map[bool]string{true: "CUDA", false: "CPU"}[h.engine.IsCudaAvailable()])
 
-	
 	// Get stock prices in batches (up to 100 symbols per API call)
 	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
@@ -539,13 +581,13 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	// Log processing performance stats
 	engineType := "CPU"
 	if (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") && h.engine.IsCudaAvailable() {
-		engineType = "CUDA GPU"
+		engineType = "CUDA"
 	}
 
 	// Major Step: Completion
 	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs | %s engine", len(results), duration.Seconds(), engineType)
 	logger.Debug.Printf("🔍 DEBUG: Analysis completed, formatting response")
-	
+
 	// Check if client is still connected
 	select {
 	case <-r.Context().Done():
@@ -554,10 +596,10 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	default:
 		logger.Debug.Printf("✅ Client connection still active, proceeding with response")
 	}
-	
-	logger.Always.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx", 
+
+	logger.Always.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx",
 		engineType, duration.Seconds(), len(cleanSymbols), len(results), h.config.Engine.ExecutionMode, h.config.Engine.WorkloadFactor)
-		
+
 	// Final processing summary - ALWAYS show real job stats, ADD workload if present
 	processingStats := fmt.Sprintf("✅ Processed %d symbols | Returned %d results | %.3f seconds | Engine: %s",
 		len(cleanSymbols), len(results), duration.Seconds(), engineType)
@@ -583,14 +625,14 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Debug.Printf("Processing time: %.2f seconds", duration.Seconds())
 	logger.Debug.Printf("Strategy: %s", req.Strategy)
 	logger.Debug.Printf("Available cash: $%.2f", req.AvailableCash)
-	
+
 	// Verbose: Detailed results breakdown
 	logger.Verbose.Printf("=== VERBOSE RESULTS DETAIL ===")
-	logger.Verbose.Printf("Symbols processed: %d | Results found: %d | Processing time: %.2f seconds", 
+	logger.Verbose.Printf("Symbols processed: %d | Results found: %d | Processing time: %.2f seconds",
 		len(req.Symbols), len(results), duration.Seconds())
 	if len(results) > 0 {
 		logger.Debug.Printf("Top result: %s $%.2f premium with %d contracts", results[0].Ticker, results[0].Premium, results[0].MaxContracts)
-		logger.Verbose.Printf("Top result detail: %s | Strike: $%.2f | Premium: $%.2f | Delta: %.3f | Contracts: %d", 
+		logger.Verbose.Printf("Top result detail: %s | Strike: $%.2f | Premium: $%.2f | Delta: %.3f | Contracts: %d",
 			results[0].Ticker, results[0].Strike, results[0].Premium, results[0].Delta, results[0].MaxContracts)
 	}
 
@@ -601,30 +643,31 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			FieldMetadata: h.getFieldMetadata(),
 		},
 		Meta: models.ResponseMetadata{
-			Strategy:         req.Strategy,
-			ExpirationDate:   req.ExpirationDate,
-			Timestamp:        time.Now().Format(time.RFC3339),
-			ProcessingTime:   duration.Seconds(),
-			ProcessingStats:  processingStats,
-			Engine:           engineType,
-			CudaAvailable:    h.engine.IsCudaAvailable(),
-			ExecutionMode:    h.config.Engine.ExecutionMode,
-			SymbolCount:      len(cleanSymbols),
-			ResultCount:      len(results),
-			WorkloadFactor:   h.config.Engine.WorkloadFactor,
-			SamplesProcessed: totalSamplesProcessed,
+			Strategy:           req.Strategy,
+			ExpirationDate:     req.ExpirationDate,
+			Timestamp:          time.Now().Format(time.RFC3339),
+			ProcessingTime:     duration.Seconds(),
+			ProcessingStats:    processingStats,
+			Engine:             engineType,
+			CudaAvailable:      h.engine.IsCudaAvailable(),
+			ExecutionMode:      engineType, // Use actual resolved execution mode, not config setting
+			SymbolCount:        len(cleanSymbols),
+			ResultCount:        len(results),
+			WorkloadFactor:     h.config.Engine.WorkloadFactor,
+			SamplesProcessed:   totalSamplesProcessed,
+			ContractsProcessed: h.contractsProcessedCount,
 		},
 	}
 
 	logger.Debug.Printf("🔄 Starting JSON encoding...")
-	
+
 	// Sanitize response data to remove infinity/NaN values that break JSON
 	h.sanitizeResponseData(response)
-	
+
 	// Debug: Try to find infinity values before encoding
 	logger.Debug.Printf("🔍 Checking for infinity values in response...")
 	h.debugInfinityValues(response)
-	
+
 	// Pre-encode JSON to get accurate size
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
@@ -634,7 +677,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	logger.Debug.Printf("✅ JSON encoded successfully (%d bytes)", len(jsonBytes))
-	
+
 	// Check connection again before sending
 	select {
 	case <-r.Context().Done():
@@ -643,25 +686,25 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	default:
 		// Continue with response
 	}
-	
+
 	// Set headers with accurate content length
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonBytes)))
 	logger.Debug.Printf("📡 Sending JSON response headers...")
-	
+
 	// Write the complete response
 	logger.Debug.Printf("📡 Writing JSON response body...")
 	if _, err := w.Write(jsonBytes); err != nil {
 		logger.Error.Printf("❌ Failed to write JSON response: %v", err)
 		return
 	}
-	
+
 	// Ensure the response is flushed to client
 	logger.Debug.Printf("📡 Flushing response...")
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	}
-	
+
 	logger.Debug.Printf("✅ JSON response sent successfully (%d bytes)", len(jsonBytes))
 }
 
@@ -689,11 +732,9 @@ func (h *OptionsHandler) TestConnectionHandler(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
-// processRealOptions fetches real options individually
+// processRealOptions finds best contracts sequentially, then batch processes with CUDA or CPU
 func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
-	var mu sync.Mutex
-	var wg sync.WaitGroup
 
 	// Calculate time to expiration
 	expirationTime, err := time.Parse("2006-01-02", req.ExpirationDate)
@@ -703,46 +744,159 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 	}
 	timeToExp := time.Until(expirationTime).Hours() / (24 * 365.25)
 
-	// Process each symbol individually
-	for symbol, stockPrice := range stockPrices {
-		wg.Add(1)
-		go func(sym string, price *alpaca.StockPrice) {
-			defer wg.Done()
-
-			// Get options for this symbol
-			optionsChain, err := h.alpacaClient.GetOptionsChain([]string{sym}, req.ExpirationDate, req.Strategy)
-			if err != nil {
-				logger.Error.Printf("❌ Error getting options for %s: %v", sym, err)
-				return
-			}
-
-			contracts, exists := optionsChain[sym]
-			if !exists || len(contracts) == 0 {
-				return
-			}
-
-			// Find best option
-			bestContract := h.findBestOptionContract(contracts, price.Price, req.TargetDelta, req.Strategy)
-			if bestContract == nil {
-				return
-			}
-
-			// Convert to result
-			companyInfo := companyData[sym]
-			result := h.convertRealOptionToResult(sym, price.Price, bestContract, req.AvailableCash, req.ExpirationDate, timeToExp, companyInfo.Company, companyInfo.Sector)
-			if result != nil {
-				mu.Lock()
-				results = append(results, *result)
-				mu.Unlock()
-			}
-		}(symbol, stockPrice)
+	// STEP 1: Find best contracts for each symbol (sequential)
+	var selectedContracts []struct {
+		symbol      string
+		stockPrice  float64
+		contract    *alpaca.OptionContract
+		companyInfo struct{ Company, Sector string }
 	}
 
-	wg.Wait()
+	for symbol, stockPrice := range stockPrices {
+		// Get options for this symbol
+		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy)
+		if err != nil {
+			logger.Error.Printf("❌ Error getting options for %s: %v", symbol, err)
+			continue
+		}
+
+		contracts, exists := optionsChain[symbol]
+		if !exists || len(contracts) == 0 {
+			logger.Debug.Printf("⚠️ No options found for %s", symbol)
+			continue
+		}
+
+		// Track actual option contracts processed for this symbol
+		h.contractsProcessedCount += len(contracts)
+
+		// Find best option
+		bestContract := h.findBestOptionContract(contracts, stockPrice.Price, req.TargetDelta, req.Strategy)
+		if bestContract == nil {
+			logger.Debug.Printf("⚠️ No suitable contract found for %s", symbol)
+			continue
+		}
+
+		// Add to selected contracts for batch processing
+		companyInfo, exists := companyData[symbol]
+		if !exists {
+			companyInfo = struct{ Company, Sector string }{Company: symbol, Sector: "Unknown"}
+		}
+
+		selectedContracts = append(selectedContracts, struct {
+			symbol      string
+			stockPrice  float64
+			contract    *alpaca.OptionContract
+			companyInfo struct{ Company, Sector string }
+		}{
+			symbol:      symbol,
+			stockPrice:  stockPrice.Price,
+			contract:    bestContract,
+			companyInfo: companyInfo,
+		})
+	}
+
+	// STEP 2: Batch process all selected contracts
+	if len(selectedContracts) > 0 {
+		logger.Debug.Printf("🎯 Processing %d selected contracts in batch", len(selectedContracts))
+		results = h.batchProcessContracts(selectedContracts, req, timeToExp)
+	}
+
 	return results
 }
 
+// batchProcessContracts processes all selected contracts in a single batch call
+func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
+	symbol      string
+	stockPrice  float64
+	contract    *alpaca.OptionContract
+	companyInfo struct{ Company, Sector string }
+}, req models.AnalysisRequest, timeToExp float64) []models.OptionResult {
 
+	var results []models.OptionResult
+
+	// Build batch calculation request using engine's OptionContract format
+	var engineContracts []barracuda.OptionContract
+	for _, sc := range selectedContracts {
+		strikePrice, err := strconv.ParseFloat(sc.contract.StrikePrice, 64)
+		if err != nil {
+			continue
+		}
+
+		optionType := byte('P') // Default to put
+		if req.Strategy == "calls" {
+			optionType = byte('C')
+		}
+
+		engineContracts = append(engineContracts, barracuda.OptionContract{
+			Symbol:           sc.symbol,
+			StrikePrice:      strikePrice,
+			UnderlyingPrice:  sc.stockPrice,
+			TimeToExpiration: timeToExp,
+			RiskFreeRate:     0.05, // 5% risk-free rate
+			Volatility:       0.25, // 25% volatility estimate
+			OptionType:       optionType,
+		})
+	}
+
+	if len(engineContracts) == 0 {
+		return results
+	}
+
+	// Execute batch calculation
+	logger.Debug.Printf("📊 Processing %d option contracts in batch", len(engineContracts))
+	calculatedContracts, err := h.engine.CalculateBlackScholes(engineContracts)
+	if err != nil {
+		logger.Error.Printf("❌ Batch calculation failed: %v", err)
+		return results
+	}
+
+	// Process results
+	for i, calcContract := range calculatedContracts {
+		if i >= len(selectedContracts) {
+			break
+		}
+
+		sc := selectedContracts[i]
+		strikePrice, _ := strconv.ParseFloat(sc.contract.StrikePrice, 64)
+
+		// Calculate contracts that can be purchased
+		premium := calcContract.TheoreticalPrice
+		maxContracts := int(req.AvailableCash / (premium * 100))
+		if maxContracts <= 0 {
+			continue
+		}
+
+		// Calculate days to expiration
+		expirationTime, _ := time.Parse("2006-01-02", req.ExpirationDate)
+		daysToExp := int(time.Until(expirationTime).Hours() / 24)
+
+		result := models.OptionResult{
+			Ticker:           sc.symbol,
+			Company:          sc.companyInfo.Company,
+			Sector:           sc.companyInfo.Sector,
+			OptionSymbol:     sc.contract.Symbol,
+			OptionType:       req.Strategy,
+			Strike:           strikePrice,
+			StockPrice:       sc.stockPrice,
+			Premium:          premium,
+			MaxContracts:     maxContracts,
+			TotalPremium:     float64(maxContracts) * premium * 100,
+			CashNeeded:       float64(maxContracts) * premium * 100,
+			ProfitPercentage: (premium / strikePrice) * 100,
+			Delta:            calcContract.Delta,
+			Gamma:            calcContract.Gamma,
+			Theta:            calcContract.Theta,
+			Vega:             calcContract.Vega,
+			ImpliedVol:       0.25, // Placeholder
+			Expiration:       req.ExpirationDate,
+			DaysToExp:        daysToExp,
+		}
+
+		results = append(results, result)
+	}
+
+	return results
+}
 
 // findBestOptionContract finds the best option contract based on criteria
 func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContract, stockPrice float64, targetDelta float64, strategy string) *alpaca.OptionContract {
@@ -1019,8 +1173,6 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 	}
 }
 
-
-
 // debugInfinityValues recursively checks for infinity values in the response
 func (h *OptionsHandler) debugInfinityValues(response *models.FormattedAnalysisResponse) {
 	// Check metadata fields
@@ -1030,7 +1182,7 @@ func (h *OptionsHandler) debugInfinityValues(response *models.FormattedAnalysisR
 	if math.IsInf(response.Meta.WorkloadFactor, 0) || math.IsNaN(response.Meta.WorkloadFactor) {
 		logger.Error.Printf("🔍 Found infinity in Meta.WorkloadFactor: %v", response.Meta.WorkloadFactor)
 	}
-	
+
 	// Check all results
 	for i, result := range response.Data.Results {
 		for fieldName, field := range result {
@@ -1048,7 +1200,7 @@ func (h *OptionsHandler) sanitizeResponseData(response *models.FormattedAnalysis
 	// Fix infinity/NaN values in all results
 	for i := range response.Data.Results {
 		result := response.Data.Results[i]
-		
+
 		// Get ticker for logging
 		ticker := "unknown"
 		if tickerField, exists := result["ticker"]; exists {
@@ -1056,7 +1208,7 @@ func (h *OptionsHandler) sanitizeResponseData(response *models.FormattedAnalysis
 				ticker = tickerStr
 			}
 		}
-		
+
 		// Sanitize ALL fields, not just specific ones
 		for fieldName, field := range result {
 			// Check float64 values
@@ -1078,7 +1230,7 @@ func (h *OptionsHandler) sanitizeResponseData(response *models.FormattedAnalysis
 					logger.Warn.Printf("🔧 Sanitized infinite %s=%v for %s", fieldName, rawValue, ticker)
 				}
 			}
-			
+
 			// Check float32 values (just in case)
 			if rawValue, ok := field.Raw.(float32); ok {
 				if math.IsInf(float64(rawValue), 0) || math.IsNaN(float64(rawValue)) {
@@ -1090,13 +1242,13 @@ func (h *OptionsHandler) sanitizeResponseData(response *models.FormattedAnalysis
 			}
 		}
 	}
-	
+
 	// Sanitize metadata fields
 	if math.IsInf(response.Meta.ProcessingTime, 0) || math.IsNaN(response.Meta.ProcessingTime) {
 		response.Meta.ProcessingTime = 0
 		logger.Debug.Printf("🔧 Sanitized infinite ProcessingTime")
 	}
-	
+
 	if math.IsInf(response.Meta.WorkloadFactor, 0) || math.IsNaN(response.Meta.WorkloadFactor) {
 		response.Meta.WorkloadFactor = 0
 		logger.Debug.Printf("🔧 Sanitized infinite WorkloadFactor")
@@ -1158,16 +1310,16 @@ func (h *OptionsHandler) formatCurrencyLarge(value float64) models.FieldValue {
 // convertToFormattedResult converts an OptionResult to formatted dual-value result
 func (h *OptionsHandler) convertToFormattedResult(result *models.OptionResult, rank int) *models.FormattedOptionResult {
 	formatted := models.FormattedOptionResult{
-		"rank":              h.formatInteger(rank),
-		"ticker":            h.formatText(result.Ticker),
-		"company":           h.formatText(result.Company),
-		"sector":            h.formatText(result.Sector),
-		"strike":            h.formatCurrency(result.Strike),
-		"stock_price":       h.formatCurrency(result.StockPrice),
-		"max_contracts":     h.formatInteger(result.MaxContracts),
-		"premium":           h.formatCurrency(result.Premium),
-		"total_premium":     h.formatCurrency(result.TotalPremium),
-		"cash_needed":       h.formatCurrencyLarge(result.CashNeeded),
+		"rank":          h.formatInteger(rank),
+		"ticker":        h.formatText(result.Ticker),
+		"company":       h.formatText(result.Company),
+		"sector":        h.formatText(result.Sector),
+		"strike":        h.formatCurrency(result.Strike),
+		"stock_price":   h.formatCurrency(result.StockPrice),
+		"max_contracts": h.formatInteger(result.MaxContracts),
+		"premium":       h.formatCurrency(result.Premium),
+		"total_premium": h.formatCurrency(result.TotalPremium),
+
 		"profit_percentage": h.formatPercentage(result.ProfitPercentage / 100), // Convert from percentage to decimal
 		"expiration":        h.formatText(result.Expiration),
 	}

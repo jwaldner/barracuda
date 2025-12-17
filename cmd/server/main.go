@@ -17,18 +17,14 @@ import (
 )
 
 func main() {
-	log.Println("🚀 Starting Barracuda Options Analyzer...")
-	// Load configuration (this will set env vars from YAML)
 	cfg := config.Load()
-	log.Println("⚙️  Configuration loaded")
 
 	// Initialize proper logging with config level and file path
 	if err := logger.InitWithConfig(cfg.Logging.LogLevel, cfg.Logging.LogFile); err != nil {
 		log.Fatalf("Failed to initialize logging: %v", err)
 	}
-	logger.Info.Printf("📝 Logging system initialized - level: %s -> %s", cfg.Logging.LogLevel, cfg.Logging.LogFile)
 	logger.Always.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
-	logger.Always.Printf("⚙️ Configuration loaded") // Terminal warning if verbose logging is enabled
+
 	if cfg.Logging.LogLevel == "verbose" {
 		fmt.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s\n", cfg.Logging.LogFile)
 	}
@@ -63,10 +59,18 @@ func main() {
 	if executionMode == "cpu" {
 		// Force CPU mode by creating engine differently
 		engine = barracuda.NewBaracudaEngineForced("cpu")
-		log.Println("CPU FORCED MODE: CUDA disabled")
-		logger.Always.Printf("CPU FORCED MODE: CUDA disabled")
+		if engine != nil && engine.IsCudaAvailable() {
+			logger.Always.Printf("🔧 EXECUTION MODE: CPU (CUDA hardware available but disabled by config)")
+		} else {
+			logger.Always.Printf("🔧 EXECUTION MODE: CPU (no CUDA hardware)")
+		}
 	} else {
 		engine = barracuda.NewBaracudaEngine()
+		if engine != nil && engine.IsCudaAvailable() {
+			logger.Always.Printf("🔧 EXECUTION MODE: CUDA")
+		} else {
+			logger.Always.Printf("🔧 EXECUTION MODE: CPU (CUDA hardware not available)")
+		}
 	}
 
 	if engine == nil {
@@ -74,28 +78,11 @@ func main() {
 	}
 	defer engine.Close()
 
-	switch executionMode {
-	case "cuda":
-		if engine.IsCudaAvailable() {
-			// CUDA engine forced mode
-		} else {
-			log.Fatal("❌ CUDA mode requested but CUDA not available")
-		}
-	case "cpu":
-		// Force CPU-only mode
-		log.Println("CPU FORCED MODE: CUDA disabled")
-		logger.Always.Printf("CPU FORCED MODE: CUDA disabled")
-	case "auto":
-		fallthrough
-	default:
-		if engine != nil && engine.IsCudaAvailable() {
-			fmt.Printf("🔥 Compute Mode: CUDA (%d devices detected)\n", engine.GetDeviceCount())
-			logger.Always.Printf("🔥 Compute Mode: CUDA (%d devices detected)", engine.GetDeviceCount())
-			logger.Info.Printf("🔥 CUDA engine initialized with %d devices", engine.GetDeviceCount())
-		} else {
-			log.Println("CPU FALLBACK: CUDA not available")
-			logger.Always.Printf("CPU FALLBACK: CUDA not available")
-		}
+	// Show final active execution mode
+	if engine != nil && engine.IsCudaAvailable() && (executionMode == "auto" || executionMode == "cuda") {
+		log.Printf("⚡ ACTIVE MODE: CUDA (%d devices)", engine.GetDeviceCount())
+	} else {
+		log.Printf("🔧 ACTIVE MODE: CPU")
 	}
 
 	// Create Alpaca client
