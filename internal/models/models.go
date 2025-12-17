@@ -34,6 +34,7 @@ type ResponseMetadata struct {
 	ExpirationDate     string  `json:"expiration_date"`
 	Timestamp          string  `json:"timestamp"`
 	ProcessingTime     float64 `json:"processing_time"`
+	ComputeDuration    float64 `json:"compute_duration"`
 	ProcessingStats    string  `json:"processing_stats"`
 	Engine             string  `json:"engine"`
 	CudaAvailable      bool    `json:"cuda_available"`

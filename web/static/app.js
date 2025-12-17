@@ -233,8 +233,9 @@ function displayResults(data) {
             totalRecords += samplesProcessed; // ADD Monte Carlo workload samples
         }
         
-        // Show processing time and records processed with prominent duration  
-        let footerContent = `🔥 ${executionMode} | ⏰ ${processingTime}s | 📊 ${totalRecords.toLocaleString()} RECORDS`;
+        // Show processing time, computation time, and records processed with prominent duration  
+        const computeTime = data.meta.compute_duration ? data.meta.compute_duration.toFixed(3) : '0.000';
+        let footerContent = `🔥 ${executionMode} | ⏰ ${processingTime}s TOTAL | 🔋 ${computeTime}s ${executionMode} COMPUTE 🔋 | 📊 ${totalRecords.toLocaleString()} RECORDS`;
         
         // ADD workload benchmark info when present
         if (workloadFactor > 0.0 && samplesProcessed > 0) {

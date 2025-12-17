@@ -4,8 +4,34 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <map>
+
+// C interface for Go integration
+extern "C" {
+    struct CPreprocessingResult {
+        int num_puts;
+        int num_calls; 
+        double preprocessing_time_ms;
+        int total_contracts_processed;
+    };
+    
+    struct CVolatilitySkewResult {
+        double put_25d_iv;
+        double call_25d_iv;
+        double skew;
+        double atm_iv;
+        double calculation_time_ms;
+        int contracts_analyzed;
+    };
+}
 
 namespace barracuda {
+
+enum class ExecutionMode {
+    Auto,
+    CUDA,
+    CPU
+};
 
 struct OptionContract {
     std::string symbol;
@@ -67,6 +93,7 @@ class BarracudaEngine {
 private:
     bool cuda_available_;
     int device_count_;
+    ExecutionMode execution_mode_;
     
 public:
     BarracudaEngine();
