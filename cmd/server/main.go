@@ -109,8 +109,8 @@ func main() {
 
 	// Main application endpoints
 	r.HandleFunc("/", optionsHandler.HomeHandler).Methods("GET")
-	r.HandleFunc("/api/analyze", optionsHandler.AnalyzeHandler).Methods("POST")
-	r.HandleFunc("/api/test-connection", optionsHandler.TestConnectionHandler).Methods("GET")
+	r.HandleFunc("/api/analyze", optionsHandler.AnalyzeHandler).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/test-connection", optionsHandler.TestConnectionHandler).Methods("GET", "OPTIONS")
 
 	// S&P 500 symbol management endpoints
 	r.HandleFunc("/api/sp500/update", sp500Handler.UpdateSymbolsHandler).Methods("POST")

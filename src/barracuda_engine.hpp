@@ -8,20 +8,29 @@
 
 // C interface for Go integration
 extern "C" {
-    struct CPreprocessingResult {
-        int num_puts;
-        int num_calls; 
-        double preprocessing_time_ms;
-        int total_contracts_processed;
-    };
-    
-    struct CVolatilitySkewResult {
-        double put_25d_iv;
-        double call_25d_iv;
-        double skew;
-        double atm_iv;
-        double calculation_time_ms;
-        int contracts_analyzed;
+    // C struct for complete option processing with all business calculations
+    struct CCompleteOptionContract {
+        char symbol[32];
+        double strike_price;
+        double underlying_price;
+        double time_to_expiration;
+        double risk_free_rate;
+        double volatility;
+        char option_type;
+        double market_close_price;
+        double delta;
+        double gamma;
+        double theta;
+        double vega;
+        double rho;
+        double theoretical_price;
+        double implied_volatility;
+        int max_contracts;
+        double total_premium;
+        double cash_needed;
+        double profit_percentage;
+        double annualized_return;
+        int days_to_expiration;
     };
 }
 
@@ -147,26 +156,7 @@ public:
         const std::vector<OptionContract>& calls,
         const std::string& expiration);
     
-    // Comprehensive batch processing - automatically chooses CUDA or CPU
-    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatch(
-        const std::vector<std::string>& symbols,
-        const std::map<std::string, double>& stock_prices,
-        const std::map<std::string, std::vector<OptionContract>>& options_chains,
-        const std::string& expiration_date);
-    
-    // CUDA parallel processing
-    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatchParallel(
-        const std::vector<std::string>& symbols,
-        const std::map<std::string, double>& stock_prices,
-        const std::map<std::string, std::vector<OptionContract>>& options_chains,
-        const std::string& expiration_date);
-    
-    // CPU sequential processing
-    std::vector<SymbolAnalysisResult> AnalyzeSymbolsBatchSequential(
-        const std::vector<std::string>& symbols,
-        const std::map<std::string, double>& stock_prices,
-        const std::map<std::string, std::vector<OptionContract>>& options_chains,
-        const std::string& expiration_date);
+    // Legacy batch analysis functions removed - replaced by complete GPU processing
     
     // Implied volatility calculation
     double CalculateImpliedVolatility(

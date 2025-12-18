@@ -1,5 +1,4 @@
 #include "barracuda_engine.hpp"
-#include "barracuda_preprocessing.hpp"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <cmath>
@@ -21,8 +20,7 @@ extern "C" {
     void launch_implied_volatility_black_scholes_kernel(OptionContract* d_contracts, int num_contracts);
     void launch_preprocess_contracts_kernel(OptionContract* d_contracts, int num_contracts,
                                           double underlying_price, double time_to_exp, double risk_free_rate);
-    void launch_find_25delta_skew_kernel(OptionContract* d_puts, int num_puts,
-                                       OptionContract* d_calls, int num_calls, double* d_results);
+    // launch_find_25delta_skew_kernel removed - was only used by legacy preprocessing engine
     void launch_separate_puts_calls_kernel(OptionContract* d_contracts, int num_contracts,
                                          int* d_put_indices, int* d_call_indices,
                                          int* d_num_puts, int* d_num_calls);
@@ -250,38 +248,7 @@ double BarracudaEngine::CalculateImpliedVolatility(
     return vol; // Return best estimate even if not converged
 }
 
-// Main batch processing function - routes to CUDA or CPU
-std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatch(
-    const std::vector<std::string>& symbols,
-    const std::map<std::string, double>& stock_prices,
-    const std::map<std::string, std::vector<OptionContract>>& options_chains,
-    const std::string& expiration_date) {
-    
-    // Simplified implementation - these batch functions need refactoring
-    return std::vector<SymbolAnalysisResult>();
-}
-
-// CUDA parallel processing implementation - STUB FOR NOW
-std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatchParallel(
-    const std::vector<std::string>& symbols,
-    const std::map<std::string, double>& stock_prices,
-    const std::map<std::string, std::vector<OptionContract>>& options_chains,
-    const std::string& expiration_date) {
-    
-    // TODO: Implement parallel batch processing
-    return std::vector<SymbolAnalysisResult>();
-}
-
-// CPU sequential processing implementation - STUB FOR NOW
-std::vector<SymbolAnalysisResult> BarracudaEngine::AnalyzeSymbolsBatchSequential(
-    const std::vector<std::string>& symbols,
-    const std::map<std::string, double>& stock_prices,
-    const std::map<std::string, std::vector<OptionContract>>& options_chains,
-    const std::string& expiration_date) {
-    
-    // TODO: Implement sequential batch processing 
-    return std::vector<SymbolAnalysisResult>();
-}
+// Legacy batch analysis functions removed - replaced by complete GPU processing
 
 std::vector<double> BarracudaEngine::CalculateRollingVolatility(
     const std::vector<MarketData>& price_data, int window_size) {

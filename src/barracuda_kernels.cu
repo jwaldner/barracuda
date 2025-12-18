@@ -201,48 +201,7 @@ __global__ void preprocess_contracts_kernel(
     opt.risk_free_rate = risk_free_rate;
 }
 
-// CUDA kernel for parallel 25-delta skew calculation
-__global__ void find_25delta_skew_kernel(
-    OptionContract* puts, int num_puts,
-    OptionContract* calls, int num_calls,
-    double* results) { // [put_25d_iv, call_25d_iv, skew, atm_iv]
-    
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    // Use first thread to do the calculation (can be optimized with reduction)
-    if (idx == 0) {
-        double target_delta = 0.25;
-        
-        // Find best put (delta ≈ -0.25)
-        double best_put_iv = 0.0; // Will be set from real market data
-        double min_put_diff = 1.0;
-        
-        for (int i = 0; i < num_puts; i++) {
-            double delta_diff = fabs(fabs(puts[i].delta) - target_delta);
-            if (delta_diff < min_put_diff) {
-                min_put_diff = delta_diff;
-                best_put_iv = puts[i].volatility;
-            }
-        }
-        
-        // Find best call (delta ≈ +0.25)
-        double best_call_iv = 0.0; // Will be set from real market data
-        double min_call_diff = 1.0;
-        
-        for (int i = 0; i < num_calls; i++) {
-            double delta_diff = fabs(calls[i].delta - target_delta);
-            if (delta_diff < min_call_diff) {
-                min_call_diff = delta_diff;
-                best_call_iv = calls[i].volatility;
-            }
-        }
-        
-        results[0] = best_put_iv;   // put_25d_iv
-        results[1] = best_call_iv;  // call_25d_iv
-        results[2] = best_put_iv - best_call_iv; // skew
-        results[3] = (best_put_iv + best_call_iv) / 2.0; // atm_iv
-    }
-}
+// Legacy 25-delta skew kernel removed - not used by complete GPU processing
 
 // CUDA kernel for parallel put/call separation
 __global__ void separate_puts_calls_kernel(
@@ -361,12 +320,7 @@ extern "C" {
         cudaDeviceSynchronize();
     }
     
-    void launch_find_25delta_skew_kernel(OptionContract* d_puts, int num_puts,
-                                       OptionContract* d_calls, int num_calls, double* d_results) {
-        // Use single block since we're doing a simple linear search
-        find_25delta_skew_kernel<<<1, 1>>>(d_puts, num_puts, d_calls, num_calls, d_results);
-        cudaDeviceSynchronize();
-    }
+    // Legacy 25-delta skew launcher removed - not used by complete GPU processing
     
     void launch_separate_puts_calls_kernel(OptionContract* d_contracts, int num_contracts,
                                          int* d_put_indices, int* d_call_indices,
