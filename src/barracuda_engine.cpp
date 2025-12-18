@@ -17,7 +17,8 @@ extern "C" {
     void launch_setup_kernel(curandState* d_states, unsigned long seed, int num_paths);
     
     // New CUDA kernels for maximum GPU utilization
-    void launch_implied_volatility_newtonraphson_kernel(OptionContract* d_contracts, int num_contracts);
+    // NOTE: Old kernel removed - using combined IV+Black-Scholes kernel
+    void launch_implied_volatility_black_scholes_kernel(OptionContract* d_contracts, int num_contracts);
     void launch_preprocess_contracts_kernel(OptionContract* d_contracts, int num_contracts,
                                           double underlying_price, double time_to_exp, double risk_free_rate);
     void launch_find_25delta_skew_kernel(OptionContract* d_puts, int num_puts,
@@ -70,8 +71,8 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         cudaMalloc(&d_contracts, size);
         cudaMemcpy(d_contracts, results.data(), size, cudaMemcpyHostToDevice);
         
-        // Launch kernel via wrapper function
-        launch_black_scholes_kernel(d_contracts, contracts.size());
+        // Launch combined IV + Black-Scholes kernel
+        launch_implied_volatility_black_scholes_kernel(d_contracts, contracts.size());
         
         // Copy results back
         cudaMemcpy(results.data(), d_contracts, size, cudaMemcpyDeviceToHost);
@@ -413,13 +414,14 @@ extern "C" {
             symbol_buf[32] = '\0';
             cpp_contract.symbol = std::string(symbol_buf);
             
-            // Copy input fields using correct offsets
+            // Copy input fields using correct offsets (accounting for 8-byte alignment)
             cpp_contract.strike_price = *(double*)(c_ptr + 32);
             cpp_contract.underlying_price = *(double*)(c_ptr + 40);
             cpp_contract.time_to_expiration = *(double*)(c_ptr + 48);
             cpp_contract.risk_free_rate = *(double*)(c_ptr + 56);
             cpp_contract.volatility = *(double*)(c_ptr + 64);
             cpp_contract.option_type = *(char*)(c_ptr + 72);
+            cpp_contract.market_close_price = *(double*)(c_ptr + 80); // 8-byte aligned after option_type // After char (padded to 8-byte boundary)
             
             cpp_contracts.push_back(cpp_contract);
         }
@@ -427,15 +429,15 @@ extern "C" {
         // Calculate with C++ engine
         auto results = eng->CalculateBlackScholes(cpp_contracts);
         
-        // Copy results back using correct offsets
+        // Copy results back using correct offsets (after market_close_price at offset 80)
         for (size_t i = 0; i < results.size() && i < (size_t)count; i++) {
             char* c_ptr = (char*)&c_contracts[i];
-            *(double*)(c_ptr + 80) = results[i].delta;
-            *(double*)(c_ptr + 88) = results[i].gamma;
-            *(double*)(c_ptr + 96) = results[i].theta;
-            *(double*)(c_ptr + 104) = results[i].vega;
-            *(double*)(c_ptr + 112) = results[i].rho;
-            *(double*)(c_ptr + 120) = results[i].theoretical_price;
+            *(double*)(c_ptr + 88) = results[i].delta;        // Greeks start at offset 88
+            *(double*)(c_ptr + 96) = results[i].gamma;
+            *(double*)(c_ptr + 104) = results[i].theta;
+            *(double*)(c_ptr + 112) = results[i].vega;
+            *(double*)(c_ptr + 120) = results[i].rho;
+            *(double*)(c_ptr + 128) = results[i].theoretical_price;
         }
         
         return 0; // Success
@@ -486,11 +488,8 @@ extern "C" {
         // CUDA Phase 1: Parallel preprocessing (set prices, time, rates)
         launch_preprocess_contracts_kernel(d_contracts, count, stock_price, 0.085, 0.05);
         
-        // CUDA Phase 2: Parallel implied volatility (Newton-Raphson)
-        launch_implied_volatility_newtonraphson_kernel(d_contracts, count);
-        
-        // CUDA Phase 3: Parallel Black-Scholes calculation
-        launch_black_scholes_kernel(d_contracts, count);
+        // CUDA Phase 2+3: Combined implied volatility calculation + Black-Scholes (single kernel)
+        launch_implied_volatility_black_scholes_kernel(d_contracts, count);
         
         // CUDA Phase 4: Parallel put/call separation
         launch_separate_puts_calls_kernel(d_contracts, count, d_put_indices, d_call_indices, 

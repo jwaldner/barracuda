@@ -17,6 +17,7 @@ type AlpacaInterface interface {
 	GetStockPrice(symbol string) (*StockPrice, error)
 	GetStockPricesBatch(symbols []string) (map[string]*StockPrice, error)
 	GetOptionsChain(symbols []string, expirationDate, strategy string) (map[string][]*OptionContract, error)
+	GetOptionQuote(symbol string) (*OptionQuote, error)
 }
 
 const (
@@ -112,6 +113,9 @@ type OptionContract struct {
 	OpenInterestDate  interface{} `json:"open_interest_date"`
 	ClosePrice        interface{} `json:"close_price"`
 	ClosePriceDate    interface{} `json:"close_price_date"`
+	BidPrice          interface{} `json:"bid_price,omitempty"`
+	AskPrice          interface{} `json:"ask_price,omitempty"`
+	LastPrice         interface{} `json:"last_price,omitempty"`
 	Ppind             bool        `json:"ppind"`
 	Delta             float64     `json:"delta,omitempty"`
 	Gamma             float64     `json:"gamma,omitempty"`
@@ -307,26 +311,15 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 			q.Add("expiration_date", expiration)
 		}
 
-		// Filter by option type (puts or calls)
-		if strategy == "puts" {
-			q.Add("type", "put")
-			// For puts: get wider range to include 25% delta strikes like $265 for AAPL
-			maxStrike := fmt.Sprintf("%.0f", stockPrice*0.98) // 98% of stock price
-			minStrike := fmt.Sprintf("%.0f", stockPrice*0.90) // 90% of stock price
-			q.Add("strike_price_gte", minStrike)
-			q.Add("strike_price_lte", maxStrike)
-			logger.Verbose.Printf("🔍 ALPACA FILTER: %s PUTS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
-				symbol, minStrike, maxStrike, 90.0, 98.0, stockPrice)
-		} else {
-			q.Add("type", "call")
-			// For calls: get strikes above stock price
-			minStrike := fmt.Sprintf("%.0f", stockPrice*1.02) // 102% of stock price
-			maxStrike := fmt.Sprintf("%.0f", stockPrice*1.10) // 110% of stock price
-			q.Add("strike_price_gte", minStrike)
-			q.Add("strike_price_lte", maxStrike)
-			logger.Verbose.Printf("🔍 ALPACA FILTER: %s CALLS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
-				symbol, minStrike, maxStrike, 102.0, 110.0, stockPrice)
-		}
+		// Filter by option type - PUTS ONLY
+		q.Add("type", "put")
+		// For puts: get MUCH wider range to have plenty of options to pick from
+		maxStrike := fmt.Sprintf("%.0f", stockPrice*1.05) // 105% of stock price (ITM puts)
+		minStrike := fmt.Sprintf("%.0f", stockPrice*0.75) // 75% of stock price (deep OTM puts)
+		q.Add("strike_price_gte", minStrike)
+		q.Add("strike_price_lte", maxStrike)
+		logger.Verbose.Printf("🔍 ALPACA FILTER: %s PUTS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
+			symbol, minStrike, maxStrike, 75.0, 105.0, stockPrice)
 
 		q.Add("limit", "1000")
 		req.URL.RawQuery = q.Encode()
@@ -451,3 +444,5 @@ func (c *Client) TestConnection() error {
 
 	return nil
 }
+
+

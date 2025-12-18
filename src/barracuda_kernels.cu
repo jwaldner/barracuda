@@ -21,43 +21,132 @@ __global__ void black_scholes_kernel(
     double T = opt.time_to_expiration;
     double r = opt.risk_free_rate;
     double sigma = opt.volatility;
+    double q = 0.005; // Dividend yield (0.5% for most stocks)
     
-    // Calculate d1 and d2
-    double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
+    // CORRECT Black-Scholes formula with dividend yield
+    // d1 = [ln(S/K) + (r - q + σ²/2)T] / (σ√T)
+    double d1 = (log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
     double d2 = d1 - sigma * sqrt(T);
     
-    // Standard normal CDF approximation
-    auto norm_cdf = [](double x) -> double {
-        return 0.5 * (1.0 + erf(x / sqrt(2.0)));
-    };
-    
-    // Standard normal PDF
-    auto norm_pdf = [](double x) -> double {
-        return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
-    };
-    
-    double Nd1 = norm_cdf(d1);
-    double Nd2 = norm_cdf(d2);
-    double nd1 = norm_pdf(d1);
+    // Cumulative normal distributions
+    double Nd1 = 0.5 * (1.0 + erf(d1 / sqrt(2.0)));
+    double Nd2 = 0.5 * (1.0 + erf(d2 / sqrt(2.0)));
+    double N_neg_d1 = 0.5 * (1.0 + erf(-d1 / sqrt(2.0)));
+    double N_neg_d2 = 0.5 * (1.0 + erf(-d2 / sqrt(2.0)));
+    double nd1 = exp(-0.5 * d1 * d1) / sqrt(2.0 * M_PI);
     
     if (opt.option_type == 'C') {
-        // Call option
-        opt.theoretical_price = S * Nd1 - K * exp(-r * T) * Nd2;
-        opt.delta = Nd1;
+        // Call option: C = S*e^(-qT)*N(d1) - K*e^(-rT)*N(d2)
+        opt.theoretical_price = S * exp(-q * T) * Nd1 - K * exp(-r * T) * Nd2;
+        opt.delta = exp(-q * T) * Nd1;
     } else {
-        // Put option
-        opt.theoretical_price = K * exp(-r * T) * (1.0 - Nd2) - S * (1.0 - Nd1);
-        opt.delta = Nd1 - 1.0;
+        // Put option: P = K*e^(-rT)*N(-d2) - S*e^(-qT)*N(-d1)
+        opt.theoretical_price = K * exp(-r * T) * N_neg_d2 - S * exp(-q * T) * N_neg_d1;
+        opt.delta = -exp(-q * T) * N_neg_d1;
     }
     
     // Greeks calculations
-    opt.gamma = nd1 / (S * sigma * sqrt(T));
-    opt.theta = -(S * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2;
-    opt.vega = S * nd1 * sqrt(T);
+    opt.gamma = exp(-q * T) * nd1 / (S * sigma * sqrt(T));
+    opt.theta = -(S * exp(-q * T) * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2 + q * S * exp(-q * T) * Nd1;
+    opt.vega = S * exp(-q * T) * nd1 * sqrt(T);
     opt.rho = K * T * exp(-r * T) * Nd2;
     
     if (opt.option_type == 'P') {
-        opt.theta += r * K * exp(-r * T);
+        opt.theta -= q * S * exp(-q * T) * Nd1 + q * S * exp(-q * T) * (1.0 - Nd1);
+        opt.rho = -opt.rho;
+    }
+}
+
+// Combined CUDA kernel: Calculate Implied Volatility + Black-Scholes in one pass
+__global__ void implied_volatility_black_scholes_kernel(
+    OptionContract* contracts,
+    int num_contracts) {
+    
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_contracts) return;
+    
+    OptionContract& opt = contracts[idx];
+    
+    // STEP 1: Calculate Implied Volatility from market close price
+    double market_price = opt.market_close_price;
+    
+    // Black-Scholes parameters
+    double stock_price = opt.underlying_price;
+    double strike = opt.strike_price;
+    double time_exp = opt.time_to_expiration;
+    double rate = opt.risk_free_rate;
+    double q = 0.005; // Dividend yield
+    
+    if (market_price > 0.0) {
+        // Initial volatility guess
+        double iv = fmax(0.10, fmin(2.0, market_price * 2.0 / (stock_price * sqrt(time_exp))));
+        const double tolerance = 1e-8;
+        const int max_iter = 50;
+        
+        // Newton-Raphson iteration for implied volatility
+        for (int i = 0; i < max_iter; i++) {
+            double d1_iv = (log(stock_price / strike) + (rate - q + 0.5 * iv * iv) * time_exp) / (iv * sqrt(time_exp));
+            double d2_iv = d1_iv - iv * sqrt(time_exp);
+            
+            double Nd1_iv = 0.5 * (1.0 + erf(d1_iv / sqrt(2.0)));
+            double Nd2_iv = 0.5 * (1.0 + erf(d2_iv / sqrt(2.0)));
+            double N_neg_d1_iv = 0.5 * (1.0 + erf(-d1_iv / sqrt(2.0)));
+            double N_neg_d2_iv = 0.5 * (1.0 + erf(-d2_iv / sqrt(2.0)));
+            
+            double theo_price;
+            if (opt.option_type == 'C') {
+                theo_price = stock_price * exp(-q * time_exp) * Nd1_iv - strike * exp(-rate * time_exp) * Nd2_iv;
+            } else {
+                theo_price = strike * exp(-rate * time_exp) * N_neg_d2_iv - stock_price * exp(-q * time_exp) * N_neg_d1_iv;
+            }
+            
+            double nd1_iv = exp(-0.5 * d1_iv * d1_iv) / sqrt(2.0 * M_PI);
+            double vega_val = stock_price * exp(-q * time_exp) * nd1_iv * sqrt(time_exp);
+            double price_diff = theo_price - market_price;
+            
+            if (fabs(price_diff) < tolerance) break;
+            
+            if (vega_val > 1e-10) {
+                iv = iv - price_diff / vega_val;
+                iv = fmax(0.01, fmin(3.0, iv));
+            } else {
+                break;
+            }
+        }
+        
+        opt.volatility = iv;
+    } else {
+        opt.volatility = 0.25; // Default 25% if no market price
+    }
+    
+    // STEP 2: Calculate Black-Scholes with the derived implied volatility
+    double sigma = opt.volatility;
+    
+    double d1 = (log(stock_price / strike) + (rate - q + 0.5 * sigma * sigma) * time_exp) / (sigma * sqrt(time_exp));
+    double d2 = d1 - sigma * sqrt(time_exp);
+    
+    double Nd1 = 0.5 * (1.0 + erf(d1 / sqrt(2.0)));
+    double Nd2 = 0.5 * (1.0 + erf(d2 / sqrt(2.0)));
+    double N_neg_d1 = 0.5 * (1.0 + erf(-d1 / sqrt(2.0)));
+    double N_neg_d2 = 0.5 * (1.0 + erf(-d2 / sqrt(2.0)));
+    double nd1 = exp(-0.5 * d1 * d1) / sqrt(2.0 * M_PI);
+    
+    if (opt.option_type == 'C') {
+        opt.theoretical_price = stock_price * exp(-q * time_exp) * Nd1 - strike * exp(-rate * time_exp) * Nd2;
+        opt.delta = exp(-q * time_exp) * Nd1;
+    } else {
+        opt.theoretical_price = strike * exp(-rate * time_exp) * N_neg_d2 - stock_price * exp(-q * time_exp) * N_neg_d1;
+        opt.delta = -exp(-q * time_exp) * N_neg_d1;
+    }
+    
+    // Greeks calculations
+    opt.gamma = exp(-q * time_exp) * nd1 / (stock_price * sigma * sqrt(time_exp));
+    opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
+    opt.vega = stock_price * exp(-q * time_exp) * nd1 * sqrt(time_exp);
+    opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
+    
+    if (opt.option_type == 'P') {
+        opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
         opt.rho = -opt.rho;
     }
 }
@@ -91,68 +180,9 @@ __global__ void monte_carlo_kernel(
     states[idx] = local_state;
 }
 
-// CUDA kernel for parallel implied volatility calculation (Newton-Raphson)
-__global__ void implied_volatility_kernel(
-    OptionContract* contracts,
-    int num_contracts,
-    double tolerance = 1e-8,
-    int max_iterations = 100) {
-    
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= num_contracts) return;
-    
-    OptionContract& opt = contracts[idx];
-    double market_price = opt.theoretical_price; // Using theoretical_price as market price
-    
-    if (market_price <= 0.01) {
-        opt.volatility = 0.25; // Default for very cheap options
-        return;
-    }
-    
-    double S = opt.underlying_price;
-    double K = opt.strike_price;
-    double T = opt.time_to_expiration;
-    double r = opt.risk_free_rate;
-    
-    // Initial volatility guess
-    double vol = market_price * 2.0 / (S * sqrt(T));
-    vol = fmax(0.05, fmin(vol, 1.0));
-    
-    for (int iter = 0; iter < max_iterations; iter++) {
-        // Black-Scholes calculation
-        double d1 = (log(S / K) + (r + 0.5 * vol * vol) * T) / (vol * sqrt(T));
-        double d2 = d1 - vol * sqrt(T);
-        
-        // Normal CDF and PDF
-        double nd1 = 0.5 * (1.0 + erf(d1 / sqrt(2.0)));
-        double nd2 = 0.5 * (1.0 + erf(d2 / sqrt(2.0)));
-        double pdf = exp(-0.5 * d1 * d1) / sqrt(2.0 * M_PI);
-        
-        double theoretical_price;
-        if (opt.option_type == 'C') {
-            theoretical_price = S * nd1 - K * exp(-r * T) * nd2;
-        } else {
-            theoretical_price = K * exp(-r * T) * (1.0 - nd2) - S * (1.0 - nd1);
-        }
-        
-        double vega = S * pdf * sqrt(T);
-        double price_diff = theoretical_price - market_price;
-        
-        if (fabs(price_diff) < tolerance) {
-            opt.volatility = vol;
-            return;
-        }
-        
-        if (vega > 1e-10) {
-            vol = vol - price_diff / vega;
-            vol = fmax(0.01, fmin(vol, 3.0)); // Clamp volatility
-        } else {
-            break;
-        }
-    }
-    
-    opt.volatility = vol;
-}
+// NOTE: Old standalone implied volatility kernel removed
+// Using combined implied_volatility_black_scholes_kernel instead
+// (Removed redundant implied volatility kernel code - conflicts resolved)
 
 // CUDA kernel for parallel contract preprocessing
 __global__ void preprocess_contracts_kernel(
@@ -184,7 +214,7 @@ __global__ void find_25delta_skew_kernel(
         double target_delta = 0.25;
         
         // Find best put (delta ≈ -0.25)
-        double best_put_iv = 0.25;
+        double best_put_iv = 0.0; // Will be set from real market data
         double min_put_diff = 1.0;
         
         for (int i = 0; i < num_puts; i++) {
@@ -196,7 +226,7 @@ __global__ void find_25delta_skew_kernel(
         }
         
         // Find best call (delta ≈ +0.25)
-        double best_call_iv = 0.25;
+        double best_call_iv = 0.0; // Will be set from real market data
         double min_call_diff = 1.0;
         
         for (int i = 0; i < num_calls; i++) {
@@ -258,78 +288,7 @@ __global__ void monte_carlo_pi_kernel(int* inside, int samples_per_thread, curan
     states[idx] = local_state;
 }
 
-// CUDA kernel for parallel implied volatility calculation
-__global__ void implied_volatility_kernel(
-    OptionContract* contracts,
-    double* market_prices,
-    int num_contracts) {
-    
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= num_contracts) return;
-    
-    OptionContract& opt = contracts[idx];
-    double market_price = market_prices[idx];
-    
-    if (market_price <= 0) {
-        opt.volatility = 0.25; // Default volatility
-        return;
-    }
-    
-    // Newton-Raphson method for implied volatility
-    const double tolerance = 1e-6;
-    const int max_iterations = 50; // Reduced for GPU
-    double vol = 0.25; // Initial guess
-    
-    double S = opt.underlying_price;
-    double K = opt.strike_price;
-    double T = opt.time_to_expiration;
-    double r = opt.risk_free_rate;
-    
-    for (int i = 0; i < max_iterations; i++) {
-        double d1 = (log(S / K) + (r + 0.5 * vol * vol) * T) / (vol * sqrt(T));
-        double d2 = d1 - vol * sqrt(T);
-        
-        // Standard normal CDF approximation
-        auto norm_cdf = [](double x) -> double {
-            return 0.5 * (1.0 + erf(x / sqrt(2.0)));
-        };
-        
-        // Standard normal PDF
-        auto norm_pdf = [](double x) -> double {
-            return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
-        };
-        
-        double Nd1 = norm_cdf(d1);
-        double Nd2 = norm_cdf(d2);
-        double nd1 = norm_pdf(d1);
-        
-        double theoretical_price;
-        if (opt.option_type == 'C') {
-            theoretical_price = S * Nd1 - K * exp(-r * T) * Nd2;
-        } else {
-            theoretical_price = K * exp(-r * T) * (1.0 - Nd2) - S * (1.0 - Nd1);
-        }
-        
-        double vega = S * nd1 * sqrt(T);
-        double price_diff = theoretical_price - market_price;
-        
-        if (abs(price_diff) < tolerance) {
-            break;
-        }
-        
-        if (vega < 1e-10) {
-            break; // Avoid division by zero
-        }
-        
-        vol -= price_diff / vega;
-        
-        // Keep volatility in reasonable bounds
-        if (vol < 0.001) vol = 0.001;
-        if (vol > 5.0) vol = 5.0;
-    }
-    
-    opt.volatility = vol;
-}
+// NOTE: All broken kernel fragments completely removed
 
 // Initialize cuRAND states
 __global__ void setup_kernel(curandState* state, unsigned long seed, int num_paths) {
@@ -345,6 +304,16 @@ extern "C" {
         int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
         
         black_scholes_kernel<<<blocksPerGrid, threadsPerBlock>>>(
+            d_contracts, num_contracts);
+        
+        cudaDeviceSynchronize();
+    }
+    
+    void launch_implied_volatility_black_scholes_kernel(OptionContract* d_contracts, int num_contracts) {
+        int threadsPerBlock = 256;
+        int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
+        
+        implied_volatility_black_scholes_kernel<<<blocksPerGrid, threadsPerBlock>>>(
             d_contracts, num_contracts);
         
         cudaDeviceSynchronize();
@@ -380,24 +349,7 @@ extern "C" {
         cudaDeviceSynchronize();
     }
     
-    void launch_implied_volatility_kernel(OptionContract* d_contracts, double* d_market_prices, int num_contracts) {
-        int threadsPerBlock = 256;
-        int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
-        
-        implied_volatility_kernel<<<blocksPerGrid, threadsPerBlock>>>(
-            d_contracts, d_market_prices, num_contracts);
-        
-        cudaDeviceSynchronize();
-    }
-    
-    // New CUDA wrapper functions for maximum GPU utilization
-    void launch_implied_volatility_newtonraphson_kernel(OptionContract* d_contracts, int num_contracts) {
-        int threadsPerBlock = 256;
-        int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
-        
-        implied_volatility_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_contracts, num_contracts);
-        cudaDeviceSynchronize();
-    }
+    // NOTE: Old implied volatility wrappers removed - using combined kernel
     
     void launch_preprocess_contracts_kernel(OptionContract* d_contracts, int num_contracts,
                                           double underlying_price, double time_to_exp, double risk_free_rate) {

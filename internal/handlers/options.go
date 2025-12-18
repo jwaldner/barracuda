@@ -815,6 +815,9 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 	companyInfo struct{ Company, Sector string }
 }, req models.AnalysisRequest, timeToExp float64) []models.OptionResult {
 
+	// All contracts go to CUDA for premium calculation
+	cudaCount := 0
+	
 	var results []models.OptionResult
 
 	// Build batch calculation request using engine's OptionContract format
@@ -830,97 +833,168 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 			optionType = byte('C')
 		}
 
+		// Skip if missing required market data - contract must be tradable
+		if sc.contract == nil || !sc.contract.Tradable {
+			logger.Verbose.Printf("❌ Missing or non-tradable contract for %s - skipping", sc.symbol)
+			continue
+		}
+		
+		// Black-Scholes parameters EXACTLY matching your mathematical formula
+		riskFreeRate := 0.04  // 4% risk-free rate per formula
+		
+		// Get market price for CUDA IV calculation (prefer close, fallback to bid-ask mid)
+		marketPrice := 0.0
+		
+		// First try close price
+		if sc.contract.ClosePrice != nil {
+			if closePriceStr, ok := sc.contract.ClosePrice.(string); ok {
+				if parsed, err := strconv.ParseFloat(closePriceStr, 64); err == nil && parsed > 0 {
+					marketPrice = parsed
+					logger.Debug.Printf("📊 Using close price $%.3f for CUDA IV calculation", marketPrice)
+				}
+			} else if closePriceFloat, ok := sc.contract.ClosePrice.(float64); ok && closePriceFloat > 0 {
+				marketPrice = closePriceFloat
+				logger.Debug.Printf("📊 Using close price $%.3f for CUDA IV calculation", marketPrice)
+			}
+		}
+		
+		// Fallback to bid-ask midpoint if no close price
+		if marketPrice == 0.0 {
+			var bidPrice, askPrice float64
+			if sc.contract.BidPrice != nil {
+				if bid, ok := sc.contract.BidPrice.(string); ok {
+					bidPrice, _ = strconv.ParseFloat(bid, 64)
+				} else if bid, ok := sc.contract.BidPrice.(float64); ok {
+					bidPrice = bid
+				}
+			}
+			if sc.contract.AskPrice != nil {
+				if ask, ok := sc.contract.AskPrice.(string); ok {
+					askPrice, _ = strconv.ParseFloat(ask, 64)
+				} else if ask, ok := sc.contract.AskPrice.(float64); ok {
+					askPrice = ask
+				}
+			}
+			
+			if bidPrice > 0 && askPrice > 0 && askPrice >= bidPrice {
+				marketPrice = (bidPrice + askPrice) / 2.0
+				logger.Debug.Printf("📊 Using bid-ask mid $%.3f (bid: $%.3f, ask: $%.3f) for CUDA IV", marketPrice, bidPrice, askPrice)
+			}
+		}
+		
+		// Default volatility for CUDA to use if no market price available
+		volatility := 0.25  // CUDA will calculate actual IV from marketPrice
+		
+		logger.Verbose.Printf("🚀 CUDA WILL CALCULATE IV: %s | Market: $%.3f | Default: %.1f%%", 
+			sc.contract.Symbol, marketPrice, volatility*100)
+		
+		// Debug log the exact parameters being sent to CUDA
+		logger.Verbose.Printf("🔧 CUDA INPUT: %s | S=%.2f | K=%.2f | T=%.6f | r=%.3f | σ=%.3f | Type=%c", 
+			sc.symbol, sc.stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, optionType)
+		
+		// ALL contracts calculated by CUDA with exact mathematical parameters + IV calculation
+		cudaCount++
 		engineContracts = append(engineContracts, barracuda.OptionContract{
 			Symbol:           sc.symbol,
 			StrikePrice:      strikePrice,
 			UnderlyingPrice:  sc.stockPrice,
 			TimeToExpiration: timeToExp,
-			RiskFreeRate:     0.05, // 5% risk-free rate
-			Volatility:       0.25, // 25% volatility estimate
+			RiskFreeRate:     riskFreeRate,
+			Volatility:       volatility,
 			OptionType:       optionType,
+			MarketClosePrice: marketPrice, // CUDA will calculate IV from this price
+			TheoreticalPrice: 0.0,         // CUDA will calculate using IV + Black-Scholes
 		})
 	}
 
+	var computeDuration time.Duration
+	
 	if len(engineContracts) == 0 {
-		return results
-	}
+		// All contracts used market data - no CUDA computation needed
+		computeDuration = time.Duration(0)
+		logger.Debug.Printf("📊 All contracts used market data - no CUDA computation required")
+	} else {
+		// Execute CUDA-MAXIMIZED batch calculation with timing
+		logger.Debug.Printf("🚀 CUDA MAXIMIZED: Processing %d option contracts on GPU", len(engineContracts))
+		computeStart := time.Now()
 
-	// Execute CUDA-MAXIMIZED batch calculation with timing
-	logger.Debug.Printf("🚀 CUDA MAXIMIZED: Processing %d option contracts on GPU", len(engineContracts))
-	computeStart := time.Now()
+		var calculatedContracts []barracuda.OptionContract
+		var err error
 
-	var calculatedContracts []barracuda.OptionContract
-	var err error
-
-	// Use CUDA maximization if available, otherwise fallback to regular calculation
-	if h.engine.IsCudaAvailable() {
-		// Get stock price from first contract (they should all be the same symbol)
-		stockPrice := engineContracts[0].UnderlyingPrice
-		puts, calls, maxErr := h.engine.MaximizeCUDAUsage(engineContracts, stockPrice)
-		if maxErr == nil {
+		// Use CUDA maximization - NO FALLBACK
+		if h.engine.IsCudaAvailable() {
+			// Get stock price from first contract (they should all be the same symbol)
+			stockPrice := engineContracts[0].UnderlyingPrice
+			puts, calls, maxErr := h.engine.MaximizeCUDAUsage(engineContracts, stockPrice)
+			if maxErr != nil {
+				logger.Error.Printf("❌ CUDA maximization failed: %v", maxErr)
+				return results
+			}
 			// Combine puts and calls back into single array
 			calculatedContracts = append(puts, calls...)
 			logger.Info.Printf("⚡ CUDA MAXIMIZED: 100%% GPU utilization for %d contracts", len(calculatedContracts))
 		} else {
-			// Fallback to regular calculation
-			logger.Warn.Printf("🔄 CUDA maximization failed, falling back to regular calculation: %v", maxErr)
-			calculatedContracts, err = h.engine.CalculateBlackScholes(engineContracts)
+			logger.Error.Printf("❌ CUDA not available - cannot process contracts")
+			return results
 		}
-	} else {
-		calculatedContracts, err = h.engine.CalculateBlackScholes(engineContracts)
+
+		computeDuration = time.Since(computeStart)
+		
+		if err != nil {
+			logger.Error.Printf("❌ Batch calculation failed: %v", err)
+			return results
+		}
+
+		// Process CUDA results
+		for i, calcContract := range calculatedContracts {
+			if i >= len(selectedContracts) {
+				break
+			}
+
+			sc := selectedContracts[i]
+			strikePrice, _ := strconv.ParseFloat(sc.contract.StrikePrice, 64)
+
+			// Calculate contracts from available cash and strike price
+			premium := calcContract.TheoreticalPrice
+			calc := h.calculateContractMetrics(premium, strikePrice, req.Strategy, req.AvailableCash)
+			if calc.MaxContracts <= 0 {
+				continue
+			}
+
+			// Calculate days to expiration
+			expirationTime, _ := time.Parse("2006-01-02", req.ExpirationDate)
+			daysToExp := int(time.Until(expirationTime).Hours() / 24)
+
+			result := models.OptionResult{
+				Ticker:           sc.symbol,
+				Company:          sc.companyInfo.Company,
+				Sector:           sc.companyInfo.Sector,
+				OptionSymbol:     sc.contract.Symbol,
+				OptionType:       req.Strategy,
+				Strike:           strikePrice,
+				StockPrice:       sc.stockPrice,
+				Premium:          premium,
+				MaxContracts:     calc.MaxContracts,
+				TotalPremium:     calc.TotalPremium,
+				CashNeeded:       float64(calc.MaxContracts) * calc.CashNeededPerContract,
+				ProfitPercentage: (premium / strikePrice) * 100,
+				Delta:            calcContract.Delta,
+				Gamma:            calcContract.Gamma,
+				Theta:            calcContract.Theta,
+				Vega:             calcContract.Vega,
+				ImpliedVol:       0, // Will be calculated from market data
+				Expiration:       req.ExpirationDate,
+				DaysToExp:        daysToExp,
+			}
+
+			results = append(results, result)
+		}
 	}
 
-	computeDuration := time.Since(computeStart)
-	if err != nil {
-		logger.Error.Printf("❌ Batch calculation failed: %v", err)
-		return results
-	}
-
-	// Process results
-	for i, calcContract := range calculatedContracts {
-		if i >= len(selectedContracts) {
-			break
-		}
-
-		sc := selectedContracts[i]
-		strikePrice, _ := strconv.ParseFloat(sc.contract.StrikePrice, 64)
-
-		// Calculate contracts from available cash and strike price
-		premium := calcContract.TheoreticalPrice
-		calc := h.calculateContractMetrics(premium, strikePrice, req.Strategy, req.AvailableCash)
-		if calc.MaxContracts <= 0 {
-			continue
-		}
-
-		// Calculate days to expiration
-		expirationTime, _ := time.Parse("2006-01-02", req.ExpirationDate)
-		daysToExp := int(time.Until(expirationTime).Hours() / 24)
-
-		result := models.OptionResult{
-			Ticker:           sc.symbol,
-			Company:          sc.companyInfo.Company,
-			Sector:           sc.companyInfo.Sector,
-			OptionSymbol:     sc.contract.Symbol,
-			OptionType:       req.Strategy,
-			Strike:           strikePrice,
-			StockPrice:       sc.stockPrice,
-			Premium:          premium,
-			MaxContracts:     calc.MaxContracts,
-			TotalPremium:     calc.TotalPremium,
-			CashNeeded:       float64(calc.MaxContracts) * calc.CashNeededPerContract,
-			ProfitPercentage: (premium / strikePrice) * 100,
-			Delta:            calcContract.Delta,
-			Gamma:            calcContract.Gamma,
-			Theta:            calcContract.Theta,
-			Vega:             calcContract.Vega,
-			ImpliedVol:       0.25, // Placeholder
-			Expiration:       req.ExpirationDate,
-			DaysToExp:        daysToExp,
-		}
-
-		results = append(results, result)
-	}
-
+	// Log processing breakdown
+	logger.Info.Printf("⚡ BATCH COMPLETE: %d total contracts | ALL %d CUDA processed (%.3fs)", 
+		len(selectedContracts), cudaCount, computeDuration.Seconds())
+	
 	h.lastComputeDuration = computeDuration
 	return results
 }
@@ -935,9 +1009,30 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 	logger.Verbose.Printf("🔍 CONTRACT FILTER: Evaluating %d contracts for %s strategy, target delta %.3f",
 		len(contracts), strategy, targetDelta)
 
-	// For puts, find contracts with strikes near the target delta range
+	// Find the contract with the nearest strike to target, regardless of direction
 	var bestContract *alpaca.OptionContract
-	bestScore := float64(-1)
+	bestDistance := float64(999999)
+
+	// Calculate target strike based on delta/risk level
+	var targetMultiplier float64
+	if strategy == "puts" {
+		if targetDelta <= 0.30 {
+			targetMultiplier = 0.88 // 12% OTM for LOW risk
+		} else if targetDelta <= 0.60 {
+			targetMultiplier = 0.95 // 5% OTM for MOD risk
+		} else {
+			targetMultiplier = 0.98 // 2% OTM for HIGH risk
+		}
+	} else {
+		if targetDelta <= 0.30 {
+			targetMultiplier = 1.12 // 12% ITM for LOW risk calls
+		} else if targetDelta <= 0.60 {
+			targetMultiplier = 1.05 // 5% ITM for MOD risk calls
+		} else {
+			targetMultiplier = 1.02 // 2% ITM for HIGH risk calls
+		}
+	}
+	targetStrike := stockPrice * targetMultiplier
 
 	for _, contract := range contracts {
 		// Parse strike price
@@ -951,41 +1046,10 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 			continue
 		}
 
-		// Calculate score based on strike distance from current price
-		var score float64
-		if strategy == "puts" {
-			// For puts, prefer strikes below current price
-			if strikePrice < stockPrice {
-				// Calculate target strike based on delta/risk level
-				var targetMultiplier float64
-				if targetDelta <= 0.30 {
-					targetMultiplier = 0.88 // 12% OTM for LOW risk
-				} else if targetDelta <= 0.60 {
-					targetMultiplier = 0.95 // 5% OTM for MOD risk
-				} else {
-					targetMultiplier = 0.98 // 2% OTM for HIGH risk
-				}
-				targetStrike := stockPrice * targetMultiplier
-				score = 1.0 - math.Abs(strikePrice-targetStrike)/targetStrike
-			}
-		} else {
-			// For calls, prefer strikes above current price
-			if strikePrice > stockPrice {
-				var targetMultiplier float64
-				if targetDelta <= 0.30 {
-					targetMultiplier = 1.12 // 12% ITM for LOW risk calls
-				} else if targetDelta <= 0.60 {
-					targetMultiplier = 1.05 // 5% ITM for MOD risk calls
-				} else {
-					targetMultiplier = 1.02 // 2% ITM for HIGH risk calls
-				}
-				targetStrike := stockPrice * targetMultiplier
-				score = 1.0 - math.Abs(strikePrice-targetStrike)/targetStrike
-			}
-		}
-
-		if score > bestScore {
-			bestScore = score
+		// Find nearest strike to target (can go above or below)
+		distance := math.Abs(strikePrice - targetStrike)
+		if distance < bestDistance {
+			bestDistance = distance
 			bestContract = contract
 		}
 	}
@@ -1014,7 +1078,7 @@ func (h *OptionsHandler) calculateContractMetrics(optionPrice float64, strikePri
 		// For puts: need cash = strike price × 100 (obligation to buy 100 shares at strike)
 		cashNeededPerContract = strikePrice * 100
 		maxContracts = int(availableCash / cashNeededPerContract)
-		logger.Verbose.Printf("🔍 CASH CALC: PUT - Strike=%.2f, Cash needed per contract=%.2f, Available=%.2f, Max contracts=%d",
+		logger.Always.Printf("🔍 PUT CALC DEBUG: Strike=$%.2f, Cash needed per contract=$%.2f, Available=$%.2f, Max contracts=%d",
 			strikePrice, cashNeededPerContract, availableCash, maxContracts)
 	} else {
 		// For calls: pay premium × 100 per contract
@@ -1213,4 +1277,59 @@ func (h *OptionsHandler) getFieldMetadata() map[string]models.FieldMetadata {
 		"annualized":        {DisplayName: "Annualized", Type: "percentage", Sortable: true, Alignment: "right"},
 		"expiration":        {DisplayName: "Expiration", Type: "text", Sortable: true, Alignment: "center"},
 	}
+}
+
+// calculateImpliedVolatility uses Newton-Raphson to find IV from market price
+func (h *OptionsHandler) calculateImpliedVolatility(marketPrice, stockPrice, strikePrice, timeToExp, riskFreeRate float64, optionType byte) float64 {
+	const (
+		tolerance     = 1e-6  // Convergence tolerance
+		maxIterations = 100   // Maximum iterations
+		dividendYield = 0.005 // 0.5% dividend yield
+	)
+	
+	// Initial volatility guess based on market price
+	vol := math.Max(0.10, math.Min(2.0, marketPrice*2.0/(stockPrice*math.Sqrt(timeToExp))))
+	
+	for i := 0; i < maxIterations; i++ {
+		// Calculate Black-Scholes price and vega with current volatility
+		d1 := (math.Log(stockPrice/strikePrice) + (riskFreeRate-dividendYield+0.5*vol*vol)*timeToExp) / (vol * math.Sqrt(timeToExp))
+		d2 := d1 - vol*math.Sqrt(timeToExp)
+		
+		// Cumulative normal distributions
+		nd1 := 0.5 * (1.0 + math.Erf(d1/math.Sqrt(2.0)))
+		nd2 := 0.5 * (1.0 + math.Erf(d2/math.Sqrt(2.0)))
+		negNd1 := 0.5 * (1.0 + math.Erf(-d1/math.Sqrt(2.0)))
+		negNd2 := 0.5 * (1.0 + math.Erf(-d2/math.Sqrt(2.0)))
+		
+		// Calculate theoretical price
+		var theoreticalPrice float64
+		if optionType == 'C' {
+			theoreticalPrice = stockPrice*math.Exp(-dividendYield*timeToExp)*nd1 - strikePrice*math.Exp(-riskFreeRate*timeToExp)*nd2
+		} else {
+			theoreticalPrice = strikePrice*math.Exp(-riskFreeRate*timeToExp)*negNd2 - stockPrice*math.Exp(-dividendYield*timeToExp)*negNd1
+		}
+		
+		// Calculate vega (sensitivity to volatility)
+		vega := stockPrice * math.Exp(-dividendYield*timeToExp) * math.Exp(-0.5*d1*d1) / math.Sqrt(2.0*math.Pi) * math.Sqrt(timeToExp)
+		
+		// Price difference
+		priceDiff := theoreticalPrice - marketPrice
+		
+		// Check convergence
+		if math.Abs(priceDiff) < tolerance {
+			return vol
+		}
+		
+		// Newton-Raphson update: vol_new = vol - f(vol)/f'(vol)
+		if vega > 1e-10 { // Avoid division by zero
+			vol = vol - priceDiff/vega
+		} else {
+			break
+		}
+		
+		// Keep volatility within reasonable bounds
+		vol = math.Max(0.01, math.Min(3.0, vol))
+	}
+	
+	return vol // Return best estimate even if not converged
 }

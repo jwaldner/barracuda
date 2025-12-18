@@ -71,6 +71,22 @@ func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, 
 	return result, err
 }
 
+// GetOptionQuote wraps the original method with performance monitoring
+func (pw *PerformanceWrapper) GetOptionQuote(symbol string) (*OptionQuote, error) {
+	start := time.Now()
+	result, err := pw.client.GetOptionQuote(symbol)
+	duration := time.Since(start)
+
+	pw.recordRequest(duration)
+
+	logger.Debug.Printf("📡 API CALL: GetOptionQuote(%s) took %v", symbol, duration)
+	if duration > 2*time.Second {
+		logger.Debug.Printf("⚠️  SLOW API CALL: GetOptionQuote(%s) took %v", symbol, duration)
+	}
+
+	return result, err
+}
+
 // recordRequest updates performance statistics
 func (pw *PerformanceWrapper) recordRequest(duration time.Duration) {
 	pw.totalRequests++

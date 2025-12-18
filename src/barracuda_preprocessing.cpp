@@ -16,7 +16,7 @@ extern "C" {
                                       double* d_result); // [put_25d_iv, call_25d_iv, skew, atm_iv]
     
     // New CUDA kernel declarations
-    void launch_implied_volatility_newtonraphson_kernel(OptionContract* d_contracts, int num_contracts);
+    void launch_implied_volatility_black_scholes_kernel(OptionContract* d_contracts, int num_contracts);
     void launch_preprocess_contracts_kernel(OptionContract* d_contracts, int num_contracts,
                                           double underlying_price, double time_to_exp, double risk_free_rate);
     void launch_find_25delta_skew_kernel(OptionContract* d_puts, int num_puts,
@@ -50,7 +50,7 @@ PreprocessingResult PreprocessingEngine::ProcessOptionsData(
                                          underlying_price, time_to_expiration, risk_free_rate);
         
         // CUDA Step 2: Parallel implied volatility calculation (Newton-Raphson)
-        launch_implied_volatility_newtonraphson_kernel(d_contracts, processed.size());
+        launch_implied_volatility_black_scholes_kernel(d_contracts, processed.size());
         
         // Copy results back
         cudaMemcpy(processed.data(), d_contracts, size, cudaMemcpyDeviceToHost);

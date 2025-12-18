@@ -13,6 +13,7 @@ typedef struct {
     double risk_free_rate;
     double volatility;
     char option_type;
+    double market_close_price;
     double delta;
     double gamma;
     double theta;
@@ -71,6 +72,7 @@ type OptionContract struct {
 	RiskFreeRate     float64
 	Volatility       float64
 	OptionType       byte // 'C' or 'P'
+	MarketClosePrice float64 // Market close price for IV calculation
 
 	// Output Greeks
 	Delta            float64
@@ -236,6 +238,7 @@ func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract) ([]O
 		cContracts[i].risk_free_rate = C.double(contract.RiskFreeRate)
 		cContracts[i].volatility = C.double(contract.Volatility)
 		cContracts[i].option_type = C.char(contract.OptionType)
+		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
 	}
 
 	// Call CUDA calculation
@@ -305,21 +308,30 @@ func (be *BaracudaEngine) AnalyzeSymbolsBatch(
 			result.ExecutionMode = "CPU"
 		}
 
-		// Separate puts and calls and calculate implied volatility from market prices
+		// Separate puts and calls - NO DEFAULTS, require real market data
 		var puts, calls []OptionContract
 		for _, option := range options {
 			option.UnderlyingPrice = stockPrice
-			option.TimeToExpiration = 0.085 // ~31 days for Jan 2026 expiration
-			option.RiskFreeRate = 0.05
+			
+			// REQUIRE real market data - NO DEFAULTS for CPU mode either
+			if option.TimeToExpiration <= 0 {
+				log.Printf("❌ CPU: Missing time to expiration for %s - skipping", option.Symbol)
+				continue
+			}
+			if option.RiskFreeRate <= 0 {
+				log.Printf("❌ CPU: Missing risk free rate for %s - skipping", option.Symbol)
+				continue
+			}
 
-			// Use market price (TheoreticalPrice) to calculate implied volatility
+			// Use market price (TheoreticalPrice) to calculate implied volatility - NO DEFAULTS
 			marketPrice := option.TheoreticalPrice
 			if marketPrice > 0.01 { // Only calculate IV for options with meaningful market price
 				// Simple implied volatility estimation (Newton-Raphson would be better)
 				option.Volatility = be.estimateImpliedVolatility(marketPrice, stockPrice, option.StrikePrice,
 					option.TimeToExpiration, option.RiskFreeRate, option.OptionType)
 			} else {
-				option.Volatility = 0.25 // Default for very cheap options
+				log.Printf("❌ CPU: Missing volatility/market price for %s - skipping", option.Symbol)
+				continue // Skip contracts with no real data
 			}
 
 			if option.OptionType == 'P' {
@@ -418,19 +430,15 @@ func (be *BaracudaEngine) estimateImpliedVolatility(marketPrice, stockPrice, str
 	tolerance := 1e-8 // Tighter tolerance for better precision
 	maxIterations := 100
 
-	// Better initial guess based on at-the-money approximation
-	var vol float64
-	atm := stockPrice / strikePrice
-	if atm > 1.1 || atm < 0.9 {
-		vol = 0.18 // Lower initial guess for OTM options
-	} else {
-		vol = marketPrice * 2.0 / (stockPrice * math.Sqrt(timeToExp)) // ATM approximation
-		if vol < 0.05 {
-			vol = 0.05
-		}
-		if vol > 1.0 {
-			vol = 0.18
-		}
+	// Calculate initial volatility guess from market price - NO DEFAULTS
+	vol := marketPrice * 2.0 / (stockPrice * math.Sqrt(timeToExp)) // Market-based approximation
+	
+	// Reasonable bounds for volatility calculation
+	if vol < 0.01 {
+		return 0 // Invalid market data - cannot calculate
+	}
+	if vol > 2.0 {
+		vol = 2.0 // Cap at 200% volatility (extreme but possible)
 	}
 
 	for i := 0; i < maxIterations; i++ {
@@ -507,14 +515,32 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 	}
 
 	log.Printf("🚀 CUDA MAXIMIZED: Processing %d contracts with minimal Go loops, maximum GPU parallelization", len(options))
+	
+	// Debug: Log the first few contract inputs to verify correct values
+	for i := 0; i < len(options) && i < 3; i++ {
+		log.Printf("🔍 Input[%d]: Symbol=%s, Strike=%.2f, Underlying=%.2f, Time=%.6f, Vol=%.3f, Rate=%.3f, Type=%c", 
+			i, options[i].Symbol, options[i].StrikePrice, options[i].UnderlyingPrice, 
+			options[i].TimeToExpiration, options[i].Volatility, options[i].RiskFreeRate, options[i].OptionType)
+	}
 
-	// Minimal Go preparation - just convert to C struct format
+	// Convert Go contracts to C contracts - ALL fields needed for Black-Scholes
 	cContracts := make([]C.COptionContract, len(options))
 	for i, contract := range options {
-		// ONLY data format conversion loop - NO computational processing
+		// Copy symbol (truncate if too long)
+		symbolBytes := []byte(contract.Symbol)
+		for j := 0; j < len(symbolBytes) && j < 31; j++ {
+			cContracts[i].symbol[j] = C.char(symbolBytes[j])
+		}
+		cContracts[i].symbol[31] = 0 // Null terminate
+
 		cContracts[i].strike_price = C.double(contract.StrikePrice)
-		cContracts[i].theoretical_price = C.double(contract.TheoreticalPrice)
+		cContracts[i].underlying_price = C.double(contract.UnderlyingPrice)
+		cContracts[i].time_to_expiration = C.double(contract.TimeToExpiration)
+		cContracts[i].risk_free_rate = C.double(contract.RiskFreeRate)
+		cContracts[i].volatility = C.double(contract.Volatility)
 		cContracts[i].option_type = C.char(contract.OptionType)
+		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
+		cContracts[i].theoretical_price = C.double(contract.TheoreticalPrice)
 	}
 
 	// ALL COMPUTATIONAL WORK ON GPU:
@@ -536,13 +562,19 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 	// Convert results back and separate puts/calls
 	var puts, calls []OptionContract
 	for i := range options {
+		// DEBUG: Log what CUDA returned
+		log.Printf("🔍 CUDA RESULT[%d]: Symbol=%s, Market=$%.3f, TheoPrice=%.6f, Delta=%.6f, Vol=%.3f", 
+			i, options[i].Symbol, float64(cContracts[i].market_close_price), 
+			float64(cContracts[i].theoretical_price), float64(cContracts[i].delta), float64(cContracts[i].volatility))
+			
 		processed := OptionContract{
 			Symbol:           options[i].Symbol,
 			StrikePrice:      options[i].StrikePrice,
 			OptionType:       options[i].OptionType,
-			UnderlyingPrice:  stockPrice,
-			TimeToExpiration: 0.085,
-			RiskFreeRate:     0.05,
+			UnderlyingPrice:  float64(cContracts[i].underlying_price),
+			TimeToExpiration: float64(cContracts[i].time_to_expiration),
+			RiskFreeRate:     float64(cContracts[i].risk_free_rate),
+			MarketClosePrice: float64(cContracts[i].market_close_price),
 			Delta:            float64(cContracts[i].delta),
 			Gamma:            float64(cContracts[i].gamma),
 			Theta:            float64(cContracts[i].theta),

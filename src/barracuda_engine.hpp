@@ -41,6 +41,7 @@ struct OptionContract {
     double risk_free_rate;
     double volatility;
     char option_type; // 'C' for call, 'P' for put
+    double market_close_price; // Market close price for IV calculation
     
     // Greeks (output)
     double delta;
