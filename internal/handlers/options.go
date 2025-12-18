@@ -807,8 +807,20 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 	return results
 }
 
-// batchProcessContracts processes all selected contracts in a single batch call
+// batchProcessContracts processes all selected contracts with complete GPU processing
 func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
+	symbol      string
+	stockPrice  float64
+	contract    *alpaca.OptionContract
+	companyInfo struct{ Company, Sector string }
+}, req models.AnalysisRequest, timeToExp float64) []models.OptionResult {
+
+	logger.Info.Printf("🚀 COMPLETE GPU PROCESSING: All calculations on CUDA")
+	return h.batchProcessContractsComplete(selectedContracts, req, timeToExp)
+}
+
+// batchProcessContractsLegacy is the current proven method (renamed for clarity)
+func (h *OptionsHandler) batchProcessContractsLegacy(selectedContracts []struct {
 	symbol      string
 	stockPrice  float64
 	contract    *alpaca.OptionContract
@@ -1331,4 +1343,111 @@ func (h *OptionsHandler) calculateImpliedVolatility(marketPrice, stockPrice, str
 	}
 
 	return vol // Return best estimate even if not converged
+}
+
+// batchProcessContractsComplete uses complete GPU processing for ALL calculations
+func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struct {
+	symbol      string
+	stockPrice  float64
+	contract    *alpaca.OptionContract
+	companyInfo struct{ Company, Sector string }
+}, req models.AnalysisRequest, timeToExp float64) []models.OptionResult {
+
+	logger.Info.Printf("🚀 COMPLETE GPU: Processing %d contracts with ALL calculations on CUDA", len(selectedContracts))
+
+	if !h.engine.IsCudaAvailable() {
+		return nil // Require CUDA for complete processing
+	}
+
+	// Build complete contract data for CUDA
+	var engineContracts []barracuda.OptionContract
+	for _, sc := range selectedContracts {
+		strikePrice, err := strconv.ParseFloat(sc.contract.StrikePrice, 64)
+		if err != nil || !sc.contract.Tradable {
+			continue
+		}
+
+		optionType := byte('P')
+		if req.Strategy == "calls" {
+			optionType = byte('C')
+		}
+
+		// Get market price for IV calculation
+		marketPrice := 0.0
+		if sc.contract.ClosePrice != nil {
+			if closePriceStr, ok := sc.contract.ClosePrice.(string); ok {
+				marketPrice, _ = strconv.ParseFloat(closePriceStr, 64)
+			} else if closePriceFloat, ok := sc.contract.ClosePrice.(float64); ok {
+				marketPrice = closePriceFloat
+			}
+		}
+
+		engineContracts = append(engineContracts, barracuda.OptionContract{
+			Symbol:           sc.symbol,
+			StrikePrice:      strikePrice,
+			UnderlyingPrice:  sc.stockPrice,
+			TimeToExpiration: timeToExp,
+			RiskFreeRate:     0.04,
+			Volatility:       0.25,
+			OptionType:       optionType,
+			MarketClosePrice: marketPrice,
+		})
+	}
+
+	if len(engineContracts) == 0 {
+		return nil
+	}
+
+	// CUDA call with complete processing (includes business calculations)
+	startTime := time.Now()
+	completeResults, err := h.engine.MaximizeCUDAUsageComplete(
+		engineContracts,
+		engineContracts[0].UnderlyingPrice,
+		req.AvailableCash,
+		req.Strategy,
+		req.ExpirationDate)
+
+	if err != nil {
+		logger.Error.Printf("❌ Complete CUDA processing failed: %v", err)
+		return nil
+	}
+
+	duration := time.Since(startTime)
+	h.lastComputeDuration = duration
+
+	// Convert complete CUDA results to business results
+	var results []models.OptionResult
+	for i, completeResult := range completeResults {
+		if i >= len(selectedContracts) {
+			break
+		}
+
+		sc := selectedContracts[i]
+		results = append(results, models.OptionResult{
+			Ticker:           completeResult.Symbol,
+			Company:          sc.companyInfo.Company,
+			Sector:           sc.companyInfo.Sector,
+			OptionSymbol:     sc.contract.Symbol,
+			OptionType:       req.Strategy,
+			Strike:           completeResult.StrikePrice,
+			StockPrice:       completeResult.UnderlyingPrice,
+			Premium:          completeResult.TheoreticalPrice,
+			MaxContracts:     completeResult.MaxContracts,
+			TotalPremium:     completeResult.TotalPremium,
+			CashNeeded:       completeResult.CashNeeded,
+			ProfitPercentage: completeResult.ProfitPercentage,
+			Delta:            completeResult.Delta,
+			Gamma:            completeResult.Gamma,
+			Theta:            completeResult.Theta,
+			Vega:             completeResult.Vega,
+			ImpliedVol:       completeResult.ImpliedVolatility,
+			Expiration:       req.ExpirationDate,
+			DaysToExp:        completeResult.DaysToExpiration,
+		})
+	}
+
+	logger.Info.Printf("⚡ COMPLETE GPU: %.3fms | %d contracts → %d results | ALL calculations on CUDA",
+		duration.Seconds()*1000, len(engineContracts), len(results))
+
+	return results
 }

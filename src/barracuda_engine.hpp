@@ -52,6 +52,35 @@ struct OptionContract {
     double theoretical_price;
 };
 
+// Complete option contract with all business calculations
+struct CompleteOptionContract {
+    char symbol[32];
+    double strike_price;
+    double underlying_price;
+    double time_to_expiration;
+    double risk_free_rate;
+    double volatility;
+    char option_type; // 'C' for call, 'P' for put
+    double market_close_price;
+    
+    // Greeks (output)
+    double delta;
+    double gamma;
+    double theta;
+    double vega;
+    double rho;
+    double theoretical_price;
+    double implied_volatility;
+    
+    // Business calculations (output)
+    int max_contracts;
+    double total_premium;
+    double cash_needed;
+    double profit_percentage;
+    double annualized_return;
+    int days_to_expiration;
+};
+
 struct MarketData {
     std::string symbol;
     double price;
@@ -182,6 +211,14 @@ extern "C" {
         void* engine,
         OptionContract* contracts,
         int count);
+    
+    // Complete option processing (all calculations on GPU)
+    int barracuda_calculate_options_complete(
+        void* engine,
+        CompleteOptionContract* contracts,
+        int count,
+        double available_cash,
+        int days_to_expiration);
     
     // Volatility skew
     int baracuda_calculate_skew(

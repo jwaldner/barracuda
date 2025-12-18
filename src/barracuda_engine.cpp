@@ -26,6 +26,9 @@ extern "C" {
     void launch_separate_puts_calls_kernel(OptionContract* d_contracts, int num_contracts,
                                          int* d_put_indices, int* d_call_indices,
                                          int* d_num_puts, int* d_num_calls);
+    void launch_complete_option_analysis_kernel(CompleteOptionContract* d_contracts, 
+                                              int num_contracts, double available_cash, 
+                                              int days_to_expiration);
 }
 
 
@@ -506,6 +509,42 @@ extern "C" {
         cudaFree(d_call_indices);
         cudaFree(d_num_puts);
         cudaFree(d_num_calls);
+        
+        return 0; // Success
+    }
+    
+    // Complete option processing - ALL calculations on GPU
+    int barracuda_calculate_options_complete(void* engine, CompleteOptionContract* c_contracts, int count,
+                                           double available_cash, int days_to_expiration) {
+        auto* eng = static_cast<BarracudaEngine*>(engine);
+        
+        if (!eng->IsCudaAvailable()) {
+            return -1; // CUDA required for complete processing
+        }
+        
+        // GPU memory allocation
+        CompleteOptionContract* d_contracts;
+        size_t contract_size = count * sizeof(CompleteOptionContract);
+        
+        cudaMalloc(&d_contracts, contract_size);
+        if (d_contracts == nullptr) {
+            return -2; // GPU memory allocation failed
+        }
+        
+        // Copy contracts to GPU
+        cudaMemcpy(d_contracts, c_contracts, contract_size, cudaMemcpyHostToDevice);
+        
+        // Launch complete processing kernel (IV + Black-Scholes + Business logic)
+        extern void launch_complete_option_analysis_kernel(CompleteOptionContract* d_contracts, 
+                                                         int num_contracts, double available_cash, 
+                                                         int days_to_expiration);
+        launch_complete_option_analysis_kernel(d_contracts, count, available_cash, days_to_expiration);
+        
+        // Copy complete results back to CPU
+        cudaMemcpy(c_contracts, d_contracts, contract_size, cudaMemcpyDeviceToHost);
+        
+        // Cleanup GPU memory
+        cudaFree(d_contracts);
         
         return 0; // Success
     }

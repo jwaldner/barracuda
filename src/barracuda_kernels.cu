@@ -375,9 +375,138 @@ extern "C" {
         int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
         
         separate_puts_calls_kernel<<<blocksPerGrid, threadsPerBlock>>>(
-            d_contracts, num_contracts, d_put_indices, d_call_indices, d_num_puts, d_num_calls);
+            d_contracts, num_contracts, d_put_indices, d_call_indices, d_num_puts, d_call_indices);
         cudaDeviceSynchronize();
     }
+
+// COMPLETE OPTION PROCESSING KERNEL - Calculates ALL business logic on GPU
+__global__ void complete_option_analysis_kernel(
+    CompleteOptionContract* contracts,
+    int num_contracts,
+    double available_cash,
+    int days_to_expiration) {
+    
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_contracts) return;
+    
+    CompleteOptionContract& opt = contracts[idx];
+    
+    // STEP 1: Calculate implied volatility (same as existing kernel)
+    double stock_price = opt.underlying_price;
+    double strike = opt.strike_price;
+    double time_exp = opt.time_to_expiration;
+    double rate = opt.risk_free_rate;
+    double market_price = opt.market_close_price;
+    double q = 0.005;
+    
+    double iv = 0.25; // Default
+    if (market_price > 0.01) {
+        iv = fmax(0.10, fmin(2.0, market_price * 2.0 / (stock_price * sqrt(time_exp))));
+        
+        for (int iter = 0; iter < 50; iter++) {
+            double d1_iv = (log(stock_price / strike) + (rate - q + 0.5 * iv * iv) * time_exp) / (iv * sqrt(time_exp));
+            double d2_iv = d1_iv - iv * sqrt(time_exp);
+            
+            double Nd1_iv = 0.5 * (1.0 + erf(d1_iv / sqrt(2.0)));
+            double Nd2_iv = 0.5 * (1.0 + erf(d2_iv / sqrt(2.0)));
+            double N_neg_d1_iv = 0.5 * (1.0 + erf(-d1_iv / sqrt(2.0)));
+            double N_neg_d2_iv = 0.5 * (1.0 + erf(-d2_iv / sqrt(2.0)));
+            
+            double theo_price;
+            if (opt.option_type == 'C') {
+                theo_price = stock_price * exp(-q * time_exp) * Nd1_iv - strike * exp(-rate * time_exp) * Nd2_iv;
+            } else {
+                theo_price = strike * exp(-rate * time_exp) * N_neg_d2_iv - stock_price * exp(-q * time_exp) * N_neg_d1_iv;
+            }
+            
+            double nd1_iv = exp(-0.5 * d1_iv * d1_iv) / sqrt(2.0 * M_PI);
+            double vega_val = stock_price * exp(-q * time_exp) * nd1_iv * sqrt(time_exp);
+            double price_diff = theo_price - market_price;
+            
+            if (fabs(price_diff) < 1e-8) break;
+            
+            if (vega_val > 1e-10) {
+                iv = iv - price_diff / vega_val;
+                iv = fmax(0.01, fmin(3.0, iv));
+            } else {
+                break;
+            }
+        }
+    }
+    
+    opt.implied_volatility = iv;
+    
+    // STEP 2: Calculate Black-Scholes with derived IV
+    double sigma = iv;
+    double d1 = (log(stock_price / strike) + (rate - q + 0.5 * sigma * sigma) * time_exp) / (sigma * sqrt(time_exp));
+    double d2 = d1 - sigma * sqrt(time_exp);
+    
+    double Nd1 = 0.5 * (1.0 + erf(d1 / sqrt(2.0)));
+    double Nd2 = 0.5 * (1.0 + erf(d2 / sqrt(2.0)));
+    double N_neg_d1 = 0.5 * (1.0 + erf(-d1 / sqrt(2.0)));
+    double N_neg_d2 = 0.5 * (1.0 + erf(-d2 / sqrt(2.0)));
+    double nd1 = exp(-0.5 * d1 * d1) / sqrt(2.0 * M_PI);
+    
+    if (opt.option_type == 'C') {
+        opt.theoretical_price = stock_price * exp(-q * time_exp) * Nd1 - strike * exp(-rate * time_exp) * Nd2;
+        opt.delta = exp(-q * time_exp) * Nd1;
+    } else {
+        opt.theoretical_price = strike * exp(-rate * time_exp) * N_neg_d2 - stock_price * exp(-q * time_exp) * N_neg_d1;
+        opt.delta = -exp(-q * time_exp) * N_neg_d1;
+    }
+    
+    // Greeks calculations
+    opt.gamma = exp(-q * time_exp) * nd1 / (stock_price * sigma * sqrt(time_exp));
+    opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
+    opt.vega = stock_price * exp(-q * time_exp) * nd1 * sqrt(time_exp);
+    opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
+    
+    if (opt.option_type == 'P') {
+        opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
+        opt.rho = -opt.rho;
+    }
+    
+    // STEP 3: BUSINESS LOGIC CALCULATIONS ON GPU
+    double premium_per_share = opt.theoretical_price;
+    double cash_needed_per_contract;
+    
+    if (opt.option_type == 'P') {
+        // Puts: need cash = strike price × 100 (obligation to buy)
+        cash_needed_per_contract = strike * 100.0;
+    } else {
+        // Calls: pay premium × 100 per contract
+        cash_needed_per_contract = premium_per_share * 100.0;
+    }
+    
+    // Calculate max contracts from available cash
+    opt.max_contracts = (int)(available_cash / cash_needed_per_contract);
+    if (opt.max_contracts < 0) opt.max_contracts = 0;
+    
+    // Calculate totals
+    opt.total_premium = (double)opt.max_contracts * premium_per_share * 100.0;
+    opt.cash_needed = (double)opt.max_contracts * cash_needed_per_contract;
+    
+    // Calculate profit percentage and annualized return
+    opt.profit_percentage = (premium_per_share / strike) * 100.0;
+    opt.annualized_return = opt.profit_percentage * (365.0 / (double)days_to_expiration);
+    opt.days_to_expiration = days_to_expiration;
+}
+
+// Launch function for complete processing kernel
+void launch_complete_option_analysis_kernel(
+    CompleteOptionContract* d_contracts,
+    int num_contracts,
+    double available_cash,
+    int days_to_expiration) {
+    
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (num_contracts + threadsPerBlock - 1) / threadsPerBlock;
+    
+    complete_option_analysis_kernel<<<blocksPerGrid, threadsPerBlock>>>(
+        d_contracts, num_contracts, available_cash, days_to_expiration);
+    cudaDeviceSynchronize();
+}
+
 }
 
 } // namespace barracuda

@@ -55,10 +55,11 @@ type AlpacaConfig struct {
 
 // EngineConfig represents computation engine configuration
 type EngineConfig struct {
-	ExecutionMode    string  `yaml:"execution_mode"`    // auto, cuda, cpu
-	BatchSize        int     `yaml:"batch_size"`        // Max contracts per batch
-	EnableBenchmarks bool    `yaml:"enable_benchmarks"` // Enable performance benchmarking
-	WorkloadFactor   float64 `yaml:"workload_factor"`   // Computational workload multiplier for benchmarking
+	ExecutionMode         string  `yaml:"execution_mode"`          // auto, cuda, cpu
+	BatchSize             int     `yaml:"batch_size"`              // Max contracts per batch
+	EnableBenchmarks      bool    `yaml:"enable_benchmarks"`       // Enable performance benchmarking
+	WorkloadFactor        float64 `yaml:"workload_factor"`         // Computational workload multiplier for benchmarking
+	CompleteGPUProcessing bool    `yaml:"complete_gpu_processing"` // Enable complete GPU processing (experimental)
 }
 
 type YAMLConfig struct {

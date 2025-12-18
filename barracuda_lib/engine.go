@@ -22,6 +22,31 @@ typedef struct {
     double theoretical_price;
 } COptionContract;
 
+// Complete C struct for complete GPU processing
+typedef struct {
+    char symbol[32];
+    double strike_price;
+    double underlying_price;
+    double time_to_expiration;
+    double risk_free_rate;
+    double volatility;
+    char option_type;
+    double market_close_price;
+    double delta;
+    double gamma;
+    double theta;
+    double vega;
+    double rho;
+    double theoretical_price;
+    double implied_volatility;
+    int max_contracts;
+    double total_premium;
+    double cash_needed;
+    double profit_percentage;
+    double annualized_return;
+    int days_to_expiration;
+} CCompleteOptionContract;
+
 // C functions from barracuda_engine.cpp
 void* barracuda_create_engine();
 void barracuda_destroy_engine(void* engine);
@@ -34,6 +59,10 @@ double barracuda_benchmark(void* engine, int num_contracts, int iterations);
 // CUDA maximization function - zero Go loops
 int barracuda_cuda_maximize_processing(void* engine, COptionContract* contracts, int count,
                                      double stock_price, int* put_count, int* call_count);
+
+// Complete GPU processing function - ALL calculations on GPU
+int barracuda_calculate_options_complete(void* engine, CCompleteOptionContract* contracts, int count,
+                                       double available_cash, int days_to_expiration);
 
 // New preprocessing functions
 typedef struct {
@@ -81,6 +110,36 @@ type OptionContract struct {
 	Vega             float64
 	Rho              float64
 	TheoreticalPrice float64
+}
+
+// CompleteOptionResult represents a complete option analysis result with all business calculations
+// EXPERIMENTAL: For complete GPU processing that includes business logic calculations
+type CompleteOptionResult struct {
+	// Basic option info
+	Symbol          string
+	OptionType      byte // 'C' or 'P'
+	StrikePrice     float64
+	UnderlyingPrice float64
+
+	// Market data
+	MarketClosePrice float64
+
+	// Calculated Greeks (from GPU)
+	Delta             float64
+	Gamma             float64
+	Theta             float64
+	Vega              float64
+	Rho               float64
+	TheoreticalPrice  float64
+	ImpliedVolatility float64
+
+	// Business calculations (from GPU)
+	MaxContracts     int
+	TotalPremium     float64
+	CashNeeded       float64
+	ProfitPercentage float64
+	AnnualizedReturn float64
+	DaysToExpiration int
 }
 
 // SymbolAnalysisResult represents comprehensive analysis for a single symbol
@@ -595,6 +654,90 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 		cudaDuration.Seconds()*1000, len(options), len(puts), len(calls))
 
 	return puts, calls, nil
+}
+
+// MaximizeCUDAUsageComplete processes options with COMPLETE GPU processing - all business calculations on GPU
+func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, stockPrice, availableCash float64, strategy string, expirationDate string) ([]CompleteOptionResult, error) {
+	if len(options) == 0 {
+		return nil, nil
+	}
+
+	if be.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
+
+	if !be.IsCudaAvailable() {
+		return nil, fmt.Errorf("CUDA not available - complete GPU processing requires CUDA")
+	}
+
+	log.Printf("🚀 COMPLETE CUDA: Processing %d contracts with ALL calculations on GPU", len(options))
+
+	// Calculate days to expiration
+	expirationTime, err := time.Parse("2006-01-02", expirationDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid expiration date format: %v", err)
+	}
+	daysToExp := int(time.Until(expirationTime).Hours() / 24)
+
+	// Convert Go contracts to C complete contracts
+	cContracts := make([]C.CCompleteOptionContract, len(options))
+	for i, contract := range options {
+		// Copy symbol (truncate if too long)
+		symbolBytes := []byte(contract.Symbol)
+		for j := 0; j < len(symbolBytes) && j < 31; j++ {
+			cContracts[i].symbol[j] = C.char(symbolBytes[j])
+		}
+		cContracts[i].symbol[31] = 0 // Null terminate
+
+		// Input fields
+		cContracts[i].strike_price = C.double(contract.StrikePrice)
+		cContracts[i].underlying_price = C.double(contract.UnderlyingPrice)
+		cContracts[i].time_to_expiration = C.double(contract.TimeToExpiration)
+		cContracts[i].risk_free_rate = C.double(contract.RiskFreeRate)
+		cContracts[i].volatility = C.double(contract.Volatility)
+		cContracts[i].option_type = C.char(contract.OptionType)
+		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
+	}
+
+	// Call CUDA complete processing
+	result := C.barracuda_calculate_options_complete(
+		be.engine,
+		(*C.CCompleteOptionContract)(unsafe.Pointer(&cContracts[0])),
+		C.int(len(options)),
+		C.double(availableCash),
+		C.int(daysToExp))
+
+	if result != 0 {
+		return nil, fmt.Errorf("CUDA complete processing failed with code %d", result)
+	}
+
+	// Convert results back to Go
+	results := make([]CompleteOptionResult, len(options))
+	for i := range options {
+		results[i] = CompleteOptionResult{
+			Symbol:            options[i].Symbol,
+			OptionType:        options[i].OptionType,
+			StrikePrice:       float64(cContracts[i].strike_price),
+			UnderlyingPrice:   float64(cContracts[i].underlying_price),
+			MarketClosePrice:  float64(cContracts[i].market_close_price),
+			Delta:             float64(cContracts[i].delta),
+			Gamma:             float64(cContracts[i].gamma),
+			Theta:             float64(cContracts[i].theta),
+			Vega:              float64(cContracts[i].vega),
+			Rho:               float64(cContracts[i].rho),
+			TheoreticalPrice:  float64(cContracts[i].theoretical_price),
+			ImpliedVolatility: float64(cContracts[i].implied_volatility),
+			MaxContracts:      int(cContracts[i].max_contracts),
+			TotalPremium:      float64(cContracts[i].total_premium),
+			CashNeeded:        float64(cContracts[i].cash_needed),
+			ProfitPercentage:  float64(cContracts[i].profit_percentage),
+			AnnualizedReturn:  float64(cContracts[i].annualized_return),
+			DaysToExpiration:  int(cContracts[i].days_to_expiration),
+		}
+	}
+
+	log.Printf("⚡ COMPLETE CUDA: %d contracts processed with ALL calculations on GPU", len(results))
+	return results, nil
 }
 
 // Close cleans up engine resources
