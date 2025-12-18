@@ -71,7 +71,7 @@ type OptionContract struct {
 	TimeToExpiration float64
 	RiskFreeRate     float64
 	Volatility       float64
-	OptionType       byte // 'C' or 'P'
+	OptionType       byte    // 'C' or 'P'
 	MarketClosePrice float64 // Market close price for IV calculation
 
 	// Output Greeks
@@ -312,7 +312,7 @@ func (be *BaracudaEngine) AnalyzeSymbolsBatch(
 		var puts, calls []OptionContract
 		for _, option := range options {
 			option.UnderlyingPrice = stockPrice
-			
+
 			// REQUIRE real market data - NO DEFAULTS for CPU mode either
 			if option.TimeToExpiration <= 0 {
 				log.Printf("❌ CPU: Missing time to expiration for %s - skipping", option.Symbol)
@@ -432,7 +432,7 @@ func (be *BaracudaEngine) estimateImpliedVolatility(marketPrice, stockPrice, str
 
 	// Calculate initial volatility guess from market price - NO DEFAULTS
 	vol := marketPrice * 2.0 / (stockPrice * math.Sqrt(timeToExp)) // Market-based approximation
-	
+
 	// Reasonable bounds for volatility calculation
 	if vol < 0.01 {
 		return 0 // Invalid market data - cannot calculate
@@ -515,11 +515,11 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 	}
 
 	log.Printf("🚀 CUDA MAXIMIZED: Processing %d contracts with minimal Go loops, maximum GPU parallelization", len(options))
-	
+
 	// Debug: Log the first few contract inputs to verify correct values
 	for i := 0; i < len(options) && i < 3; i++ {
-		log.Printf("🔍 Input[%d]: Symbol=%s, Strike=%.2f, Underlying=%.2f, Time=%.6f, Vol=%.3f, Rate=%.3f, Type=%c", 
-			i, options[i].Symbol, options[i].StrikePrice, options[i].UnderlyingPrice, 
+		log.Printf("🔍 Input[%d]: Symbol=%s, Strike=%.2f, Underlying=%.2f, Time=%.6f, Vol=%.3f, Rate=%.3f, Type=%c",
+			i, options[i].Symbol, options[i].StrikePrice, options[i].UnderlyingPrice,
 			options[i].TimeToExpiration, options[i].Volatility, options[i].RiskFreeRate, options[i].OptionType)
 	}
 
@@ -563,10 +563,10 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 	var puts, calls []OptionContract
 	for i := range options {
 		// DEBUG: Log what CUDA returned
-		log.Printf("🔍 CUDA RESULT[%d]: Symbol=%s, Market=$%.3f, TheoPrice=%.6f, Delta=%.6f, Vol=%.3f", 
-			i, options[i].Symbol, float64(cContracts[i].market_close_price), 
+		log.Printf("🔍 CUDA RESULT[%d]: Symbol=%s, Market=$%.3f, TheoPrice=%.6f, Delta=%.6f, Vol=%.3f",
+			i, options[i].Symbol, float64(cContracts[i].market_close_price),
 			float64(cContracts[i].theoretical_price), float64(cContracts[i].delta), float64(cContracts[i].volatility))
-			
+
 		processed := OptionContract{
 			Symbol:           options[i].Symbol,
 			StrikePrice:      options[i].StrikePrice,

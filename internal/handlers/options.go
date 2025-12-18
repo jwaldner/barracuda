@@ -817,7 +817,7 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 
 	// All contracts go to CUDA for premium calculation
 	cudaCount := 0
-	
+
 	var results []models.OptionResult
 
 	// Build batch calculation request using engine's OptionContract format
@@ -838,13 +838,13 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 			logger.Verbose.Printf("❌ Missing or non-tradable contract for %s - skipping", sc.symbol)
 			continue
 		}
-		
+
 		// Black-Scholes parameters EXACTLY matching your mathematical formula
-		riskFreeRate := 0.04  // 4% risk-free rate per formula
-		
+		riskFreeRate := 0.04 // 4% risk-free rate per formula
+
 		// Get market price for CUDA IV calculation (prefer close, fallback to bid-ask mid)
 		marketPrice := 0.0
-		
+
 		// First try close price
 		if sc.contract.ClosePrice != nil {
 			if closePriceStr, ok := sc.contract.ClosePrice.(string); ok {
@@ -857,7 +857,7 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 				logger.Debug.Printf("📊 Using close price $%.3f for CUDA IV calculation", marketPrice)
 			}
 		}
-		
+
 		// Fallback to bid-ask midpoint if no close price
 		if marketPrice == 0.0 {
 			var bidPrice, askPrice float64
@@ -875,23 +875,23 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 					askPrice = ask
 				}
 			}
-			
+
 			if bidPrice > 0 && askPrice > 0 && askPrice >= bidPrice {
 				marketPrice = (bidPrice + askPrice) / 2.0
 				logger.Debug.Printf("📊 Using bid-ask mid $%.3f (bid: $%.3f, ask: $%.3f) for CUDA IV", marketPrice, bidPrice, askPrice)
 			}
 		}
-		
+
 		// Default volatility for CUDA to use if no market price available
-		volatility := 0.25  // CUDA will calculate actual IV from marketPrice
-		
-		logger.Verbose.Printf("🚀 CUDA WILL CALCULATE IV: %s | Market: $%.3f | Default: %.1f%%", 
+		volatility := 0.25 // CUDA will calculate actual IV from marketPrice
+
+		logger.Verbose.Printf("🚀 CUDA WILL CALCULATE IV: %s | Market: $%.3f | Default: %.1f%%",
 			sc.contract.Symbol, marketPrice, volatility*100)
-		
+
 		// Debug log the exact parameters being sent to CUDA
-		logger.Verbose.Printf("🔧 CUDA INPUT: %s | S=%.2f | K=%.2f | T=%.6f | r=%.3f | σ=%.3f | Type=%c", 
+		logger.Verbose.Printf("🔧 CUDA INPUT: %s | S=%.2f | K=%.2f | T=%.6f | r=%.3f | σ=%.3f | Type=%c",
 			sc.symbol, sc.stockPrice, strikePrice, timeToExp, riskFreeRate, volatility, optionType)
-		
+
 		// ALL contracts calculated by CUDA with exact mathematical parameters + IV calculation
 		cudaCount++
 		engineContracts = append(engineContracts, barracuda.OptionContract{
@@ -908,7 +908,7 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 	}
 
 	var computeDuration time.Duration
-	
+
 	if len(engineContracts) == 0 {
 		// All contracts used market data - no CUDA computation needed
 		computeDuration = time.Duration(0)
@@ -939,7 +939,7 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 		}
 
 		computeDuration = time.Since(computeStart)
-		
+
 		if err != nil {
 			logger.Error.Printf("❌ Batch calculation failed: %v", err)
 			return results
@@ -992,9 +992,9 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 	}
 
 	// Log processing breakdown
-	logger.Info.Printf("⚡ BATCH COMPLETE: %d total contracts | ALL %d CUDA processed (%.3fs)", 
+	logger.Info.Printf("⚡ BATCH COMPLETE: %d total contracts | ALL %d CUDA processed (%.3fs)",
 		len(selectedContracts), cudaCount, computeDuration.Seconds())
-	
+
 	h.lastComputeDuration = computeDuration
 	return results
 }
@@ -1056,7 +1056,6 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 
 	return bestContract
 }
-
 
 // ContractCalculation holds all contract-related calculations
 type ContractCalculation struct {
@@ -1286,21 +1285,21 @@ func (h *OptionsHandler) calculateImpliedVolatility(marketPrice, stockPrice, str
 		maxIterations = 100   // Maximum iterations
 		dividendYield = 0.005 // 0.5% dividend yield
 	)
-	
+
 	// Initial volatility guess based on market price
 	vol := math.Max(0.10, math.Min(2.0, marketPrice*2.0/(stockPrice*math.Sqrt(timeToExp))))
-	
+
 	for i := 0; i < maxIterations; i++ {
 		// Calculate Black-Scholes price and vega with current volatility
 		d1 := (math.Log(stockPrice/strikePrice) + (riskFreeRate-dividendYield+0.5*vol*vol)*timeToExp) / (vol * math.Sqrt(timeToExp))
 		d2 := d1 - vol*math.Sqrt(timeToExp)
-		
+
 		// Cumulative normal distributions
 		nd1 := 0.5 * (1.0 + math.Erf(d1/math.Sqrt(2.0)))
 		nd2 := 0.5 * (1.0 + math.Erf(d2/math.Sqrt(2.0)))
 		negNd1 := 0.5 * (1.0 + math.Erf(-d1/math.Sqrt(2.0)))
 		negNd2 := 0.5 * (1.0 + math.Erf(-d2/math.Sqrt(2.0)))
-		
+
 		// Calculate theoretical price
 		var theoreticalPrice float64
 		if optionType == 'C' {
@@ -1308,28 +1307,28 @@ func (h *OptionsHandler) calculateImpliedVolatility(marketPrice, stockPrice, str
 		} else {
 			theoreticalPrice = strikePrice*math.Exp(-riskFreeRate*timeToExp)*negNd2 - stockPrice*math.Exp(-dividendYield*timeToExp)*negNd1
 		}
-		
+
 		// Calculate vega (sensitivity to volatility)
 		vega := stockPrice * math.Exp(-dividendYield*timeToExp) * math.Exp(-0.5*d1*d1) / math.Sqrt(2.0*math.Pi) * math.Sqrt(timeToExp)
-		
+
 		// Price difference
 		priceDiff := theoreticalPrice - marketPrice
-		
+
 		// Check convergence
 		if math.Abs(priceDiff) < tolerance {
 			return vol
 		}
-		
+
 		// Newton-Raphson update: vol_new = vol - f(vol)/f'(vol)
 		if vega > 1e-10 { // Avoid division by zero
 			vol = vol - priceDiff/vega
 		} else {
 			break
 		}
-		
+
 		// Keep volatility within reasonable bounds
 		vol = math.Max(0.01, math.Min(3.0, vol))
 	}
-	
+
 	return vol // Return best estimate even if not converged
 }
