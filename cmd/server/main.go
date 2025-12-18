@@ -90,7 +90,8 @@ func main() {
 	logger.Always.Printf("📡 Creating Alpaca client")
 	logger.Info.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets")
 
-	alpacaClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
+	baseClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
+	alpacaClient := alpaca.NewPerformanceWrapper(baseClient)
 
 	// Create symbol service for company/sector lookups
 	symbolService := symbols.NewSP500Service("assets/symbols")

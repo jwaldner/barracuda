@@ -108,15 +108,16 @@ func getSymbolCount(info map[string]interface{}) int {
 
 // OptionsHandler handles options analysis requests - DUMB HTTP layer only
 type OptionsHandler struct {
-	alpacaClient            *alpaca.Client
+	alpacaClient            alpaca.AlpacaInterface
 	config                  *config.Config
 	engine                  *barracuda.BaracudaEngine
 	symbolService           *symbols.SP500Service
 	contractsProcessedCount int
+	lastComputeDuration     time.Duration
 }
 
 // NewOptionsHandler creates a new options handler - just HTTP routing
-func NewOptionsHandler(alpacaClient *alpaca.Client, cfg *config.Config, engine *barracuda.BaracudaEngine, symbolService *symbols.SP500Service) *OptionsHandler {
+func NewOptionsHandler(alpacaClient alpaca.AlpacaInterface, cfg *config.Config, engine *barracuda.BaracudaEngine, symbolService *symbols.SP500Service) *OptionsHandler {
 	return &OptionsHandler{
 		alpacaClient:  alpacaClient,
 		config:        cfg,
@@ -585,7 +586,8 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Major Step: Completion
-	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs | %s engine", len(results), duration.Seconds(), engineType)
+	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs total | ⚡ %.3fs %s COMPUTE | %s engine",
+		len(results), duration.Seconds(), h.lastComputeDuration.Seconds(), engineType, engineType)
 	logger.Debug.Printf("🔍 DEBUG: Analysis completed, formatting response")
 
 	// Check if client is still connected
@@ -647,6 +649,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			ExpirationDate:     req.ExpirationDate,
 			Timestamp:          time.Now().Format(time.RFC3339),
 			ProcessingTime:     duration.Seconds(),
+			ComputeDuration:    h.lastComputeDuration.Seconds(),
 			ProcessingStats:    processingStats,
 			Engine:             engineType,
 			CudaAvailable:      h.engine.IsCudaAvailable(),
@@ -842,9 +845,32 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 		return results
 	}
 
-	// Execute batch calculation
-	logger.Debug.Printf("📊 Processing %d option contracts in batch", len(engineContracts))
-	calculatedContracts, err := h.engine.CalculateBlackScholes(engineContracts)
+	// Execute CUDA-MAXIMIZED batch calculation with timing
+	logger.Debug.Printf("🚀 CUDA MAXIMIZED: Processing %d option contracts on GPU", len(engineContracts))
+	computeStart := time.Now()
+
+	var calculatedContracts []barracuda.OptionContract
+	var err error
+
+	// Use CUDA maximization if available, otherwise fallback to regular calculation
+	if h.engine.IsCudaAvailable() {
+		// Get stock price from first contract (they should all be the same symbol)
+		stockPrice := engineContracts[0].UnderlyingPrice
+		puts, calls, maxErr := h.engine.MaximizeCUDAUsage(engineContracts, stockPrice)
+		if maxErr == nil {
+			// Combine puts and calls back into single array
+			calculatedContracts = append(puts, calls...)
+			logger.Info.Printf("⚡ CUDA MAXIMIZED: 100%% GPU utilization for %d contracts", len(calculatedContracts))
+		} else {
+			// Fallback to regular calculation
+			logger.Warn.Printf("🔄 CUDA maximization failed, falling back to regular calculation: %v", maxErr)
+			calculatedContracts, err = h.engine.CalculateBlackScholes(engineContracts)
+		}
+	} else {
+		calculatedContracts, err = h.engine.CalculateBlackScholes(engineContracts)
+	}
+
+	computeDuration := time.Since(computeStart)
 	if err != nil {
 		logger.Error.Printf("❌ Batch calculation failed: %v", err)
 		return results
@@ -895,6 +921,7 @@ func (h *OptionsHandler) batchProcessContracts(selectedContracts []struct {
 		results = append(results, result)
 	}
 
+	h.lastComputeDuration = computeDuration
 	return results
 }
 

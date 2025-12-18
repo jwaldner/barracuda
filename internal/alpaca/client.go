@@ -12,6 +12,27 @@ import (
 	"github.com/jwaldner/barracuda/internal/logger"
 )
 
+// AlpacaInterface defines the methods that both Client and PerformanceWrapper implement
+type AlpacaInterface interface {
+	GetStockPrice(symbol string) (*StockPrice, error)
+	GetStockPricesBatch(symbols []string) (map[string]*StockPrice, error)
+	GetOptionsChain(symbols []string, expirationDate, strategy string) (map[string][]*OptionContract, error)
+}
+
+const (
+	// Rate limiting for Alpaca Basic Plan (200 requests per minute)
+	BasicPlanDelay = 350 * time.Millisecond
+
+	// Rate limiting for Alpaca Algo Trader Plus (10,000 requests per minute)
+	AlgoPlusDelay = 10 * time.Millisecond
+
+	// HTTP timeout
+	DefaultTimeout = 30 * time.Second
+
+	// Performance thresholds
+	SlowRequestThreshold = 5 * time.Second
+)
+
 type Client struct {
 	APIKey     string
 	SecretKey  string
@@ -129,7 +150,7 @@ func (c *Client) GetStockPricesBatch(symbols []string) (map[string]*StockPrice, 
 
 		// Rate limiting - 200 requests per minute
 		if i+batchSize < len(symbols) {
-			time.Sleep(350 * time.Millisecond)
+			time.Sleep(BasicPlanDelay)
 		}
 	}
 
@@ -364,7 +385,7 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 		contractsBySymbol[symbol] = contracts
 
 		// Rate limiting between options requests
-		time.Sleep(350 * time.Millisecond)
+		time.Sleep(BasicPlanDelay)
 	}
 
 	return contractsBySymbol, nil
