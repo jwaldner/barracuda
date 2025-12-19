@@ -5,6 +5,11 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <ctime>
+#include <iomanip>
 
 namespace barracuda {
 
@@ -57,7 +62,7 @@ bool BarracudaEngine::InitializeCUDA() {
 }
 
 std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
-    const std::vector<OptionContract>& contracts) {
+    const std::vector<OptionContract>& contracts, const char* audit_symbol) {
     
     std::vector<OptionContract> results = contracts;
     
@@ -78,6 +83,12 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         // Copy results back
         cudaMemcpy(results.data(), d_contracts, size, cudaMemcpyDeviceToHost);
         cudaFree(d_contracts);
+        
+        // Add audit message if audit_symbol is provided
+        if (audit_symbol != nullptr) {
+            std::string message = "hello from cuda! (symbol: " + std::string(audit_symbol) + ")";
+            appendAuditMessage(message);
+        }
         
     } else {
         
@@ -128,6 +139,12 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
                 contract.theta += r * K * exp(-r * T);
                 contract.rho = -contract.rho;
             }
+        }
+        
+        // Add audit message if audit_symbol is provided
+        if (audit_symbol != nullptr) {
+            std::string message = "hello from cpu! (symbol: " + std::string(audit_symbol) + ")";
+            appendAuditMessage(message);
         }
     }
     
@@ -350,6 +367,11 @@ std::string BarracudaEngine::GetDeviceInfo(int device_id) const {
            std::to_string(prop.minor) + ")";
 }
 
+extern "C" {
+    int barracuda_calculate_options_with_audit(void* engine, OptionContract* c_contracts, int count, const char* audit_symbol);
+    void barracuda_set_execution_mode(void* engine, const char* mode);
+}
+
 // C interface implementations
 extern "C" {
     void* barracuda_create_engine() {
@@ -365,6 +387,10 @@ extern "C" {
     }
     
     int barracuda_calculate_options(void* engine, OptionContract* c_contracts, int count) {
+        return barracuda_calculate_options_with_audit(engine, c_contracts, count, nullptr);
+    }
+    
+    int barracuda_calculate_options_with_audit(void* engine, OptionContract* c_contracts, int count, const char* audit_symbol) {
         auto* eng = static_cast<BarracudaEngine*>(engine);
         
         // C struct layout: char[32] symbol, then doubles, char, then output doubles
@@ -397,7 +423,7 @@ extern "C" {
         }
         
         // Calculate with C++ engine
-        auto results = eng->CalculateBlackScholes(cpp_contracts);
+        auto results = eng->CalculateBlackScholes(cpp_contracts, audit_symbol);
         
         // Copy results back using correct offsets (after market_close_price at offset 80)
         for (size_t i = 0; i < results.size() && i < (size_t)count; i++) {
@@ -419,6 +445,19 @@ extern "C" {
 
     int barracuda_get_device_count(void* engine) {
         return static_cast<BarracudaEngine*>(engine)->GetDeviceCount();
+    }
+
+    void barracuda_set_execution_mode(void* engine, const char* mode) {
+        auto* eng = static_cast<BarracudaEngine*>(engine);
+        std::string mode_str(mode);
+        
+        if (mode_str == "cpu") {
+            eng->SetExecutionMode(ExecutionMode::CPU);
+        } else if (mode_str == "cuda") {
+            eng->SetExecutionMode(ExecutionMode::CUDA);
+        } else {
+            eng->SetExecutionMode(ExecutionMode::Auto);
+        }
     }
 
     double barracuda_benchmark(void* engine, int num_contracts, int iterations) {
@@ -514,6 +553,52 @@ extern "C" {
         cudaFree(d_contracts);
         
         return 0; // Success
+    }
+}
+
+// Helper function to append audit messages to JSON file
+void BarracudaEngine::appendAuditMessage(const std::string& message) {
+    std::ifstream inFile("audit.json");
+    if (!inFile.is_open()) {
+        return; // File doesn't exist, return silently
+    }
+    
+    // Read entire file content
+    std::string content((std::istreambuf_iterator<char>(inFile)),
+                        std::istreambuf_iterator<char>());
+    inFile.close();
+    
+    // Get current timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%dT%H:%M:%S");
+    
+    // Find the api_requests array and insert before the closing ]
+    size_t api_requests_pos = content.find("\"api_requests\":");
+    if (api_requests_pos != std::string::npos) {
+        // Find the array content
+        size_t array_start = content.find("[", api_requests_pos);
+        size_t array_end = content.find_last_of("]");
+        
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            // Create audit entry
+            std::string audit_entry = ",\n    {\n"
+                                      "      \"type\": \"BlackScholesCalculation\",\n"
+                                      "      \"message\": \"" + message + "\",\n"
+                                      "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
+                                      "    }";
+            
+            // Insert before the closing ]
+            content.insert(array_end, audit_entry);
+            
+            // Write back to file
+            std::ofstream outFile("audit.json");
+            if (outFile.is_open()) {
+                outFile << content;
+                outFile.close();
+            }
+        }
     }
 }
 

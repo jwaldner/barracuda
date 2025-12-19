@@ -4,9 +4,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
+	"github.com/jwaldner/barracuda/internal/audit"
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/handlers"
 	"github.com/jwaldner/barracuda/internal/logger"
@@ -14,6 +16,14 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+// Global audit component that handlers can access
+var globalAuditComponent *audit.AlpacaAudit
+
+// GetGlobalAuditComponent returns the global audit component for use by handlers
+func GetGlobalAuditComponent() *audit.AlpacaAudit {
+	return globalAuditComponent
+}
 
 func main() {
 	cfg := config.Load()
@@ -92,6 +102,63 @@ func main() {
 	baseClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
 	alpacaClient := alpaca.NewPerformanceWrapper(baseClient)
 
+	// Create Alpaca audit component for logging API calls
+	alpacaAudit := audit.NewAlpacaAudit()
+	globalAuditComponent = alpacaAudit
+	
+	// Register in audit registry so handlers can access it
+	audit.RegisterAudit("alpaca", alpacaAudit)
+	
+	// Set up audit callback function for the base client
+	auditCallback := func(symbol, operation string, data map[string]interface{}) {
+		// Log to console
+		logger.Info.Printf("🔍 AUDIT: %s operation on %s: %v", operation, symbol, data)
+		
+		// Add to audit component
+		url := "/unknown"
+		if urlVal, ok := data["endpoint"]; ok {
+			if urlStr, isStr := urlVal.(string); isStr {
+				url = urlStr
+			}
+		}
+		
+		// Extract duration if present
+		duration := int64(0)
+		if durVal, ok := data["duration_ms"]; ok {
+			if durInt, isInt := durVal.(int64); isInt {
+				duration = durInt
+			}
+		}
+		
+		// Extract error if present
+		errorMsg := ""
+		if errVal, ok := data["error"]; ok {
+			if errStr, isStr := errVal.(string); isStr {
+				errorMsg = errStr
+			}
+		}
+		
+		alpacaAudit.AddRequest(
+			operation,
+			url,
+			"GET",
+			time.Duration(duration)*time.Millisecond,
+			errorMsg == "",
+			errorMsg,
+			data,
+		)
+		
+		// Save audit data to audit.json (overwrites each time on purpose)
+		if err := alpacaAudit.SaveToFile("audit.json"); err != nil {
+			logger.Info.Printf("❌ Failed to save audit data to audit.json: %v", err)
+		} else {
+			logger.Info.Printf("💾 Audit data saved to audit.json")
+		}
+	}
+	
+	// Set audit callback on the base client
+	baseClient.SetAuditCallback(auditCallback)
+
 	// Create symbol service for company/sector lookups
 	symbolService := symbols.NewSP500Service("assets/symbols")
 
@@ -114,7 +181,7 @@ func main() {
 
 	// Audit system endpoints
 	r.HandleFunc("/api/audit-startup", optionsHandler.AuditStartupHandler).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/audit-ticker", optionsHandler.AuditTickerHandler).Methods("POST", "OPTIONS")
+
 	r.HandleFunc("/api/ai-analysis", optionsHandler.AIAnalysisHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/audit-log", optionsHandler.AuditLogHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/audit-exists", optionsHandler.AuditFileExistsHandler).Methods("GET")

@@ -14,10 +14,10 @@ import (
 
 // AlpacaInterface defines the methods that both Client and PerformanceWrapper implement
 type AlpacaInterface interface {
-	GetStockPrice(symbol string) (*StockPrice, error)
-	GetStockPricesBatch(symbols []string) (map[string]*StockPrice, error)
-	GetOptionsChain(symbols []string, expirationDate, strategy string) (map[string][]*OptionContract, error)
-	GetOptionQuote(symbol string) (*OptionQuote, error)
+	GetStockPrice(symbol string, auditTicker *string) (*StockPrice, error)
+	GetStockPricesBatch(symbols []string, auditTicker *string) (map[string]*StockPrice, error)
+	GetOptionsChain(symbols []string, expirationDate, strategy string, auditTicker *string) (map[string][]*OptionContract, error)
+	GetOptionQuote(symbol string, auditTicker *string) (*OptionQuote, error)
 }
 
 const (
@@ -34,12 +34,16 @@ const (
 	SlowRequestThreshold = 5 * time.Second
 )
 
+// AuditCallback is a function that can be called to append audit data
+type AuditCallback func(symbol, operation string, data map[string]interface{})
+
 type Client struct {
 	APIKey     string
 	SecretKey  string
 	BaseURL    string
 	DataURL    string
 	HTTPClient *http.Client
+	AuditCallback AuditCallback
 }
 
 func NewClient(apiKey, secretKey string) *Client {
@@ -130,12 +134,13 @@ type AlpacaOptionsResponse struct {
 }
 
 // Get batch stock prices from Alpaca (up to 100 symbols per request)
-func (c *Client) GetStockPricesBatch(symbols []string) (map[string]*StockPrice, error) {
+func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map[string]*StockPrice, error) {
 	results := make(map[string]*StockPrice)
 
 	// Process in batches of 100 (Alpaca limit)
 	batchSize := 100
 	for i := 0; i < len(symbols); i += batchSize {
+		batchStartTime := time.Now()
 		end := i + batchSize
 		if end > len(symbols) {
 			end = len(symbols)
@@ -143,6 +148,8 @@ func (c *Client) GetStockPricesBatch(symbols []string) (map[string]*StockPrice, 
 
 		batch := symbols[i:end]
 		batchResults, err := c.getStockPricesBatchInternal(batch)
+		batchDuration := time.Since(batchStartTime)
+		
 		if err != nil {
 			return nil, fmt.Errorf("batch %d-%d failed: %v", i, end-1, err)
 		}
@@ -150,6 +157,16 @@ func (c *Client) GetStockPricesBatch(symbols []string) (map[string]*StockPrice, 
 		// Merge results
 		for symbol, price := range batchResults {
 			results[symbol] = price
+			// Check for audit match and append data
+			if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
+				c.AuditCallback(symbol, "GetStockPricesBatch", map[string]interface{}{
+					"symbol": symbol,
+					"price": price.Price,
+					"batch_size": len(batch),
+					"duration_ms": batchDuration.Milliseconds(),
+					"batch_index": i,
+				})
+			}
 		}
 
 		// Rate limiting - 200 requests per minute
@@ -236,7 +253,8 @@ func (c *Client) getStockPricesBatchInternal(symbols []string) (map[string]*Stoc
 }
 
 // Get real stock price from Alpaca using bars (more reliable than quotes)
-func (c *Client) GetStockPrice(symbol string) (*StockPrice, error) {
+func (c *Client) GetStockPrice(symbol string, auditTicker *string) (*StockPrice, error) {
+	startTime := time.Now()
 	endpoint := fmt.Sprintf("/v2/stocks/%s/bars/latest", symbol)
 
 	req, err := http.NewRequest("GET", c.DataURL+endpoint, nil)
@@ -263,14 +281,29 @@ func (c *Client) GetStockPrice(symbol string) (*StockPrice, error) {
 		return nil, err
 	}
 
-	return &StockPrice{
+	stockPrice := &StockPrice{
 		Symbol: symbol,
 		Price:  alpacaResp.Bar.Close,
-	}, nil
+	}
+	
+	duration := time.Since(startTime)
+
+	// Check for audit match and append data
+	if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
+		c.AuditCallback(symbol, "GetStockPrice", map[string]interface{}{
+			"symbol": symbol,
+			"price": stockPrice.Price,
+			"endpoint": endpoint,
+			"duration_ms": duration.Milliseconds(),
+			"status_code": resp.StatusCode,
+		})
+	}
+
+	return stockPrice, nil
 }
 
 // Get options chain from Alpaca with filtering per symbol
-func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy string) (map[string][]*OptionContract, error) {
+func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy string, auditTicker *string) (map[string][]*OptionContract, error) {
 	contractsBySymbol := make(map[string][]*OptionContract)
 
 	// Get stock prices in batches first to determine strike limits
@@ -279,7 +312,7 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 		cleanSymbols = append(cleanSymbols, strings.TrimSpace(symbol))
 	}
 
-	stockPriceBatch, err := c.GetStockPricesBatch(cleanSymbols)
+	stockPriceBatch, err := c.GetStockPricesBatch(cleanSymbols, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stock prices: %v", err)
 	}
@@ -291,6 +324,7 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 
 	// Process each symbol individually for options
 	for _, symbol := range cleanSymbols {
+		symbolStartTime := time.Now()
 		symbol = strings.TrimSpace(symbol)
 
 		stockPrice, exists := stockPrices[symbol]
@@ -377,6 +411,68 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 
 		contractsBySymbol[symbol] = contracts
 
+		symbolDuration := time.Since(symbolStartTime)
+
+		// Check for audit match and append data
+		if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
+			// Collect all contract data
+			var contractsData []map[string]interface{}
+			for _, contract := range contracts {
+				contractData := map[string]interface{}{
+					"symbol":            contract.Symbol,
+					"expiration_date":   contract.ExpirationDate,
+					"strike_price":      contract.StrikePrice,
+					"type":              contract.Type,
+					"underlying_symbol": contract.UnderlyingSymbol,
+					"multiplier":        contract.Multiplier,
+					"status":            contract.Status,
+					"tradable":          contract.Tradable,
+				}
+				
+				// Add optional fields if they exist
+				if contract.BidPrice != nil {
+					contractData["bid_price"] = contract.BidPrice
+				}
+				if contract.AskPrice != nil {
+					contractData["ask_price"] = contract.AskPrice
+				}
+				if contract.LastPrice != nil {
+					contractData["last_price"] = contract.LastPrice
+				}
+				if contract.OpenInterest != nil {
+					contractData["open_interest"] = contract.OpenInterest
+				}
+				if contract.Delta != 0 {
+					contractData["delta"] = contract.Delta
+				}
+				if contract.Gamma != 0 {
+					contractData["gamma"] = contract.Gamma
+				}
+				if contract.Theta != 0 {
+					contractData["theta"] = contract.Theta
+				}
+				if contract.Vega != 0 {
+					contractData["vega"] = contract.Vega
+				}
+				if contract.ImpliedVol != 0 {
+					contractData["implied_volatility"] = contract.ImpliedVol
+				}
+				
+				contractsData = append(contractsData, contractData)
+			}
+			
+			c.AuditCallback(symbol, "GetOptionsChain", map[string]interface{}{
+				"symbol": symbol,
+				"expiration": expiration,
+				"strategy": strategy,
+				"contracts_count": len(contracts),
+				"contracts": contractsData,
+				"stock_price": stockPrice,
+				"duration_ms": symbolDuration.Milliseconds(),
+				"endpoint": endpoint,
+			})
+		}
+
 		// Rate limiting between options requests
 		time.Sleep(BasicPlanDelay)
 	}
@@ -385,7 +481,8 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 }
 
 // GetOptionQuote gets real-time option quote (bid/ask) from Alpaca
-func (c *Client) GetOptionQuote(optionSymbol string) (*OptionQuote, error) {
+func (c *Client) GetOptionQuote(optionSymbol string, auditTicker *string) (*OptionQuote, error) {
+	startTime := time.Now()
 	// Use the data API endpoint for option quotes
 	endpoint := fmt.Sprintf("/v1beta1/options/quotes/latest?symbols=%s", optionSymbol)
 
@@ -418,7 +515,26 @@ func (c *Client) GetOptionQuote(optionSymbol string) (*OptionQuote, error) {
 		return nil, fmt.Errorf("no quote found for option symbol: %s", optionSymbol)
 	}
 
+	duration := time.Since(startTime)
+
+	// Check for audit match and append data
+	if auditTicker != nil && *auditTicker == optionSymbol && c.AuditCallback != nil {
+		c.AuditCallback(optionSymbol, "GetOptionQuote", map[string]interface{}{
+			"option_symbol": optionSymbol,
+			"bid_price": quote.BidPrice,
+			"ask_price": quote.AskPrice,
+			"endpoint": endpoint,
+			"duration_ms": duration.Milliseconds(),
+			"status_code": resp.StatusCode,
+		})
+	}
+
 	return &quote, nil
+}
+
+// SetAuditCallback sets the audit callback function for the client
+func (c *Client) SetAuditCallback(callback AuditCallback) {
+	c.AuditCallback = callback
 }
 
 // TestConnection tests connection to Alpaca API

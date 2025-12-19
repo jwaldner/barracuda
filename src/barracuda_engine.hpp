@@ -143,7 +143,8 @@ public:
     
     // Options pricing and Greeks calculation
     std::vector<OptionContract> CalculateBlackScholes(
-        const std::vector<OptionContract>& contracts);
+        const std::vector<OptionContract>& contracts,
+        const char* audit_symbol = nullptr);
     
     // Batch processing for large option chains
     std::vector<OptionContract> BatchProcessOptions(
@@ -157,6 +158,21 @@ public:
         const std::string& expiration);
     
     // Legacy batch analysis functions removed - replaced by complete GPU processing
+    
+    // Utility functions (public for C interface)
+    bool IsCudaAvailable() const { return cuda_available_; }
+    int GetDeviceCount() const { return device_count_; }
+    std::string GetDeviceInfo(int device_id) const;
+    
+    // Execution mode setter (public for C interface)
+    void SetExecutionMode(ExecutionMode mode) { execution_mode_ = mode; }
+    
+    // Performance benchmarking (public for C interface)
+    double BenchmarkCalculation(int num_contracts, int iterations);
+    
+private:
+    // Helper function to append audit messages to JSON file
+    void appendAuditMessage(const std::string& message);
     
     // Implied volatility calculation
     double CalculateImpliedVolatility(
@@ -179,14 +195,6 @@ public:
         const std::vector<OptionContract>& portfolio,
         int num_simulations,
         int time_steps);
-    
-    // Utility functions
-    bool IsCudaAvailable() const { return cuda_available_; }
-    int GetDeviceCount() const { return device_count_; }
-    std::string GetDeviceInfo(int device_id) const;
-    
-    // Performance benchmarking
-    double BenchmarkCalculation(int num_contracts, int iterations);
 };
 
 // C interface for Go FFI

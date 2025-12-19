@@ -1,10 +1,28 @@
 # Barracuda Go Server - targets defined below with CUDA support
 
+# Variables
+CXX = g++
+CC = nvcc
+SRCDIR = src
+OBJDIR = obj
+LIBDIR = lib
+INCLUDES = -I$(SRCDIR)
+CFLAGS = -O3 -std=c++14 -arch=sm_50
+LIBS = -lcudart -lcurand
+LIBRARY = $(LIBDIR)/libbarracuda.so
+CPP_SOURCES = $(SRCDIR)/barracuda_engine.cpp
+CU_SOURCES = $(SRCDIR)/barracuda_kernels.cu
+CPP_OBJECTS = $(OBJDIR)/barracuda_engine.o
+CU_OBJECTS = $(OBJDIR)/barracuda_kernels.o
+
 .PHONY: build run clean
 BENCHMARK = bin/benchmark
 
-# Default target
-all: directories $(LIBRARY) $(BENCHMARK)
+# Default target - just build the library
+all: directories $(LIBRARY)
+
+# Build everything including benchmark
+all-with-benchmark: directories $(LIBRARY) $(BENCHMARK)
 
 # Create directories
 directories:
@@ -24,7 +42,8 @@ $(LIBRARY): $(CPP_OBJECTS) $(CU_OBJECTS)
 
 # Build benchmark executable
 $(BENCHMARK): src/benchmark.cpp $(LIBRARY)
-	$(CC) $(CFLAGS) $(INCLUDES) -L$(LIBDIR) -o $@ src/benchmark.cpp -lbarracuda $(LIBS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $(INCLUDES) -L./$(LIBDIR) -Wl,-rpath,./$(LIBDIR) -o $@ src/benchmark.cpp -lbarracuda $(LIBS)
 
 # Go module build
 # Build Go binary with CUDA support
@@ -33,6 +52,9 @@ build: $(LIBRARY)
 
 # Build library target alias
 build-lib: $(LIBRARY)
+
+# Build benchmark only
+benchmark: $(BENCHMARK)
 
 # Build Go binary without CUDA (mock mode)
 build-mock:

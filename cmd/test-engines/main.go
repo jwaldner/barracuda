@@ -58,7 +58,7 @@ func testEngine(mode string, options []barracuda.OptionContract, symbol string, 
 	startTime := time.Now()
 
 	// Use Black-Scholes calculation function
-	calculatedOptions, err := engine.CalculateBlackScholes(options)
+	calculatedOptions, err := engine.CalculateBlackScholes(options, nil)
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n\n", err)
 		return

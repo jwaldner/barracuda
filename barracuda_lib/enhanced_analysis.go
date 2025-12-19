@@ -84,14 +84,14 @@ func (be *BaracudaEngine) AnalyzeSymbolsBatchWithTiming(symbols []string, stockP
 		blackScholesStart := time.Now()
 
 		if len(puts) > 0 {
-			calculatedPuts, err := be.CalculateBlackScholes(puts)
+			calculatedPuts, err := be.CalculateBlackScholes(puts, &symbol)
 			if err == nil {
 				result.PutsWithIV = calculatedPuts
 			}
 		}
 
 		if len(calls) > 0 {
-			calculatedCalls, err := be.CalculateBlackScholes(calls)
+			calculatedCalls, err := be.CalculateBlackScholes(calls, &symbol)
 			if err == nil {
 				result.CallsWithIV = calculatedCalls
 			}

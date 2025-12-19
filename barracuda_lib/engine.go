@@ -4,6 +4,8 @@ package barracuda
 #cgo CXXFLAGS: -I${SRCDIR}/../src -std=c++11
 #cgo LDFLAGS: -L${SRCDIR}/../lib -lbarracuda -lcudart -lcurand -lstdc++ -Wl,-rpath,${SRCDIR}/../lib
 
+#include <stdlib.h>
+
 // C struct matching barracuda_engine.cpp
 typedef struct {
     char symbol[32];
@@ -54,6 +56,8 @@ int barracuda_initialize_cuda(void* engine);
 int barracuda_is_cuda_available(void* engine);
 int barracuda_get_device_count(void* engine);
 int barracuda_calculate_options(void* engine, COptionContract* contracts, int count);
+int barracuda_calculate_options_with_audit(void* engine, COptionContract* contracts, int count, const char* audit_symbol);
+void barracuda_set_execution_mode(void* engine, const char* mode);
 double barracuda_benchmark(void* engine, int num_contracts, int iterations);
 
 // CUDA maximization function - zero Go loops
@@ -272,7 +276,7 @@ func (be *BaracudaEngine) GetDeviceCount() int {
 }
 
 // CalculateBlackScholes performs GPU-accelerated Black-Scholes calculation
-func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract) ([]OptionContract, error) {
+func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract, auditSymbol *string) ([]OptionContract, error) {
 	if len(contracts) == 0 {
 		return contracts, nil
 	}
@@ -300,11 +304,21 @@ func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract) ([]O
 		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
 	}
 
-	// Call CUDA calculation
-	result := C.barracuda_calculate_options(
+	// Call calculation with audit symbol (C++ engine will choose CUDA or CPU path automatically)
+	// ALWAYS pass audit symbol - either nil or actual symbol
+	var auditPtr *C.char
+	if auditSymbol != nil {
+		// Convert Go string to C string
+		auditBytes := []byte(*auditSymbol + "\000") // null terminate
+		auditPtr = (*C.char)(unsafe.Pointer(&auditBytes[0]))
+	}
+	// auditPtr will be nil if auditSymbol is nil
+	
+	result := C.barracuda_calculate_options_with_audit(
 		be.engine,
 		(*C.COptionContract)(unsafe.Pointer(&cContracts[0])),
-		C.int(len(contracts)))
+		C.int(len(contracts)),
+		auditPtr)
 
 	if result != 0 {
 		return nil, fmt.Errorf("CUDA calculation failed with code %d", result)
@@ -550,7 +564,7 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 }
 
 // MaximizeCUDAUsageComplete processes options with COMPLETE GPU processing - all business calculations on GPU
-func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, stockPrice, availableCash float64, strategy string, expirationDate string) ([]CompleteOptionResult, error) {
+func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, stockPrice, availableCash float64, strategy string, expirationDate string, auditSymbol *string) ([]CompleteOptionResult, error) {
 	if len(options) == 0 {
 		return nil, nil
 	}
@@ -604,6 +618,15 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 		return nil, fmt.Errorf("CUDA complete processing failed with code %d", result)
 	}
 
+	// Add audit message for complete processing if audit symbol provided
+	if auditSymbol != nil {
+		// Use a simple Black-Scholes calculation to trigger audit message
+		if len(options) > 0 {
+			simpleContract := []OptionContract{options[0]}
+			_, _ = be.CalculateBlackScholes(simpleContract, auditSymbol)
+		}
+	}
+
 	// Convert results back to Go
 	results := make([]CompleteOptionResult, len(options))
 	for i := range options {
@@ -630,6 +653,70 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 	}
 
 	log.Printf("⚡ COMPLETE CUDA: %d contracts processed with ALL calculations on GPU", len(results))
+	return results, nil
+}
+
+// SetExecutionMode sets the execution mode (cpu, cuda, auto)
+func (be *BaracudaEngine) SetExecutionMode(mode string) {
+	if be.engine == nil {
+		return
+	}
+	
+	modeBytes := []byte(mode + "\000") // null terminate
+	C.barracuda_set_execution_mode(
+		be.engine,
+		(*C.char)(unsafe.Pointer(&modeBytes[0])))
+}
+
+// MaximizeCPUUsageComplete processes options with COMPLETE CPU processing - all business calculations on CPU
+func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, stockPrice, availableCash float64, strategy string, expirationDate string, auditSymbol *string) ([]CompleteOptionResult, error) {
+	if len(options) == 0 {
+		return nil, nil
+	}
+
+	if be.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
+
+	log.Printf("🖥️  COMPLETE CPU: Processing %d contracts with ALL calculations on CPU", len(options))
+
+	// Set engine to CPU mode
+	be.SetExecutionMode("cpu")
+	
+	// Measure CPU processing time
+	cpuStart := time.Now()
+	
+	// Use regular Black-Scholes calculation in CPU mode
+	calculatedOptions, err := be.CalculateBlackScholes(options, auditSymbol)
+	if err != nil {
+		return nil, err
+	}
+	
+	cpuDuration := time.Since(cpuStart)
+	log.Printf("🖥️  CPU Processing completed in %.2fms", float64(cpuDuration.Nanoseconds())/1e6)
+	
+	// Convert to CompleteOptionResult format for web interface
+	results := make([]CompleteOptionResult, len(calculatedOptions))
+	for i, opt := range calculatedOptions {
+		maxContracts := int(availableCash / (opt.TheoreticalPrice * 100))
+		if maxContracts < 0 {
+			maxContracts = 0
+		}
+		
+		results[i] = CompleteOptionResult{
+			Symbol:            opt.Symbol,
+			StrikePrice:      opt.StrikePrice,
+			TheoreticalPrice: opt.TheoreticalPrice,
+			Delta:            opt.Delta,
+			Gamma:            opt.Gamma,
+			Theta:            opt.Theta,
+			Vega:             opt.Vega,
+			Rho:              opt.Rho,
+			MaxContracts:     maxContracts,
+			TotalPremium:     opt.TheoreticalPrice * float64(maxContracts),
+		}
+	}
+	
 	return results, nil
 }
 

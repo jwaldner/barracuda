@@ -24,9 +24,9 @@ func NewPerformanceWrapper(client *Client) *PerformanceWrapper {
 }
 
 // GetStockPrice wraps the original method with performance monitoring
-func (pw *PerformanceWrapper) GetStockPrice(symbol string) (*StockPrice, error) {
+func (pw *PerformanceWrapper) GetStockPrice(symbol string, auditTicker *string) (*StockPrice, error) {
 	start := time.Now()
-	result, err := pw.client.GetStockPrice(symbol)
+	result, err := pw.client.GetStockPrice(symbol, auditTicker)
 	duration := time.Since(start)
 
 	pw.recordRequest(duration)
@@ -40,9 +40,9 @@ func (pw *PerformanceWrapper) GetStockPrice(symbol string) (*StockPrice, error) 
 }
 
 // GetStockPricesBatch wraps the original method with performance monitoring
-func (pw *PerformanceWrapper) GetStockPricesBatch(symbols []string) (map[string]*StockPrice, error) {
+func (pw *PerformanceWrapper) GetStockPricesBatch(symbols []string, auditTicker *string) (map[string]*StockPrice, error) {
 	start := time.Now()
-	result, err := pw.client.GetStockPricesBatch(symbols)
+	result, err := pw.client.GetStockPricesBatch(symbols, auditTicker)
 	duration := time.Since(start)
 
 	pw.recordRequest(duration)
@@ -56,9 +56,9 @@ func (pw *PerformanceWrapper) GetStockPricesBatch(symbols []string) (map[string]
 }
 
 // GetOptionsChain wraps the original method with performance monitoring
-func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, strategy string) (map[string][]*OptionContract, error) {
+func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, strategy string, auditTicker *string) (map[string][]*OptionContract, error) {
 	start := time.Now()
-	result, err := pw.client.GetOptionsChain(symbols, expirationDate, strategy)
+	result, err := pw.client.GetOptionsChain(symbols, expirationDate, strategy, auditTicker)
 	duration := time.Since(start)
 
 	pw.recordRequest(duration)
@@ -72,9 +72,9 @@ func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, 
 }
 
 // GetOptionQuote wraps the original method with performance monitoring
-func (pw *PerformanceWrapper) GetOptionQuote(symbol string) (*OptionQuote, error) {
+func (pw *PerformanceWrapper) GetOptionQuote(symbol string, auditTicker *string) (*OptionQuote, error) {
 	start := time.Now()
-	result, err := pw.client.GetOptionQuote(symbol)
+	result, err := pw.client.GetOptionQuote(symbol, auditTicker)
 	duration := time.Since(start)
 
 	pw.recordRequest(duration)

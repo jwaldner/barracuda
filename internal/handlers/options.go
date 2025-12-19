@@ -402,7 +402,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// FIRST THING: Validate API credentials by testing connection
-	if _, err := h.alpacaClient.GetStockPrice("AAPL"); err != nil {
+	if _, err := h.alpacaClient.GetStockPrice("AAPL", nil); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -423,6 +423,12 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	if req.AuditTicker != "" {
 		logger.Warn.Printf("🔍 AUDIT MODE: Ticker %s set for detailed audit logging", req.AuditTicker)
 		logger.Warn.Printf("🔍 AUDIT MODE: This analysis will collect detailed data for %s", req.AuditTicker)
+	}
+
+	// Setup audit ticker pointer for API calls
+	var auditTickerPtr *string
+	if req.AuditTicker != "" {
+		auditTickerPtr = &req.AuditTicker
 	}
 
 	// VERBOSE: Log request parameters
@@ -518,7 +524,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Get stock prices in batches (up to 100 symbols per API call)
 	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
-	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
+	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols, auditTickerPtr)
 	if err != nil {
 		logger.Error.Printf("❌ Error fetching stock prices: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
@@ -543,7 +549,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Info.Printf("📋 Enriched %d symbols with company/sector data", len(companyData))
 
 	// Process real options data using individual approach
-	results := h.processRealOptions(stockPrices, req, companyData)
+	results := h.processRealOptions(stockPrices, req, companyData, auditTickerPtr)
 
 	if h.config.Engine.WorkloadFactor > 0.0 {
 		workloadStart := time.Now()
@@ -617,13 +623,6 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	// Major Step: Completion
 	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs total | ⚡ %.3fs %s COMPUTE | %s engine",
 		len(results), duration.Seconds(), h.lastComputeDuration.Seconds(), engineType, engineType)
-	
-	// Create/recreate audit JSON file if audit ticker was set
-	if req.AuditTicker != "" {
-		logger.Warn.Printf("🔍 AUDIT: Creating audit JSON file for %s", req.AuditTicker)
-		h.createAuditJSONFile(req.AuditTicker, req, results, duration)
-		logger.Warn.Printf("🔍 AUDIT: JSON file ready for Grok analysis")
-	}
 	
 	logger.Debug.Printf("🔍 DEBUG: Analysis completed, formatting response")
 
@@ -763,7 +762,7 @@ func (h *OptionsHandler) TestConnectionHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	// Test connection by getting account info
-	if _, err := h.alpacaClient.GetStockPrice("AAPL"); err != nil {
+	if _, err := h.alpacaClient.GetStockPrice("AAPL", nil); err != nil {
 		response := map[string]interface{}{
 			"status":  "error",
 			"message": "Alpaca API connection failed: " + err.Error(),
@@ -803,7 +802,7 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Validate API credentials first (same as AnalyzeHandler)
-	if _, err := h.alpacaClient.GetStockPrice("AAPL"); err != nil {
+	if _, err := h.alpacaClient.GetStockPrice("AAPL", nil); err != nil {
 		http.Error(w, "Invalid API credentials", http.StatusUnauthorized)
 		return
 	}
@@ -813,6 +812,12 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Setup audit ticker pointer for API calls (same as AnalyzeHandler)
+	var auditTickerPtr *string
+	if req.AuditTicker != "" {
+		auditTickerPtr = &req.AuditTicker
 	}
 
 	// Same symbol handling logic as AnalyzeHandler
@@ -856,7 +861,7 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	logger.Info.Printf("📊 CSV Generation: Analyzing %s options for %d symbols", req.Strategy, len(cleanSymbols))
 
 	// Get stock prices (same as AnalyzeHandler)
-	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
+	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols, auditTickerPtr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
 		return
@@ -876,7 +881,7 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Process options using same method as AnalyzeHandler
-	results := h.processRealOptions(stockPrices, req, companyData)
+	results := h.processRealOptions(stockPrices, req, companyData, auditTickerPtr)
 
 	// Sort results by total premium (same as AnalyzeHandler)
 	for i := 0; i < len(results); i++ {
@@ -944,7 +949,7 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 }
 
 // processRealOptions finds best contracts sequentially, then batch processes with CUDA or CPU
-func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
+func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }, auditTicker *string) []models.OptionResult {
 	var results []models.OptionResult
 
 	// Calculate time to expiration
@@ -964,8 +969,36 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 	}
 
 	for symbol, stockPrice := range stockPrices {
-		// Get options for this symbol
-		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy)
+		// Check if this symbol matches our audit ticker
+		isAuditSymbol := auditTicker != nil && symbol == *auditTicker
+		
+		if isAuditSymbol {
+			logger.Warn.Printf("🔍 AUDIT: Processing audit ticker %s - creating audit file", symbol)
+			
+			// Create minimal audit data - just the ticker for now
+			auditData := map[string]interface{}{
+				"ticker": symbol,
+			}
+			
+			// Write audit file immediately when we process the audit symbol
+			filename := "audit.json"
+			file, createErr := os.Create(filename)
+			if createErr != nil {
+				logger.Error.Printf("🔍 AUDIT: Failed to create audit file: %v", createErr)
+			} else {
+				defer file.Close()
+				encoder := json.NewEncoder(file)
+				encoder.SetIndent("", "  ")
+				if encodeErr := encoder.Encode(auditData); encodeErr != nil {
+					logger.Error.Printf("🔍 AUDIT: Failed to write audit data: %v", encodeErr)
+				} else {
+					logger.Info.Printf("🔍 AUDIT: Created audit file: %s", filename)
+				}
+			}
+		}
+		
+		// Get options for this symbol (audit ticker is passed through to API calls)
+		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy, auditTicker)
 		if err != nil {
 			logger.Error.Printf("❌ Error getting options for %s: %v", symbol, err)
 			continue
@@ -1241,7 +1274,10 @@ func (h *OptionsHandler) convertToFormattedResult(result *models.OptionResult, r
 	}
 
 	// Calculate annualized return
-	annualized := result.ProfitPercentage * (365.0 / float64(result.DaysToExp))
+	annualized := 0.0
+	if result.DaysToExp > 0 {
+		annualized = result.ProfitPercentage * (365.0 / float64(result.DaysToExp))
+	}
 	formatted["annualized"] = h.formatPercentage(annualized / 100)
 
 	return &formatted
@@ -1372,14 +1408,35 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 		return nil
 	}
 
-	// CUDA call with complete processing (includes business calculations)
+	// Complete processing call - use CPU or CUDA function based on execution mode
 	startTime := time.Now()
-	completeResults, err := h.engine.MaximizeCUDAUsageComplete(
-		engineContracts,
-		engineContracts[0].UnderlyingPrice,
-		req.AvailableCash,
-		req.Strategy,
-		req.ExpirationDate)
+	// Pass ONLY the audit ticker if explicitly set - NO FALLBACKS
+	var auditSymbol *string
+	if req.AuditTicker != "" {
+		auditSymbol = &req.AuditTicker
+	}
+	// If no AuditTicker set, auditSymbol stays nil (no audit message)
+	
+	var completeResults []barracuda.CompleteOptionResult
+	var err error
+	
+	if h.config.Engine.ExecutionMode == "cpu" {
+		completeResults, err = h.engine.MaximizeCPUUsageComplete(
+			engineContracts,
+			engineContracts[0].UnderlyingPrice,
+			req.AvailableCash,
+			req.Strategy,
+			req.ExpirationDate,
+			auditSymbol)
+	} else {
+		completeResults, err = h.engine.MaximizeCUDAUsageComplete(
+			engineContracts,
+			engineContracts[0].UnderlyingPrice,
+			req.AvailableCash,
+			req.Strategy,
+			req.ExpirationDate,
+			auditSymbol)
+	}
 
 	if err != nil {
 		logger.Error.Printf("❌ Complete CUDA processing failed: %v", err)
@@ -1431,333 +1488,6 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 	return results
 }
 
-// createAuditJSONFile creates/recreates the audit JSON file for a ticker
-func (h *OptionsHandler) createAuditJSONFile(ticker string, req models.AnalysisRequest, results []models.OptionResult, duration time.Duration) {
-	// Always the same filename: audit.json in root (overwritten each time)
-	filename := "audit.json"
-	logger.Warn.Printf("🔍 AUDIT: Creating/overwriting JSON file: %s", filename)
-	
-	// Ensure results are properly sorted by profit percentage (descending) for correct ranking
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].ProfitPercentage > results[j].ProfitPercentage
-	})
-
-	// Find ALL options for the ticker and get the best one's rank
-	var tickerResult *models.OptionResult
-	var allTickerOptions []models.OptionResult
-	var rank int
-	found := false
-	
-	// Collect all options for this ticker
-	for i := range results {
-		if results[i].Ticker == ticker {
-			allTickerOptions = append(allTickerOptions, results[i])
-			// The first one we find is the best (highest ranked)
-			if !found {
-				tickerResult = &results[i]
-				rank = i + 1 // 1-based ranking
-				found = true
-			}
-		}
-	}
-
-	// Create numbered results list with ranking validation data
-	numberedResults := make([]map[string]interface{}, len(results))
-	for i, result := range results {
-		// Calculate metrics for ranking analysis
-		moneyness := result.StockPrice / result.Strike
-		annualizedReturn := result.ProfitPercentage * (365.0 / float64(result.DaysToExp))
-		premiumAsPercent := (result.Premium / result.StockPrice) * 100
-		cashEfficiency := result.TotalPremium / result.CashNeeded * 100
-		
-		// Risk assessment indicators
-		otmDistance := math.Abs(result.StockPrice - result.Strike) / result.StockPrice * 100
-		volatilityRisk := "UNKNOWN"
-		if result.ImpliedVol > 0.5 {
-			volatilityRisk = "HIGH"
-		} else if result.ImpliedVol > 0.3 {
-			volatilityRisk = "MEDIUM"
-		} else {
-			volatilityRisk = "LOW"
-		}
-		
-		// Position size efficiency
-		capitalUtilization := result.CashNeeded / req.AvailableCash * 100
-		
-		numberedResults[i] = map[string]interface{}{
-			"rank": i + 1,
-			"ticker": result.Ticker,
-			"company": result.Company,
-			"sector": result.Sector,
-			"ranking_metrics": map[string]interface{}{
-				"profit_percentage": result.ProfitPercentage,
-				"annualized_return_percent": annualizedReturn,
-				"cash_efficiency_percent": cashEfficiency,
-				"otm_distance_percent": otmDistance,
-				"volatility_risk_level": volatilityRisk,
-				"capital_utilization_percent": capitalUtilization,
-			},
-			"option_details": map[string]interface{}{
-				"strike": result.Strike,
-				"stock_price": result.StockPrice,
-				"moneyness": moneyness,
-				"premium": result.Premium,
-				"premium_as_percent_of_stock": premiumAsPercent,
-				"max_contracts": result.MaxContracts,
-				"total_premium": result.TotalPremium,
-				"cash_needed": result.CashNeeded,
-			},
-			"greeks_and_risk": map[string]interface{}{
-				"delta": result.Delta,
-				"gamma": result.Gamma,
-				"theta": result.Theta,
-				"vega": result.Vega,
-				"implied_volatility": result.ImpliedVol,
-			},
-			"time_factors": map[string]interface{}{
-				"expiration": result.Expiration,
-				"days_to_exp": result.DaysToExp,
-			},
-			"ranking_concerns": map[string]interface{}{
-				"high_volatility_warning": result.ImpliedVol > 0.6,
-				"low_liquidity_risk": result.MaxContracts < 5,
-				"excessive_capital_use": capitalUtilization > 50,
-				"very_short_term": result.DaysToExp < 14,
-				"deep_otm": otmDistance > 20,
-			},
-		}
-	}
-
-	// Calculate ranking validation statistics
-	var avgProfitPct, avgDelta, avgImpliedVol, avgDaysToExp float64
-	var highVolCount, lowLiquidityCount, shortTermCount int
-	sectorCounts := make(map[string]int)
-	
-	for _, result := range results {
-		avgProfitPct += result.ProfitPercentage
-		avgDelta += math.Abs(result.Delta)
-		avgImpliedVol += result.ImpliedVol
-		avgDaysToExp += float64(result.DaysToExp)
-		sectorCounts[result.Sector]++
-		
-		// Count risk factors
-		if result.ImpliedVol > 0.5 {
-			highVolCount++
-		}
-		if result.MaxContracts < 10 {
-			lowLiquidityCount++
-		}
-		if result.DaysToExp < 21 {
-			shortTermCount++
-		}
-	}
-	
-	if len(results) > 0 {
-		avgProfitPct /= float64(len(results))
-		avgDelta /= float64(len(results))
-		avgImpliedVol /= float64(len(results))
-		avgDaysToExp /= float64(len(results))
-	}
-	
-	// Analyze top and bottom performers for ranking validation
-	var topPerformer, bottomPerformer map[string]interface{}
-	if len(results) > 0 {
-		topResult := results[0]
-		topPerformer = map[string]interface{}{
-			"ticker": topResult.Ticker,
-			"company": topResult.Company,
-			"sector": topResult.Sector,
-			"profit_percentage": topResult.ProfitPercentage,
-			"implied_vol": topResult.ImpliedVol,
-			"days_to_exp": topResult.DaysToExp,
-			"max_contracts": topResult.MaxContracts,
-			"justification_question": "Does this stock deserve #1 ranking? Consider sector outlook, volatility environment, and liquidity.",
-		}
-		
-		if len(results) > 1 {
-			bottomResult := results[len(results)-1]
-			bottomPerformer = map[string]interface{}{
-				"ticker": bottomResult.Ticker,
-				"company": bottomResult.Company,
-				"sector": bottomResult.Sector,
-				"profit_percentage": bottomResult.ProfitPercentage,
-				"implied_vol": bottomResult.ImpliedVol,
-				"days_to_exp": bottomResult.DaysToExp,
-				"max_contracts": bottomResult.MaxContracts,
-				"justification_question": "Is this stock rightfully at the bottom? Could hidden risks justify the low ranking?",
-			}
-		}
-	}
-
-	// Collect comprehensive audit data with market insights
-	auditData := map[string]interface{}{
-		"ticker": ticker,
-		"timestamp": time.Now().Format(time.RFC3339),
-		"analysis_request": req,
-		"processing_time_seconds": duration.Seconds(),
-		"execution_mode": h.getExecutionMode(),
-		"total_results": len(results),
-		"market_analysis": map[string]interface{}{
-			"average_profit_percentage": avgProfitPct,
-			"average_delta": avgDelta,
-			"average_implied_volatility": avgImpliedVol,
-			"average_days_to_expiration": avgDaysToExp,
-			"sector_distribution": sectorCounts,
-			"strategy": req.Strategy,
-			"target_delta": req.TargetDelta,
-			"available_cash": req.AvailableCash,
-			"risk_factors": map[string]interface{}{
-				"high_volatility_count": highVolCount,
-				"low_liquidity_count": lowLiquidityCount,
-				"short_term_count": shortTermCount,
-				"total_opportunities": len(results),
-			},
-		},
-		"ranking_validation": map[string]interface{}{
-			"top_performer": topPerformer,
-			"bottom_performer": bottomPerformer,
-			"analysis_prompt": "Analyze if the ranking order makes fundamental sense. Does the #1 stock deserve top position? Are there hidden risks in top picks? Does the bottom stock have unfair disadvantages or represent a contrarian opportunity?",
-		},
-		"ranked_results": numberedResults,
-	}
-
-	// Collect available market data for the audited ticker
-	alpacaData := map[string]interface{}{
-		"data_collection_time": time.Now().Format(time.RFC3339),
-		"ticker": ticker,
-		"analysis_context": map[string]interface{}{
-			"expiration_date": req.ExpirationDate,
-			"strategy": req.Strategy,
-			"target_delta": req.TargetDelta,
-		},
-	}
-	
-	// Get current stock price for comparison
-	if stockPrice, err := h.alpacaClient.GetStockPrice(ticker); err == nil {
-		alpacaData["current_stock_price"] = map[string]interface{}{
-			"symbol": stockPrice.Symbol,
-			"price": stockPrice.Price,
-		}
-		
-		// Add market context analysis
-		if found && tickerResult != nil {
-			priceDiscrepancy := math.Abs(stockPrice.Price - tickerResult.StockPrice) / stockPrice.Price * 100
-			alpacaData["price_analysis"] = map[string]interface{}{
-				"analysis_price": tickerResult.StockPrice,
-				"current_market_price": stockPrice.Price,
-				"price_discrepancy_percent": priceDiscrepancy,
-				"stale_data_warning": priceDiscrepancy > 2.0,
-				"price_movement_analysis": map[string]interface{}{
-					"direction": func() string {
-						if stockPrice.Price > tickerResult.StockPrice {
-							return "increased"
-						} else if stockPrice.Price < tickerResult.StockPrice {
-							return "decreased"
-						}
-						return "unchanged"
-					}(),
-					"significant_change": priceDiscrepancy > 1.0,
-				},
-			}
-		}
-	} else {
-		alpacaData["stock_price_error"] = err.Error()
-	}
-	
-	// Add market data context for Grok analysis
-	alpacaData["market_context_questions"] = []string{
-		"Is the current stock price significantly different from analysis price?",
-		"Does the recent price movement affect the option attractiveness?", 
-		"Are there any market conditions that could impact this ranking?",
-		"Does the volume indicate unusual activity in this stock?",
-		"Based on current market conditions, would you choose a different strike price?",
-		"Do any of the alternative options offer better risk-adjusted returns?",
-	}
-
-	if found {
-		// Create detailed analysis of all ticker options
-		allOptionsAnalysis := make([]map[string]interface{}, len(allTickerOptions))
-		for i, option := range allTickerOptions {
-			// Find this option's rank in the overall results
-			optionRank := 0
-			for j, result := range results {
-				if result.Ticker == option.Ticker && result.OptionSymbol == option.OptionSymbol {
-					optionRank = j + 1
-					break
-				}
-			}
-			
-			moneyness := option.StockPrice / option.Strike
-			annualizedReturn := option.ProfitPercentage * (365.0 / float64(option.DaysToExp))
-			premiumAsPercent := (option.Premium / option.StockPrice) * 100
-			cashEfficiency := option.TotalPremium / option.CashNeeded * 100
-			
-			allOptionsAnalysis[i] = map[string]interface{}{
-				"rank_in_overall_results": optionRank,
-				"rank_among_ticker_options": i + 1,
-				"option_symbol": option.OptionSymbol,
-				"strike": option.Strike,
-				"premium": option.Premium,
-				"profit_percentage": option.ProfitPercentage,
-				"delta": option.Delta,
-				"implied_volatility": option.ImpliedVol,
-				"days_to_expiration": option.DaysToExp,
-				"max_contracts": option.MaxContracts,
-				"total_premium": option.TotalPremium,
-				"cash_needed": option.CashNeeded,
-				"greeks": map[string]interface{}{
-					"delta": option.Delta,
-					"gamma": option.Gamma,
-					"theta": option.Theta,
-					"vega": option.Vega,
-				},
-				"advanced_metrics": map[string]interface{}{
-					"moneyness": moneyness,
-					"annualized_return": annualizedReturn,
-					"premium_as_percent_of_stock": premiumAsPercent,
-					"cash_efficiency": cashEfficiency,
-				},
-			}
-		}
-		
-		auditData["option_result"] = tickerResult
-		auditData["rank"] = rank
-		auditData["total_options_for_ticker"] = len(allTickerOptions)
-		auditData["all_ticker_options"] = allOptionsAnalysis
-		auditData["option_selection_analysis"] = map[string]interface{}{
-			"best_option_rank": rank,
-			"alternative_options_available": len(allTickerOptions) - 1,
-			"grok_analysis_prompt": fmt.Sprintf("This ticker has %d different option contracts available. The system chose the one ranked #%d overall. Analyze: 1) Is this the best choice among the %d options for %s? 2) Would you rank the alternatives differently? 3) Are there better risk/reward profiles in the other options? 4) Does the #1 choice optimize for the right factors?", len(allTickerOptions), rank, len(allTickerOptions), ticker),
-		}
-		auditData["alpaca_market_data"] = alpacaData
-		logger.Warn.Printf("🔍 AUDIT: Found %s with %d options, best at rank %d out of %d total", ticker, len(allTickerOptions), rank, len(results))
-	} else {
-		auditData["option_result"] = nil
-		auditData["rank"] = "NOT_FOUND"
-		auditData["total_options_for_ticker"] = 0
-		auditData["alpaca_market_data"] = alpacaData
-		logger.Warn.Printf("🔍 AUDIT: %s not found in %d results", ticker, len(results))
-	}
-
-	// Write/overwrite JSON file
-	file, err := os.Create(filename)
-	if err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Failed to create JSON file: %v", err)
-		return
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(auditData); err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Failed to write JSON: %v", err)
-		return
-	}
-
-	dataSize := len(fmt.Sprintf("%v", auditData))
-	logger.Warn.Printf("🔍 AUDIT: JSON file created: %s (%d bytes)", filename, dataSize)
-}
-
 // getExecutionMode returns current execution mode
 func (h *OptionsHandler) getExecutionMode() string {
 	if h.engine.IsCudaAvailable() && (h.config.Engine.ExecutionMode == "auto" || h.config.Engine.ExecutionMode == "cuda") {
@@ -1800,161 +1530,7 @@ func (h *OptionsHandler) AuditStartupHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-// AuditTickerHandler gathers detailed data for a single ticker audit
-func (h *OptionsHandler) AuditTickerHandler(w http.ResponseWriter, r *http.Request) {
-	logger.Warn.Printf("🔍 AUDIT: Ticker audit request received")
-	
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	if r.Method == "OPTIONS" {
-		logger.Warn.Printf("🔍 AUDIT: OPTIONS preflight request handled")
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != http.MethodPost {
-		logger.Warn.Printf("🔍 AUDIT: Invalid method %s rejected", r.Method)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse audit request
-	var req models.AnalysisRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Failed to parse request: %v", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	ticker := req.AuditTicker
-	if ticker == "" {
-		logger.Warn.Printf("🔍 AUDIT: Missing audit_ticker in request")
-		http.Error(w, "audit_ticker is required", http.StatusBadRequest)
-		return
-	}
-	
-	logger.Warn.Printf("🔍 AUDIT: Processing detailed audit for ticker %s", ticker)
-	logger.Warn.Printf("🔍 AUDIT: Request parameters - Delta: %.3f, Expiration: %s, Cash: %.2f", req.TargetDelta, req.ExpirationDate, req.AvailableCash)
-
-	// Get stock price with full API logging
-	logger.Warn.Printf("🔍 AUDIT: Fetching stock price from Alpaca API for %s", ticker)
-	stockPrice, err := h.alpacaClient.GetStockPrice(ticker)
-	if err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Failed to get stock price for %s: %v", ticker, err)
-		http.Error(w, fmt.Sprintf("Failed to get stock price for %s: %v", ticker, err), http.StatusInternalServerError)
-		return
-	}
-	logger.Warn.Printf("🔍 AUDIT: Stock price received for %s: $%.2f", ticker, stockPrice.Price)
-
-	// Calculate time to expiration
-	logger.Warn.Printf("🔍 AUDIT: Parsing expiration date: %s", req.ExpirationDate)
-	expirationTime, err := time.Parse("2006-01-02", req.ExpirationDate)
-	if err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Invalid expiration date format: %v", err)
-		http.Error(w, fmt.Sprintf("Invalid expiration date: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	now := time.Now()
-	daysToExp := int(expirationTime.Sub(now).Hours() / 24)
-	logger.Warn.Printf("🔍 AUDIT: Time calculation - Days to expiration: %d", daysToExp)
-	timeToExp := float64(daysToExp) / 365.0
-
-	// Calculate target strike based on delta (simplified for audit)
-	var targetMultiplier float64
-	if req.TargetDelta <= 0.30 {
-		targetMultiplier = 0.95 // 5% OTM for puts
-	} else {
-		targetMultiplier = 0.90 // 10% OTM for higher delta
-	}
-	
-	bestStrike := stockPrice.Price * targetMultiplier
-	// Round to nearest $5
-	bestStrike = math.Round(bestStrike/5) * 5
-	
-	// Perform detailed Black-Scholes calculation with logging
-	riskFreeRate := 0.0525 // 5.25% risk-free rate
-	dividendYield := 0.005 // 0.5% dividend yield
-	impliedVol := 0.25    // 25% implied volatility
-	
-	logger.Warn.Printf("🔍 AUDIT: Starting Black-Scholes calculation for %s", ticker)
-	logger.Warn.Printf("🔍 AUDIT: BS Input - S: $%.2f, K: $%.2f, T: %.4f, r: %.4f, σ: %.3f", stockPrice.Price, bestStrike, timeToExp, riskFreeRate, impliedVol)
-
-	// Calculate d1 and d2 with full formula logging
-	d1 := (math.Log(stockPrice.Price/bestStrike) + (riskFreeRate-dividendYield+0.5*impliedVol*impliedVol)*timeToExp) / (impliedVol * math.Sqrt(timeToExp))
-	d2 := d1 - impliedVol*math.Sqrt(timeToExp)
-	logger.Warn.Printf("🔍 AUDIT: BS Calculated - d1: %.4f, d2: %.4f", d1, d2)
-
-	// Calculate N(d1) and N(d2)
-	nd1 := 0.5 * (1.0 + math.Erf(d1/math.Sqrt(2.0)))
-	nd2 := 0.5 * (1.0 + math.Erf(d2/math.Sqrt(2.0)))
-	negNd1 := 0.5 * (1.0 + math.Erf(-d1/math.Sqrt(2.0)))
-	negNd2 := 0.5 * (1.0 + math.Erf(-d2/math.Sqrt(2.0)))
-	logger.Warn.Printf("🔍 AUDIT: BS Normal distributions - N(d1): %.4f, N(d2): %.4f, N(-d1): %.4f, N(-d2): %.4f", nd1, nd2, negNd1, negNd2)
-
-	// Calculate put option price and Greeks
-	putPrice := bestStrike*math.Exp(-riskFreeRate*timeToExp)*negNd2 - stockPrice.Price*math.Exp(-dividendYield*timeToExp)*negNd1
-	delta := -math.Exp(-dividendYield*timeToExp) * negNd1
-	logger.Warn.Printf("🔍 AUDIT: BS Final results - Put Price: $%.4f, Delta: %.4f", putPrice, delta)
-
-	// Create detailed audit response
-	logger.Warn.Printf("🔍 AUDIT: Building comprehensive audit response for %s", ticker)
-	auditResponse := map[string]interface{}{
-		"ticker": ticker,
-		"rank":   1, // Will be determined by ranking
-		"api_requests": []map[string]interface{}{
-			{
-				"url":           fmt.Sprintf("/v2/stocks/%s/quotes/latest", ticker),
-				"method":        "GET",
-				"response":      stockPrice,
-				"timestamp":     time.Now().Format(time.RFC3339),
-			},
-		},
-		"calculations": map[string]interface{}{
-			"inputs": map[string]float64{
-				"S": stockPrice.Price,
-				"K": bestStrike,
-				"T": timeToExp,
-				"r": riskFreeRate,
-				"σ": impliedVol,
-			},
-			"formulas": map[string]string{
-				"d1": fmt.Sprintf("d1 = (ln(%.2f/%.2f) + (%.4f + 0.5*%.3f²)*%.3f) / (%.3f * √%.3f) = %.4f",
-					stockPrice.Price, bestStrike, riskFreeRate, impliedVol, timeToExp, impliedVol, timeToExp, d1),
-				"d2": fmt.Sprintf("d2 = %.4f - %.3f * √%.3f = %.4f", d1, impliedVol, timeToExp, d2),
-				"N_d1": fmt.Sprintf("N(%.4f) = %.4f", d1, nd1),
-				"N_d2": fmt.Sprintf("N(%.4f) = %.4f", d2, nd2),
-				"put_price": fmt.Sprintf("P = %.2f*e^(-%.4f*%.3f)*%.4f - %.2f*e^(-%.3f*%.3f)*%.4f = %.4f",
-					bestStrike, riskFreeRate, timeToExp, negNd2, stockPrice.Price, dividendYield, timeToExp, negNd1, putPrice),
-				"delta": fmt.Sprintf("Δ = -e^(-%.3f*%.3f) * %.4f = %.4f", dividendYield, timeToExp, negNd1, delta),
-			},
-			"execution_mode": "CPU_AUDIT",
-			"computation_time_ms": 0.1,
-		},
-		"final_result": map[string]interface{}{
-			"strike":           bestStrike,
-			"premium":          putPrice,
-			"delta":            delta,
-			"days_to_exp":      daysToExp,
-			"profit_potential": (putPrice / bestStrike) * 100,
-		},
-	}
-	
-	responseSize := len(fmt.Sprintf("%v", auditResponse))
-	logger.Warn.Printf("🔍 AUDIT: Audit response built for %s (%d bytes)", ticker, responseSize)
-	logger.Warn.Printf("🔍 AUDIT: Final results - Strike: $%.2f, Premium: $%.4f, Delta: %.4f, Profit: %.2f%%", 
-		bestStrike, putPrice, delta, (putPrice/bestStrike)*100)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(auditResponse); err != nil {
-		logger.Warn.Printf("🔍 AUDIT: Failed to encode audit response for %s: %v", ticker, err)
-		return
-	}
-	logger.Warn.Printf("🔍 AUDIT: Complete - audit data sent successfully for %s", ticker)
-}
 
 // AIAnalysisHandler sends data to AI for analysis
 func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Request) {
@@ -1996,7 +1572,7 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 
 	logger.Warn.Printf("🤖 GROK: Processing analysis for ticker %s", ticker)
 
-	// Load the single audit JSON file
+	// Load the single audit JSON file (gets overwritten each analysis)
 	auditFile := "audit.json"
 	logger.Warn.Printf("🤖 GROK: Loading audit JSON file: %s", auditFile)
 	
