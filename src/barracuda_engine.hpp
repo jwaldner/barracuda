@@ -174,6 +174,9 @@ private:
     // Helper function to append audit messages to JSON file
     void appendAuditMessage(const std::string& message);
     
+    // Helper function to append detailed calculation data to JSON file
+    void appendAuditCalculation(const std::string& calculation_data);
+    
     // Implied volatility calculation
     double CalculateImpliedVolatility(
         double market_price, double stock_price, double strike_price,

@@ -322,8 +322,11 @@ function displayResults(data) {
         }
         
         // Show processing time, computation time, and records processed with prominent duration  
-        const computeTime = data.meta.compute_duration ? data.meta.compute_duration.toFixed(3) : '0.000';
-        let footerContent = `🔥 ${executionMode} | ⏰ ${processingTime}s TOTAL | 🔋 ${computeTime}s ${executionMode} COMPUTE 🔋 | 📊 ${totalRecords.toLocaleString()} RECORDS`;
+        const computeTime = data.meta.compute_duration ? 
+            (data.meta.compute_duration < 0.001 ? 
+                (data.meta.compute_duration * 1000).toFixed(2) + 'ms' : 
+                data.meta.compute_duration.toFixed(3) + 's') : '0.000s';
+        let footerContent = `🔥 ${executionMode} | ⏰ ${processingTime}s TOTAL | 🔋 ${computeTime} ${executionMode} COMPUTE 🔋 | 📊 ${totalRecords.toLocaleString()} RECORDS`;
         
         // ADD workload benchmark info when present
         if (workloadFactor > 0.0 && samplesProcessed > 0) {

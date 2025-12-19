@@ -90,10 +90,11 @@ typedef struct {
 import "C"
 import (
 	"fmt"
-	"log"
 	"math"
 	"time"
 	"unsafe"
+	
+	"github.com/jwaldner/barracuda/internal/logger"
 )
 
 // OptionContract represents an options contract
@@ -480,11 +481,11 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 		return nil, nil, fmt.Errorf("CUDA not available - cannot maximize GPU usage")
 	}
 
-	log.Printf("🚀 CUDA MAXIMIZED: Processing %d contracts with minimal Go loops, maximum GPU parallelization", len(options))
+	logger.Info.Printf("🚀 CUDA MAXIMIZED: Processing %d contracts with minimal Go loops, maximum GPU parallelization", len(options))
 
 	// Debug: Log the first few contract inputs to verify correct values
 	for i := 0; i < len(options) && i < 3; i++ {
-		log.Printf("🔍 Input[%d]: Symbol=%s, Strike=%.2f, Underlying=%.2f, Time=%.6f, Vol=%.3f, Rate=%.3f, Type=%c",
+		logger.Info.Printf("🔍 Input[%d]: Symbol=%s, Strike=%.2f, Underlying=%.2f, Time=%.6f, Vol=%.3f, Rate=%.3f, Type=%c",
 			i, options[i].Symbol, options[i].StrikePrice, options[i].UnderlyingPrice,
 			options[i].TimeToExpiration, options[i].Volatility, options[i].RiskFreeRate, options[i].OptionType)
 	}
@@ -529,7 +530,7 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 	var puts, calls []OptionContract
 	for i := range options {
 		// DEBUG: Log what CUDA returned
-		log.Printf("🔍 CUDA RESULT[%d]: Symbol=%s, Market=$%.3f, TheoPrice=%.6f, Delta=%.6f, Vol=%.3f",
+		logger.Info.Printf("🔍 CUDA RESULT[%d]: Symbol=%s, Market=$%.3f, TheoPrice=%.6f, Delta=%.6f, Vol=%.3f",
 			i, options[i].Symbol, float64(cContracts[i].market_close_price),
 			float64(cContracts[i].theoretical_price), float64(cContracts[i].delta), float64(cContracts[i].volatility))
 
@@ -557,7 +558,7 @@ func (be *BaracudaEngine) MaximizeCUDAUsage(options []OptionContract, stockPrice
 		}
 	}
 
-	log.Printf("⚡ CUDA MAXIMIZED: %.3fms | %d contracts → %d puts, %d calls | All computations on GPU",
+	logger.Info.Printf("⚡ CUDA MAXIMIZED: %.3fms | %d contracts → %d puts, %d calls | All computations on GPU",
 		cudaDuration.Seconds()*1000, len(options), len(puts), len(calls))
 
 	return puts, calls, nil
@@ -577,7 +578,7 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 		return nil, fmt.Errorf("CUDA not available - complete GPU processing requires CUDA")
 	}
 
-	log.Printf("🚀 COMPLETE CUDA: Processing %d contracts with ALL calculations on GPU", len(options))
+	logger.Info.Printf("🚀 COMPLETE CUDA: Processing %d contracts with ALL calculations on GPU", len(options))
 
 	// Calculate days to expiration
 	expirationTime, err := time.Parse("2006-01-02", expirationDate)
@@ -652,7 +653,7 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 		}
 	}
 
-	log.Printf("⚡ COMPLETE CUDA: %d contracts processed with ALL calculations on GPU", len(results))
+	logger.Info.Printf("⚡ COMPLETE CUDA: %d contracts processed with ALL calculations on GPU", len(results))
 	return results, nil
 }
 
@@ -678,7 +679,7 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 		return nil, fmt.Errorf("engine not initialized")
 	}
 
-	log.Printf("🖥️  COMPLETE CPU: Processing %d contracts with ALL calculations on CPU", len(options))
+	logger.Info.Printf("🖥️  COMPLETE CPU: Processing %d contracts with ALL calculations on CPU", len(options))
 
 	// Set engine to CPU mode
 	be.SetExecutionMode("cpu")
@@ -693,7 +694,7 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 	}
 	
 	cpuDuration := time.Since(cpuStart)
-	log.Printf("🖥️  CPU Processing completed in %.2fms", float64(cpuDuration.Nanoseconds())/1e6)
+	logger.Info.Printf("🖥️  CPU Processing completed in %.2fms", float64(cpuDuration.Nanoseconds())/1e6)
 	
 	// Convert to CompleteOptionResult format for web interface
 	results := make([]CompleteOptionResult, len(calculatedOptions))

@@ -1420,6 +1420,9 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 	var completeResults []barracuda.CompleteOptionResult
 	var err error
 	
+	// Measure just the compute time
+	computeStartTime := time.Now()
+	
 	if h.config.Engine.ExecutionMode == "cpu" {
 		completeResults, err = h.engine.MaximizeCPUUsageComplete(
 			engineContracts,
@@ -1437,14 +1440,20 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 			req.ExpirationDate,
 			auditSymbol)
 	}
-
+	
+	computeDuration := time.Since(computeStartTime)
+	
 	if err != nil {
-		logger.Error.Printf("❌ Complete CUDA processing failed: %v", err)
+		logger.Error.Printf("❌ Complete processing failed: %v", err)
 		return nil
 	}
 
 	duration := time.Since(startTime)
-	h.lastComputeDuration = duration
+	h.lastComputeDuration = computeDuration
+	
+	// DEBUG: Log timing details
+	logger.Warn.Printf("🔍 TIMING DEBUG: Total duration: %.3fms, Compute duration: %.3fms", 
+		duration.Seconds()*1000, h.lastComputeDuration.Seconds()*1000)
 
 	// Convert complete CUDA results to business results
 	var results []models.OptionResult

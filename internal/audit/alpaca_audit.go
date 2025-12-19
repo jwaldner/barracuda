@@ -65,15 +65,78 @@ func (aa *AlpacaAudit) AddRequest(reqType, url, method string, duration time.Dur
 	aa.requests = append(aa.requests, request)
 }
 
-// Audit implements the Auditable interface
-func (aa *AlpacaAudit) Audit(ticker string, request models.AnalysisRequest) (interface{}, error) {
-	// Calculate summary
-	totalRequests := len(aa.requests)
+// InitAppendRename is the ONLY function to interact with audit system
+// It handles initialization, appending, and file management in one call
+func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data map[string]interface{}) error {
+	// Step 1: INIT - Check if this is first audit for this ticker
+	filename := "audit.json"
+	var existingData AlpacaAuditData
+	isNewAudit := false
+	
+	if file, err := os.Open(filename); err == nil {
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		if err := decoder.Decode(&existingData); err != nil {
+			// File corrupted, start fresh
+			isNewAudit = true
+			existingData = AlpacaAuditData{APIRequests: []APIRequest{}, Summary: Summary{}}
+		}
+	} else {
+		// No file exists, start fresh
+		isNewAudit = true
+		existingData = AlpacaAuditData{APIRequests: []APIRequest{}, Summary: Summary{}}
+	}
+	
+	// If this is new audit or first time seeing this ticker, add init message FIRST
+	needsInit := isNewAudit
+	if !needsInit {
+		// Check if we already have init message for this ticker
+		hasInit := false
+		for _, req := range existingData.APIRequests {
+			if req.Type == "TickerAuditInitialization" {
+				if tickerVal, ok := req.Response["ticker"]; ok {
+					if tickerStr, isStr := tickerVal.(string); isStr && tickerStr == ticker {
+						hasInit = true
+						break
+					}
+				}
+			}
+		}
+		needsInit = !hasInit
+	}
+	
+	if needsInit {
+		// Step 1: Add ticker initialization as FIRST entry
+		initRequest := APIRequest{
+			Type:       "TickerAuditInitialization", 
+			URL:        "/audit/init",
+			Method:     "INIT",
+			DurationMs: 0,
+			Timestamp:  time.Now().Format(time.RFC3339),
+			Success:    true,
+			Response: map[string]interface{}{
+				"ticker":  ticker,
+				"message": "🎯 AUDIT INIT: Now auditing ticker: " + ticker,
+			},
+		}
+		
+		// Insert at beginning
+		existingData.APIRequests = append([]APIRequest{initRequest}, existingData.APIRequests...)
+	}
+	
+	// Step 2: APPEND - Add the current audit entry
+	if operation != "" {
+		// Add current request data from aa.requests to existing data
+		existingData.APIRequests = append(existingData.APIRequests, aa.requests...)
+	}
+	
+	// Step 3: RENAME/SAVE - Calculate summary and save
+	totalRequests := len(existingData.APIRequests)
 	successCount := 0
 	errorCount := 0
 	totalTime := int64(0)
 	
-	for _, req := range aa.requests {
+	for _, req := range existingData.APIRequests {
 		if req.Success {
 			successCount++
 		} else {
@@ -82,17 +145,23 @@ func (aa *AlpacaAudit) Audit(ticker string, request models.AnalysisRequest) (int
 		totalTime += req.DurationMs
 	}
 	
-	summary := Summary{
+	existingData.Summary = Summary{
 		TotalRequests: totalRequests,
 		SuccessCount:  successCount,
 		ErrorCount:    errorCount,
 		TotalTimeMs:   totalTime,
 	}
 	
-	return AlpacaAuditData{
-		APIRequests: aa.requests,
-		Summary:     summary,
-	}, nil
+	// Write final file
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create audit file: %v", err)
+	}
+	defer file.Close()
+	
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(existingData)
 }
 
 // SaveToFile saves the current audit data to a JSON file

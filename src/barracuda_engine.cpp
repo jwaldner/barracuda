@@ -86,8 +86,34 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         
         // Add audit message if audit_symbol is provided
         if (audit_symbol != nullptr) {
-            std::string message = "hello from cuda! (symbol: " + std::string(audit_symbol) + ")";
-            appendAuditMessage(message);
+            // Log detailed CUDA processing results
+            if (!results.empty()) {
+                const auto& sample = results[0]; // Use first contract as sample
+                std::stringstream audit_data;
+                audit_data << "{"
+                          << "\"execution_type\": \"CUDA\", "
+                          << "\"symbol\": \"" << audit_symbol << "\", "
+                          << "\"formula\": \"Black-Scholes\", "
+                          << "\"variables\": {"
+                          << "\"S\": " << sample.underlying_price << ", "
+                          << "\"K\": " << sample.strike_price << ", "
+                          << "\"T\": " << sample.time_to_expiration << ", "
+                          << "\"r\": " << sample.risk_free_rate << ", "
+                          << "\"sigma\": " << sample.volatility << ", "
+                          << "\"option_type\": \"" << sample.option_type << "\""
+                          << "}, "
+                          << "\"results\": {"
+                          << "\"theoretical_price\": " << sample.theoretical_price << ", "
+                          << "\"delta\": " << sample.delta << ", "
+                          << "\"gamma\": " << sample.gamma << ", "
+                          << "\"theta\": " << sample.theta << ", "
+                          << "\"vega\": " << sample.vega << ", "
+                          << "\"rho\": " << sample.rho
+                          << "}, "
+                          << "\"contracts_processed\": " << results.size()
+                          << "}";
+                appendAuditCalculation(audit_data.str());
+            }
         }
         
     } else {
@@ -143,8 +169,34 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         
         // Add audit message if audit_symbol is provided
         if (audit_symbol != nullptr) {
-            std::string message = "hello from cpu! (symbol: " + std::string(audit_symbol) + ")";
-            appendAuditMessage(message);
+            // Log detailed CPU processing results
+            if (!results.empty()) {
+                const auto& sample = results[0]; // Use first contract as sample
+                std::stringstream audit_data;
+                audit_data << "{"
+                          << "\"execution_type\": \"CPU\", "
+                          << "\"symbol\": \"" << audit_symbol << "\", "
+                          << "\"formula\": \"Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls\", "
+                          << "\"variables\": {"
+                          << "\"S\": " << sample.underlying_price << ", "
+                          << "\"K\": " << sample.strike_price << ", "
+                          << "\"T\": " << sample.time_to_expiration << ", "
+                          << "\"r\": " << sample.risk_free_rate << ", "
+                          << "\"sigma\": " << sample.volatility << ", "
+                          << "\"option_type\": \"" << sample.option_type << "\""
+                          << "}, "
+                          << "\"results\": {"
+                          << "\"theoretical_price\": " << sample.theoretical_price << ", "
+                          << "\"delta\": " << sample.delta << ", "
+                          << "\"gamma\": " << sample.gamma << ", "
+                          << "\"theta\": " << sample.theta << ", "
+                          << "\"vega\": " << sample.vega << ", "
+                          << "\"rho\": " << sample.rho
+                          << "}, "
+                          << "\"contracts_processed\": " << results.size()
+                          << "}";
+                appendAuditCalculation(audit_data.str());
+            }
         }
     }
     
@@ -586,6 +638,51 @@ void BarracudaEngine::appendAuditMessage(const std::string& message) {
             std::string audit_entry = ",\n    {\n"
                                       "      \"type\": \"BlackScholesCalculation\",\n"
                                       "      \"message\": \"" + message + "\",\n"
+                                      "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
+                                      "    }";
+            
+            // Insert before the closing ]
+            content.insert(array_end, audit_entry);
+            
+            // Write back to file
+            std::ofstream outFile("audit.json");
+            if (outFile.is_open()) {
+                outFile << content;
+                outFile.close();
+            }
+        }
+    }
+}
+
+void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data) {
+    std::ifstream inFile("audit.json");
+    if (!inFile.is_open()) {
+        return; // File doesn't exist, return silently
+    }
+    
+    // Read entire file content
+    std::string content((std::istreambuf_iterator<char>(inFile)),
+                        std::istreambuf_iterator<char>());
+    inFile.close();
+    
+    // Get current timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%dT%H:%M:%S");
+    
+    // Find the api_requests array and insert before the closing ]
+    size_t api_requests_pos = content.find("\"api_requests\":");
+    if (api_requests_pos != std::string::npos) {
+        // Find the array content
+        size_t array_start = content.find("[", api_requests_pos);
+        size_t array_end = content.find_last_of("]");
+        
+        if (array_start != std::string::npos && array_end != std::string::npos) {
+            // Create detailed audit entry
+            std::string audit_entry = ",\n    {\n"
+                                      "      \"type\": \"BlackScholesCalculation\",\n"
+                                      "      \"calculation_details\": " + calculation_data + ",\n"
                                       "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
                                       "    }";
             

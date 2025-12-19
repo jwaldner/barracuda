@@ -89,25 +89,30 @@ func main() {
 
 	// Show final active execution mode
 	if engine != nil && engine.IsCudaAvailable() && (executionMode == "auto" || executionMode == "cuda") {
-		log.Printf("⚡ ACTIVE MODE: CUDA (%d devices)", engine.GetDeviceCount())
+		logger.Always.Printf("⚡ ACTIVE MODE: CUDA (%d devices)", engine.GetDeviceCount())
 	} else {
-		log.Printf("🔧 ACTIVE MODE: CPU")
+		logger.Always.Printf("🔧 ACTIVE MODE: CPU")
 	}
 
 	// Create Alpaca client
-	log.Println("📡 Creating Alpaca client...")
-	logger.Always.Printf("📡 Creating Alpaca client")
+	logger.Always.Printf("📡 Creating Alpaca client...")
 	logger.Info.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets")
 
 	baseClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
 	alpacaClient := alpaca.NewPerformanceWrapper(baseClient)
 
+	// Create AuditCoordinator (this will immediately log initialization)
+	_ = audit.NewAuditCoordinator() // Create coordinator but don't use it yet
+	
 	// Create Alpaca audit component for logging API calls
 	alpacaAudit := audit.NewAlpacaAudit()
 	globalAuditComponent = alpacaAudit
 	
-	// Register in audit registry so handlers can access it
+	// Register components in audit registry and coordinator
 	audit.RegisterAudit("alpaca", alpacaAudit)
+	
+	// Register alpaca audit as an auditable component (when implemented)
+	// auditCoordinator.Register("alpaca", alpacaAudit)
 	
 	// Set up audit callback function for the base client
 	auditCallback := func(symbol, operation string, data map[string]interface{}) {
