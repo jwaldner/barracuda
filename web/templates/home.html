@@ -98,6 +98,18 @@
             </div>
         </div>
 
+        <!-- Notification Area -->
+        <div id="notification" class="hidden fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm">
+            <div id="notification-content" class="flex items-center">
+                <span id="notification-message" class="flex-1"></span>
+                <button onclick="hideNotification()" class="ml-3 text-white hover:text-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <!-- Main Form -->
         <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 mb-8">
             <form id="analysis-form" class="space-y-6" novalidate>
@@ -199,11 +211,18 @@
                         						<h2 id="results-title" class="text-2xl font-bold text-white">{{resultsTitle}}</h2>
                         						<p class="text-blue-100">{{resultsSubtitle}}</p>
                     </div>
-                    <button id="copy-csv-btn" onclick="copyTableToCSV()" 
-                        class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
-                        title="Export results as CSV">
-                        {{exportButtonText}}
-                    </button>
+                    <div class="flex gap-3">
+                        <button id="copy-csv-btn"
+                            class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
+                            title="Copy CSV data to clipboard">
+                            📋 Copy CSV
+                        </button>
+                        <button id="downloadCSVBtn" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
+                            title="Download results as CSV file">
+                            💾 Download CSV
+                        </button>
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto">

@@ -43,7 +43,7 @@ func (s *RequestService) ParseAnalysisRequest(r *http.Request) (*dto.AnalysisReq
 
 	// Set defaults
 	if req.TargetDelta == 0 {
-		req.TargetDelta = 0.25
+		req.TargetDelta = 0.10  // LOW risk default
 	}
 
 	if req.AvailableCash == 0 {

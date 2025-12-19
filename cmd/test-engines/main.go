@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jwaldner/barracuda/barracuda_lib"
-	"github.com/jwaldner/barracuda/test_data"
+	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
+	testdata "github.com/jwaldner/barracuda/test_data"
 )
 
 func main() {
@@ -74,18 +74,18 @@ func testEngine(mode string, options []barracuda.OptionContract, symbol string, 
 	// Create a simple result structure for display
 	result := struct {
 		Symbol                string
-		StockPrice           float64
-		Expiration           string
+		StockPrice            float64
+		Expiration            string
 		TotalOptionsProcessed int
-		ExecutionMode        string
-		CalculationTimeMs    float64
+		ExecutionMode         string
+		CalculationTimeMs     float64
 	}{
 		Symbol:                symbol,
-		StockPrice:           stockPrice,
-		Expiration:           expiration,
+		StockPrice:            stockPrice,
+		Expiration:            expiration,
 		TotalOptionsProcessed: len(calculatedOptions),
-		ExecutionMode:        mode,
-		CalculationTimeMs:    duration.Seconds() * 1000,
+		ExecutionMode:         mode,
+		CalculationTimeMs:     duration.Seconds() * 1000,
 	}
 
 	fmt.Printf("✅ Success! Processed in %.2fms\n", duration.Seconds()*1000)

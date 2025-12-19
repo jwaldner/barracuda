@@ -72,51 +72,139 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Mode indicator is handled by backend template functions only
     
-    // CSV Export functionality
-    const exportCSVBtn = document.getElementById('exportCSV');
-    if (exportCSVBtn) {
-        exportCSVBtn.addEventListener('click', function() {
-        if (!window.lastResults) return;
-        
-				const headers = window.csvHeaders || []; // Backend provides headers
-        let csvContent = headers.join(',') + '\n';
-        
-        // Helper function to get raw value for CSV (numbers, not formatted strings)
-        const getRawValue = (field) => {
-            if (!field) return '';
-            if (typeof field === 'object' && field.raw !== undefined) {
-                return field.raw;
+    // CSV Copy functionality (Copy to clipboard)  
+    const copyCSVBtn = document.getElementById('copy-csv-btn');
+    if (copyCSVBtn) {
+        copyCSVBtn.addEventListener('click', function() {
+            if (!window.lastResults) return;
+            
+            const headers = window.csvHeaders || [];
+            let csvContent = headers.join(',') + '\n';
+            
+            // Helper function to get raw value for CSV
+            const getRawValue = (field) => {
+                if (!field) return '';
+                if (typeof field === 'object' && field.raw !== undefined) {
+                    return field.raw;
+                }
+                return field;
+            };
+            
+            window.lastResults.forEach((option, index) => {
+                const ticker = getRawValue(option.ticker);
+                const company = getRawValue(option.company) || ticker;
+                const sector = getRawValue(option.sector) || 'Unknown';
+                    
+                const row = [
+                    getRawValue(option.rank) || (index + 1),
+                    ticker,
+                    company,
+                    sector,
+                    getRawValue(option.strike),
+                    getRawValue(option.stock_price),
+                    getRawValue(option.premium),
+                    getRawValue(option.max_contracts),
+                    getRawValue(option.total_premium),
+                    getRawValue(option.profit_percentage),
+                    getRawValue(option.annualized),
+                    getRawValue(option.expiration)
+                ];
+                csvContent += row.join(',') + '\n';
+            });
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(csvContent).then(function() {
+                showNotification('📋 CSV copied to clipboard!', 'success');
+            });
+        });
+    }
+    
+    // CSV Download functionality (Download file)
+    const downloadCSVBtn = document.getElementById('downloadCSVBtn');
+    if (downloadCSVBtn) {
+        downloadCSVBtn.addEventListener('click', async function() {
+            if (!window.lastAnalysisRequest) {
+                showNotification('❌ No analysis data available for download', 'error');
+                return;
             }
-            return field; // Fallback for old format
-        };
-        
-        window.lastResults.forEach((option, index) => {
-            const ticker = getRawValue(option.ticker);
-            const company = getRawValue(option.company) || ticker; // Use backend company data
-            const sector = getRawValue(option.sector) || 'Unknown'; // Use backend sector data
+            
+            try {
+                // Use current frontend selection for filename
+                const csvRequest = Object.assign({}, window.lastAnalysisRequest);
+                csvRequest.target_delta = selectedDelta; // Use what's actually selected now
                 
-            const row = [
-                getRawValue(option.rank) || (index + 1),
-                ticker,
-                company,
-                sector,
-                getRawValue(option.strike),
-                getRawValue(option.stock_price),
-                getRawValue(option.premium),
-                getRawValue(option.max_contracts),
-                getRawValue(option.total_premium),
-
-                getRawValue(option.profit_percentage),
-                getRawValue(option.annualized),
-                getRawValue(option.expiration)
-            ];
-            csvContent += row.join(',') + '\n';
-        });
-        
-        // Copy to clipboard
-        navigator.clipboard.writeText(csvContent).then(function() {
-            showNotification();
-        });
+                console.log('Making fetch request to /api/download-csv');
+                const response = await fetch('/api/download-csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(csvRequest)
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('Error response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                
+                // Get filename from response headers or generate default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                console.log('Content-Disposition:', contentDisposition);
+                let filename = 'options-analysis.csv';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                console.log('Filename:', filename);
+                
+                // Save the file first
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Then open the same content in new tab
+                setTimeout(() => {
+                    window.open(url, '_blank');
+                }, 100);
+                
+                // Clean up
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 1000);
+                
+                // Show notification
+                showNotification('💾 CSV saved & opened!', 'success');
+                
+                // Make notification open the CSV file 
+                setTimeout(() => {
+                    const notification = document.getElementById('notification');
+                    if (notification) {
+                        notification.onclick = function() {
+                            if (window.lastCSVBlob) {
+                                const csvUrl = URL.createObjectURL(window.lastCSVBlob);
+                                window.open(csvUrl, '_blank');
+                                setTimeout(() => URL.revokeObjectURL(csvUrl), 1000);
+                            }
+                        };
+                    }
+                }, 100);
+                
+            } catch (error) {
+                console.error('CSV download failed:', error);
+                showNotification(`❌ Download failed: ${error.message}`, 'error');
+            }
         });
     }
 });
@@ -266,20 +354,71 @@ function displayResults(data) {
     }
 }
 
-function showNotification() {
-    const notification = document.getElementById('notification');
-    if (notification) {
-        notification.classList.remove('hidden');
-        setTimeout(() => {
-            const notificationTimeout = document.getElementById('notification');
-            if (notificationTimeout) {
-                notificationTimeout.classList.add('hidden');
-            }
-        }, 3000);
-    }
+function showNotification(message = 'CSV data copied to clipboard!', type = 'success', persistent = false) {
+	const notification = document.getElementById('notification');
+	if (notification) {
+		// Update notification message 
+		const messageEl = document.getElementById('notification-message');
+		if (messageEl) {
+			messageEl.textContent = message;
+		}
+		
+		// Update notification style based on type - add cursor pointer for clickability
+		if (type === 'error') {
+			notification.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm bg-red-500 text-white cursor-pointer';
+			// Only add default click handler for errors
+			notification.onclick = function() {
+				hideNotification();
+			};
+		} else {
+			notification.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm bg-green-500 text-white cursor-pointer';
+			// Don't override onclick for success - let caller set it
+		}
+		
+		notification.classList.remove('hidden');
+		
+		// Only auto-hide if not persistent
+		if (!persistent) {
+			setTimeout(() => {
+				hideNotification();
+			}, 3000);
+		}
+	}
 }
 
-async function copyTableToCSV() {
+function hideNotification() {
+	const notification = document.getElementById('notification');
+	if (notification) {
+		notification.classList.add('hidden');
+	}
+}
+
+function showStickyDownloadNotification() {
+	const notification = document.getElementById('notification');
+	if (notification) {
+		const messageEl = document.getElementById('notification-message');
+		if (messageEl) {
+			// Generic download notification - NO individual file names
+			messageEl.innerHTML = `💾 CSV downloaded! <a href="chrome://downloads/" target="_blank" style="color: #90EE90; text-decoration: underline; font-weight: bold;">Open Downloads Folder</a>`;
+		}
+		
+		// Green sticky notification
+		notification.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm bg-green-500 text-white';
+		
+		// Remove the general click handler since we have a specific link
+		notification.onclick = null;
+		
+		notification.classList.remove('hidden');
+		// Sticky - no auto-hide
+	}
+}
+
+function openDownloadsFolder() {
+	// Just show the keyboard shortcut - no navigation
+	const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+	const shortcut = isMac ? 'Cmd+Shift+J' : 'Ctrl+Shift+J';
+	showNotification(`📁 CSV saved! Press ${shortcut} to view Downloads`, 'success', true);
+}async function copyTableToCSV() {
     const table = document.querySelector('#results table');
     if (!table) {
         alert(window.errorMessages?.noResults || 'No table data available to copy');
@@ -384,11 +523,11 @@ function selectRisk(delta) {
         btn.className = 'risk-btn px-4 py-3 rounded-xl text-sm font-bold text-white transition-all transform duration-300 hover:scale-105';
 
         // Add appropriate color classes based on delta
-        if (btnDelta === 0.25) {
+        if (btnDelta === 0.10) {
             btn.classList.add('bg-green-600/40', 'border-2', 'border-green-400', 'hover:bg-green-600/60');
-        } else if (btnDelta === 0.50) {
-            btn.classList.add('bg-blue-600/40', 'border-2', 'border-blue-400', 'hover:bg-blue-600/60');
-        } else if (btnDelta === 0.75) {
+        } else if (btnDelta === 0.20) {
+            btn.classList.add('bg-orange-600/40', 'border-2', 'border-orange-400', 'hover:bg-orange-600/60');
+        } else if (btnDelta === 0.30) {
             btn.classList.add('bg-red-600/40', 'border-2', 'border-red-400', 'hover:bg-red-600/60');
         }
 
@@ -492,11 +631,11 @@ function selectRiskDeltaQuest(delta) {
         const btnDelta = parseFloat(btn.dataset.delta);
 
         // Reset to base classes and add appropriate gradient
-        if (btnDelta === 0.25) {
+        if (btnDelta === 0.10) {
             btn.className = 'risk-btn px-6 py-4 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200';
-        } else if (btnDelta === 0.50) {
+        } else if (btnDelta === 0.20) {
             btn.className = 'risk-btn px-6 py-4 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200';
-        } else if (btnDelta === 0.75) {
+        } else if (btnDelta === 0.30) {
             btn.className = 'risk-btn px-6 py-4 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200';
         }
 
@@ -513,9 +652,12 @@ async function handleSubmit(e) {
 
     // Validate selectedDelta before proceeding
     if (isNaN(selectedDelta) || selectedDelta <= 0) {
-        selectedDelta = parseFloat(document.getElementById('selected-delta').value) || 0.50;
+        selectedDelta = parseFloat(document.getElementById('selected-delta').value) || 0.10;
     }
 
+    // Clear any existing notifications when starting new analysis
+    hideNotification();
+    
     // Show loading and hide footer during processing
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
@@ -547,16 +689,19 @@ async function handleSubmit(e) {
         .map(s => s.trim().toUpperCase())
         .filter(s => s.length > 0);
     
-    // Create JSON request data
-    const requestData = {
-        symbols: symbolsArray,
-        expiration_date: expirationValue,
-        target_delta: selectedDelta,
-        available_cash: parseFloat(cashValue),
-        strategy: currentStrategy
-    };
-
-    try {
+	// Create JSON request data
+	const requestData = {
+		symbols: symbolsArray,
+		expiration_date: expirationValue,
+		target_delta: selectedDelta,
+		available_cash: parseFloat(cashValue),
+		strategy: currentStrategy
+	};
+	
+	// Store for CSV download
+	window.lastAnalysisRequest = requestData;
+	
+	try {
         const response = await fetch('/api/analyze', {
             method: 'POST',
             headers: {
@@ -585,8 +730,13 @@ async function handleSubmit(e) {
         }
         
         displayResults(data);
+        
+        // Analysis complete - download button is now available (no notification needed)
 
     } catch (error) {
+        // Clear notification on error
+        hideNotification();
+        
         showError((window.errorMessages?.analysisError || 'Analysis failed:') + ' ' + error.message);
         
         // Show footer again even on error
@@ -633,6 +783,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set default strategy and risk level
     switchStrategy('puts');
     setTimeout(() => {
-        selectRiskDeltaQuest(0.50);
+        selectRiskDeltaQuest(0.10);
     }, 100);
 });

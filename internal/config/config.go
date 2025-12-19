@@ -24,6 +24,11 @@ type ComputeConfig struct {
 	SimulationWorkload    bool   `yaml:"simulation_workload"`
 }
 
+// CSVConfig represents CSV export configuration
+type CSVConfig struct {
+	FilenameFormat string `yaml:"filename_format"`
+}
+
 type Config struct {
 	// Server settings
 	Port string
@@ -45,6 +50,8 @@ type Config struct {
 	Engine EngineConfig `yaml:"engine"`
 	// Compute settings (legacy)
 	Compute ComputeConfig `yaml:"compute"`
+	// CSV export settings
+	CSV CSVConfig `yaml:"csv"`
 }
 
 // AlpacaConfig represents Alpaca API configuration
@@ -76,6 +83,7 @@ type YAMLConfig struct {
 
 	Engine  EngineConfig  `yaml:"engine"`
 	Compute ComputeConfig `yaml:"compute"`
+	CSV     CSVConfig     `yaml:"csv"`
 }
 
 func Load() *Config {
@@ -157,6 +165,13 @@ func Load() *Config {
 
 		// Compute configuration from YAML (legacy)
 		cfg.Compute = yamlCfg.Compute
+
+		// CSV configuration from YAML
+		cfg.CSV = yamlCfg.CSV
+		// Set default filename format if not specified
+		if cfg.CSV.FilenameFormat == "" {
+			cfg.CSV.FilenameFormat = "{time}_{exp_date}_{delta}_{strategy}.csv"
+		}
 
 		// Validate execution mode
 		if cfg.Compute.ExecutionMode == "" {

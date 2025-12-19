@@ -759,6 +759,165 @@ func (h *OptionsHandler) TestConnectionHandler(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
+// DownloadCSVHandler generates and returns CSV file for download
+func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// Handle preflight OPTIONS request
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate API credentials first (same as AnalyzeHandler)
+	if _, err := h.alpacaClient.GetStockPrice("AAPL"); err != nil {
+		http.Error(w, "Invalid API credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse the same analysis request
+	var req models.AnalysisRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Same symbol handling logic as AnalyzeHandler
+	if len(req.Symbols) == 0 {
+		if len(h.config.DefaultStocks) > 0 {
+			req.Symbols = h.config.DefaultStocks
+		} else {
+			symbols, err := h.symbolService.GetSymbolsAsStrings()
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to get S&P 500 symbols: %v", err), http.StatusInternalServerError)
+				return
+			}
+			req.Symbols = symbols
+		}
+	}
+
+	// Clean symbols (same logic as AnalyzeHandler)
+	cleanSymbols := make([]string, 0, len(req.Symbols))
+	for _, symbol := range req.Symbols {
+		if cleaned := strings.TrimSpace(symbol); cleaned != "" {
+			cleanSymbols = append(cleanSymbols, cleaned)
+		}
+	}
+
+	if len(cleanSymbols) == 0 {
+		http.Error(w, "No valid symbols provided", http.StatusBadRequest)
+		return
+	}
+
+	// Validate request (same as AnalyzeHandler)
+	if req.AvailableCash <= 0 {
+		http.Error(w, "Available cash must be positive", http.StatusBadRequest)
+		return
+	}
+	if req.Strategy != "puts" && req.Strategy != "calls" {
+		http.Error(w, "Strategy must be 'puts' or 'calls'", http.StatusBadRequest)
+		return
+	}
+
+	startTime := time.Now()
+	logger.Info.Printf("📊 CSV Generation: Analyzing %s options for %d symbols", req.Strategy, len(cleanSymbols))
+
+	// Get stock prices (same as AnalyzeHandler)
+	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Pre-load company/sector info (same as AnalyzeHandler)
+	companyData := make(map[string]struct {
+		Company string
+		Sector  string
+	})
+	for _, symbol := range cleanSymbols {
+		company, sector := h.symbolService.GetSymbolInfo(symbol)
+		companyData[symbol] = struct {
+			Company string
+			Sector  string
+		}{Company: company, Sector: sector}
+	}
+
+	// Process options using same method as AnalyzeHandler
+	results := h.processRealOptions(stockPrices, req, companyData)
+
+	// Sort results by total premium (same as AnalyzeHandler)
+	for i := 0; i < len(results); i++ {
+		for j := i + 1; j < len(results); j++ {
+			if results[j].TotalPremium > results[i].TotalPremium {
+				results[i], results[j] = results[j], results[i]
+			}
+		}
+	}
+
+	// Apply max_results limit (same as AnalyzeHandler)
+	if h.config.MaxResults > 0 && len(results) > h.config.MaxResults {
+		results = results[:h.config.MaxResults]
+	}
+
+	// Generate CSV content
+	var csvContent strings.Builder
+
+	// CSV Header
+	headers := []string{
+		"Rank", "Ticker", "Company", "Sector", "Strike", "Stock_Price",
+		"Premium", "Max_Contracts", "Total_Premium", "Profit_Percentage", "Delta", "Expiration", "Days_To_Exp",
+	}
+	csvContent.WriteString(strings.Join(headers, ",") + "\n")
+
+	// CSV Data rows
+	for i, result := range results {
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			result.Ticker,
+			fmt.Sprintf("\"%s\"", result.Company), // Quote company names with spaces
+			fmt.Sprintf("\"%s\"", result.Sector),
+			fmt.Sprintf("%.2f", result.Strike),
+			fmt.Sprintf("%.2f", result.StockPrice),
+			fmt.Sprintf("%.2f", result.Premium),
+			fmt.Sprintf("%d", result.MaxContracts),
+			fmt.Sprintf("%.2f", result.TotalPremium),
+			fmt.Sprintf("%.2f", result.ProfitPercentage),
+			fmt.Sprintf("%.4f", result.Delta),
+			result.Expiration,
+			fmt.Sprintf("%d", result.DaysToExp),
+		}
+		csvContent.WriteString(strings.Join(row, ",") + "\n")
+	}
+
+	// Set headers for file download using configurable format
+	timestamp := time.Now().Format("15-04-05") // HH-MM-SS for clarity
+	expDate := req.ExpirationDate // Keep as YYYY-MM-DD format
+	deltaStr := fmt.Sprintf("delta%.2f", req.TargetDelta)
+	strategy := strings.ToLower(req.Strategy) // puts or calls
+	
+	// Use configurable filename format
+	filename := h.config.CSV.FilenameFormat
+	filename = strings.ReplaceAll(filename, "{time}", timestamp)
+	filename = strings.ReplaceAll(filename, "{exp_date}", expDate)
+	filename = strings.ReplaceAll(filename, "{delta}", deltaStr)
+	filename = strings.ReplaceAll(filename, "{strategy}", strategy)
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	// Write CSV content
+	w.Write([]byte(csvContent.String()))
+
+	logger.Info.Printf("📊 CSV downloaded: %d results in %.3fs", len(results), time.Since(startTime).Seconds())
+}
+
 // processRealOptions finds best contracts sequentially, then batch processes with CUDA or CPU
 func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.StockPrice, req models.AnalysisRequest, companyData map[string]struct{ Company, Sector string }) []models.OptionResult {
 	var results []models.OptionResult
