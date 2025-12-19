@@ -7,6 +7,10 @@ alpaca:
   # Alpaca secret key. Best practice: set via env var `ALPACA_SECRET_KEY`.
   secret_key: "<ALPACA_SECRET_KEY>"  # string (keep out of VCS)
 
+# Grok AI API Configuration
+# Best practice: set via env var `GROK_API_KEY` or replace locally
+grok_api_key: "<GROK_API_KEY>"
+
 # Logging Configuration
 logging:
   log_level: "info"          # Log level: error, warn, info, debug, verbose (verbose details only in log file)

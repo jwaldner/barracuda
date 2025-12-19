@@ -211,7 +211,7 @@
                         						<h2 id="results-title" class="text-2xl font-bold text-white">{{resultsTitle}}</h2>
                         						<p class="text-blue-100">{{resultsSubtitle}}</p>
                     </div>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 items-center">
                         <button id="copy-csv-btn"
                             class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2"
                             title="Copy CSV data to clipboard">
@@ -222,6 +222,20 @@
                             title="Download results as CSV file">
                             💾 Download CSV
                         </button>
+                        
+                        <!-- Audit Section -->
+                        <div class="flex gap-2 items-center ml-4 pl-4 border-l border-white/30">
+                            <label class="text-white text-sm font-semibold">Audit:</label>
+                            <input type="text" id="audit-ticker-input" 
+                                   placeholder="AAPL" 
+                                   class="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 w-20 text-center font-bold uppercase"
+                                   maxlength="5">
+                            <button id="grok-btn" disabled
+                                class="bg-black hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg border border-gray-600 shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 flex items-center gap-2 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="No audit data available - run analysis with ticker first">
+                                𝕏 Grok
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -259,6 +273,10 @@
                 "engineMode": "{{engineMode}}",
                 "workloadStatus": "{{workloadStatus}}",
                 "cudaHardwareAvailable": {{cudaHardwareAvailable}}
+            },
+            "auditConfig": {
+                "jsonFilename": "{{auditJSONFilename}}",
+                "directory": "{{auditDirectory}}"
             }
         }
     </script>

@@ -1,0 +1,37 @@
+{
+  "ticker": "EXAMPLE",
+  "timestamp": "2025-12-19T10:30:00-06:00",
+  "analysis_request": {
+    "symbols": ["AAPL", "MSFT", "GOOGL"],
+    "expiration_date": "2026-01-16",
+    "target_delta": 0.1,
+    "available_cash": 50000,
+    "strategy": "puts",
+    "audit_ticker": "EXAMPLE"
+  },
+  "processing_time_seconds": 3.456,
+  "execution_mode": "CUDA",
+  "total_results": 25,
+  "rank": 1,
+  "option_result": {
+    "ticker": "EXAMPLE",
+    "company": "Example Corporation",
+    "sector": "Technology",
+    "option_symbol": "EXAMPLE260116P00100000",
+    "option_type": "puts",
+    "strike": 100.0,
+    "stock_price": 120.50,
+    "premium": 2.45,
+    "max_contracts": 20,
+    "total_premium": 4900.0,
+    "cash_needed": 200000,
+    "profit_percentage": 2.45,
+    "delta": -0.125,
+    "gamma": 0.003,
+    "theta": -15.2,
+    "vega": 25.8,
+    "implied_volatility": 0.35,
+    "expiration": "2026-01-16",
+    "days_to_expiration": 28
+  }
+}

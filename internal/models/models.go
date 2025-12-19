@@ -52,7 +52,8 @@ type AnalysisRequest struct {
 	ExpirationDate string   `json:"expiration_date"`
 	TargetDelta    float64  `json:"target_delta"`
 	AvailableCash  float64  `json:"available_cash"`
-	Strategy       string   `json:"strategy"` // "puts" or "calls"
+	Strategy       string   `json:"strategy"`     // "puts" or "calls"
+	AuditTicker    string   `json:"audit_ticker"` // For audit logging
 }
 
 // OptionResult represents the result of analyzing an option

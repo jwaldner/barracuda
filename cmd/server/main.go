@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -26,7 +25,7 @@ func main() {
 	logger.Always.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
 
 	if cfg.Logging.LogLevel == "verbose" {
-		fmt.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s\n", cfg.Logging.LogFile)
+		logger.Always.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s", cfg.Logging.LogFile)
 	}
 
 	// Validate required config after loading from YAML
@@ -113,6 +112,13 @@ func main() {
 	r.HandleFunc("/api/download-csv", optionsHandler.DownloadCSVHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/test-connection", optionsHandler.TestConnectionHandler).Methods("GET", "OPTIONS")
 
+	// Audit system endpoints
+	r.HandleFunc("/api/audit-startup", optionsHandler.AuditStartupHandler).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/audit-ticker", optionsHandler.AuditTickerHandler).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/ai-analysis", optionsHandler.AIAnalysisHandler).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/audit-log", optionsHandler.AuditLogHandler).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/audit-exists", optionsHandler.AuditFileExistsHandler).Methods("GET")
+
 	// S&P 500 symbol management endpoints
 	r.HandleFunc("/api/sp500/update", sp500Handler.UpdateSymbolsHandler).Methods("POST")
 	r.HandleFunc("/api/sp500/symbols", sp500Handler.GetSymbolsHandler).Methods("GET")
@@ -120,7 +126,6 @@ func main() {
 	r.HandleFunc("/api/sp500/top25", sp500Handler.GetTop25Handler).Methods("GET")
 
 	// Start server
-	fmt.Printf("🌐 Server starting on http://localhost:%s\n", cfg.Port)
 	logger.Always.Printf("🌐 Server starting on http://localhost:%s", cfg.Port)
 	logger.Info.Printf("🌐 HTTP server started on port %s", cfg.Port)
 

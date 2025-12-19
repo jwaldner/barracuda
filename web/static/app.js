@@ -490,6 +490,240 @@ function openDownloadsFolder() {
     }
 }
 
+// Audit system - ticker input sets audit target, Grok button sends to AI
+document.addEventListener('DOMContentLoaded', function() {
+    const grokBtn = document.getElementById('grok-btn');
+    const auditInput = document.getElementById('audit-ticker-input');
+    
+    // Check audit file exists and update Grok button state
+    window.updateGrokButtonState = async function() {
+        if (!grokBtn) return;
+        
+        try {
+            const response = await fetch('/api/audit-exists');
+            const result = await response.json();
+            console.log('🔍 Audit file exists:', result.exists, '| Button will be:', result.exists ? 'ENABLED' : 'DISABLED');
+            grokBtn.disabled = !result.exists;
+            
+            if (result.exists) {
+                grokBtn.title = "Send audit data to Grok AI - Powered by xAI";
+            } else {
+                grokBtn.title = "No audit data available - run analysis with ticker first";
+            }
+        } catch (error) {
+            console.log('Failed to check audit file existence:', error);
+            grokBtn.disabled = true;
+        }
+    }
+    
+    // Initial check
+    window.updateGrokButtonState();
+    
+    // Check periodically for file existence
+    setInterval(window.updateGrokButtonState, 2000);
+    
+    // Check if ticker is already set for audit on startup
+    if (auditInput && auditInput.value.trim()) {
+        const ticker = auditInput.value.trim().toUpperCase();
+        console.warn(`⚠️ STARTUP: Audit ticker "${ticker}" is set for detailed logging`);
+        // Send startup notification to server log
+        fetch('/api/audit-startup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: ticker })
+        }).catch(err => console.log('Startup audit notification failed:', err));
+        // Initialize audit data for this ticker (overwrites any previous)
+        window.auditData = {};
+    }
+    
+    if (grokBtn) {
+        grokBtn.addEventListener('click', handleGrokAnalysis);
+    }
+    
+    // Clear audit data when ticker changes (COST CONTROL)
+    if (auditInput) {
+        let lastTicker = auditInput.value.trim().toUpperCase();
+        
+        auditInput.addEventListener('input', function() {
+            const currentTicker = auditInput.value.trim().toUpperCase();
+            
+            // If ticker changed, clear ALL audit data (overwrite)
+            if (currentTicker !== lastTicker) {
+                if (lastTicker) {
+                    console.log(`🧹 Clearing all audit data (switched from ${lastTicker} to ${currentTicker})`);
+                }
+                // Overwrite - clear ALL previous audit data
+                window.auditData = {};
+                lastTicker = currentTicker;
+            }
+        });
+    }
+});
+
+function handleGrokAnalysis() {
+    const auditInput = document.getElementById('audit-ticker-input');
+    const grokBtn = document.getElementById('grok-btn');
+    
+    if (!auditInput || !grokBtn) return;
+    
+    const ticker = auditInput.value.trim().toUpperCase();
+    if (!ticker) {
+        showNotification('❌ Please enter a ticker to audit first', 'error');
+        return;
+    }
+    
+    // Disable button during processing
+    grokBtn.disabled = true;
+    
+    // Read audit data from JSON file via server
+    sendToGrok(ticker, null, grokBtn);
+}
+
+async function sendToGrok(ticker, auditData, grokBtn) {
+    try {
+        showNotification(`🤖 Sending ${ticker} data to Grok AI...`, 'info');
+        
+        const response = await fetch('/api/ai-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Grok analysis failed: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Append to audit log
+        await appendAIAnalysisToLog(ticker, result.analysis);
+        
+        showNotification(`✅ Grok analysis complete for ${ticker}! Added to audit log.`, 'success');
+        
+    } catch (error) {
+        console.error('Grok analysis failed:', error);
+        showNotification(`❌ Grok analysis failed: ${error.message}`, 'error');
+    } finally {
+        grokBtn.disabled = false;
+    }
+}
+
+async function appendAIAnalysisToLog(ticker, analysis) {
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        ticker: ticker,
+        ai_analysis: analysis,
+        type: 'grok_analysis'
+    };
+    
+    const response = await fetch('/api/audit-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry)
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to create audit file: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log(`📄 Audit file created: ${result.filename}`);
+    
+    return result;
+}
+
+async function startAuditProcess(ticker, rank, controls) {
+    try {
+        showNotification(`🔍 Starting audit for ${ticker} (Rank #${rank})...`, 'info');
+        
+        // Step 1: Gather data for this ticker
+        showNotification(`📊 Gathering data for ${ticker}...`, 'info');
+        const auditData = await gatherTickerData(ticker, rank);
+        
+        // Step 2: Send to AI for analysis
+        showNotification(`🤖 AI analyzing ${ticker}...`, 'info');
+        const aiAnalysis = await getAIAnalysis(auditData);
+        
+        // Step 3: Append to audit log
+        showNotification(`💾 Saving audit log for ${ticker}...`, 'info');
+        await appendToAuditLog(auditData, aiAnalysis);
+        
+        // Step 4: Clear input and re-enable (COST CONTROL)
+        if (controls.input) {
+            controls.input.value = '';
+            controls.input.disabled = false;
+            controls.input.focus();
+        }
+        showNotification(`✅ Audit complete for ${ticker}! Input cleared.`, 'success');
+        
+    } catch (error) {
+        console.error('Audit process failed:', error);
+        if (controls.input) {
+            controls.input.disabled = false;
+        }
+        showNotification(`❌ Audit failed for ${ticker}: ${error.message}`, 'error');
+    }
+}
+
+async function gatherTickerData(ticker, rank) {
+    // Check if we have analysis data to audit
+    if (!window.lastAnalysisRequest) {
+        throw new Error('No analysis data available. Please run an analysis first.');
+    }
+    
+    // Gather all data for this ticker
+    const requestData = Object.assign({}, window.lastAnalysisRequest);
+    requestData.audit_ticker = ticker;
+    requestData.target_delta = selectedDelta;
+    
+    const response = await fetch('/api/audit-ticker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to gather data: ${response.statusText}`);
+    }
+    
+    return await response.json();
+}
+
+async function getAIAnalysis(auditData) {
+    const response = await fetch('/api/ai-analysis', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(auditData)
+    });
+    
+    if (!response.ok) {
+        throw new Error(`AI analysis failed: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.analysis;
+}
+
+async function appendToAuditLog(auditData, aiAnalysis) {
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        ticker: auditData.ticker,
+        rank: auditData.rank,
+        audit_data: auditData,
+        ai_analysis: aiAnalysis
+    };
+    
+    const response = await fetch('/api/audit-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry)
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to save audit log: ${response.statusText}`);
+    }
+}
+
 // Risk selector functions
 function setupRiskSelector() {
     document.querySelectorAll('.risk-btn').forEach(btn => {
@@ -698,6 +932,12 @@ async function handleSubmit(e) {
 		strategy: currentStrategy
 	};
 	
+	// Add audit ticker if set
+	const auditInput = document.getElementById('audit-ticker-input');
+	if (auditInput && auditInput.value.trim()) {
+		requestData.audit_ticker = auditInput.value.trim().toUpperCase();
+	}
+	
 	// Store for CSV download
 	window.lastAnalysisRequest = requestData;
 	
@@ -730,6 +970,11 @@ async function handleSubmit(e) {
         }
         
         displayResults(data);
+        
+        // Update Grok button state after analysis (audit file may have been created)
+        if (window.updateGrokButtonState) {
+            window.updateGrokButtonState();
+        }
         
         // Analysis complete - download button is now available (no notification needed)
 

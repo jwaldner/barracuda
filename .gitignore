@@ -48,10 +48,17 @@ tests/bin/
 *.o
 *.ptx
 *.cubin
+
+# Grok documentation
+docs/grok.md
 *.fatbin
 
 # Configuration files with secrets (keep template)
 config.yaml
+
+# Audit files
+audit.json
+audits/
 
 # Log files
 *.log
