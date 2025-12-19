@@ -132,7 +132,7 @@ func TestAuditFunctionality(t *testing.T) {
 	auditData, _ = ioutil.ReadFile("audit.json")
 	json.Unmarshal(auditData, &auditObj)
 	requestsAfter, _ := auditObj["api_requests"].([]interface{})
-	
+
 	if len(requestsAfter) != requestsBefore {
 		t.Error("Audit message was added when auditSymbol was nil")
 	} else {

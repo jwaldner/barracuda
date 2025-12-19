@@ -19,7 +19,7 @@ func SaveAuditToFile(ticker string) error {
 	if audit == nil {
 		return nil // No audit data
 	}
-	
+
 	filename := "audit_" + ticker + ".json"
 	err := audit.SaveToFile(filename)
 	if err == nil {

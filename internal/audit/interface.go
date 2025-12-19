@@ -25,10 +25,10 @@ func NewAuditCoordinator() *AuditCoordinator {
 	ac := &AuditCoordinator{
 		Components: make(map[string]Auditable),
 	}
-	
+
 	// Try to append initialization message to existing audit.json, don't create new file
 	ac.appendInitialization()
-	
+
 	return ac
 }
 
@@ -38,18 +38,18 @@ func (ac *AuditCoordinator) appendInitialization() {
 	if _, err := os.Stat("audit.json"); os.IsNotExist(err) {
 		return // File doesn't exist, don't create it
 	}
-	
+
 	// Read existing file
 	data, err := os.ReadFile("audit.json")
 	if err != nil {
 		return // Can't read, skip
 	}
-	
+
 	var auditData map[string]interface{}
 	if err := json.Unmarshal(data, &auditData); err != nil {
 		return // Invalid JSON, skip
 	}
-	
+
 	// Add initialization message to api_requests array
 	if apiRequests, ok := auditData["api_requests"].([]interface{}); ok {
 		initMessage := map[string]interface{}{
@@ -57,9 +57,9 @@ func (ac *AuditCoordinator) appendInitialization() {
 			"message":   "AuditManager initialized and ready for component registration",
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
-		
+
 		auditData["api_requests"] = append(apiRequests, initMessage)
-		
+
 		// Update summary
 		if summary, ok := auditData["summary"].(map[string]interface{}); ok {
 			if totalRequests, ok := summary["total_requests"].(float64); ok {
@@ -69,7 +69,7 @@ func (ac *AuditCoordinator) appendInitialization() {
 				summary["success_count"] = successCount + 1
 			}
 		}
-		
+
 		// Write back to file
 		if file, err := os.Create("audit.json"); err == nil {
 			defer file.Close()
@@ -89,7 +89,7 @@ func (ac *AuditCoordinator) Register(name string, auditable Auditable) {
 func (ac *AuditCoordinator) AuditTicker(ticker string, request models.AnalysisRequest) (map[string]interface{}, error) {
 	// First, add a clear ticker audit initialization message
 	ac.logTickerAuditInit(ticker)
-	
+
 	auditData := map[string]interface{}{
 		"ticker":     ticker,
 		"timestamp":  time.Now().Format(time.RFC3339),
@@ -114,18 +114,18 @@ func (ac *AuditCoordinator) logTickerAuditInit(ticker string) {
 	if _, err := os.Stat("audit.json"); os.IsNotExist(err) {
 		return // File doesn't exist, don't create it
 	}
-	
+
 	// Read existing file
 	data, err := os.ReadFile("audit.json")
 	if err != nil {
 		return // Can't read, skip
 	}
-	
+
 	var auditData map[string]interface{}
 	if err := json.Unmarshal(data, &auditData); err != nil {
 		return // Invalid JSON, skip
 	}
-	
+
 	// Add ticker audit initialization message to api_requests array
 	if apiRequests, ok := auditData["api_requests"].([]interface{}); ok {
 		tickerInitMessage := map[string]interface{}{
@@ -134,9 +134,9 @@ func (ac *AuditCoordinator) logTickerAuditInit(ticker string) {
 			"ticker":    ticker,
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
-		
+
 		auditData["api_requests"] = append(apiRequests, tickerInitMessage)
-		
+
 		// Update summary
 		if summary, ok := auditData["summary"].(map[string]interface{}); ok {
 			if totalRequests, ok := summary["total_requests"].(float64); ok {
@@ -146,7 +146,7 @@ func (ac *AuditCoordinator) logTickerAuditInit(ticker string) {
 				summary["success_count"] = successCount + 1
 			}
 		}
-		
+
 		// Write back to file
 		if file, err := os.Create("audit.json"); err == nil {
 			defer file.Close()

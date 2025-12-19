@@ -93,7 +93,7 @@ import (
 	"math"
 	"time"
 	"unsafe"
-	
+
 	"github.com/jwaldner/barracuda/internal/logger"
 )
 
@@ -314,7 +314,7 @@ func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract, audi
 		auditPtr = (*C.char)(unsafe.Pointer(&auditBytes[0]))
 	}
 	// auditPtr will be nil if auditSymbol is nil
-	
+
 	result := C.barracuda_calculate_options_with_audit(
 		be.engine,
 		(*C.COptionContract)(unsafe.Pointer(&cContracts[0])),
@@ -662,7 +662,7 @@ func (be *BaracudaEngine) SetExecutionMode(mode string) {
 	if be.engine == nil {
 		return
 	}
-	
+
 	modeBytes := []byte(mode + "\000") // null terminate
 	C.barracuda_set_execution_mode(
 		be.engine,
@@ -683,19 +683,19 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 
 	// Set engine to CPU mode
 	be.SetExecutionMode("cpu")
-	
+
 	// Measure CPU processing time
 	cpuStart := time.Now()
-	
+
 	// Use regular Black-Scholes calculation in CPU mode
 	calculatedOptions, err := be.CalculateBlackScholes(options, auditSymbol)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	cpuDuration := time.Since(cpuStart)
 	logger.Info.Printf("🖥️  CPU Processing completed in %.2fms", float64(cpuDuration.Nanoseconds())/1e6)
-	
+
 	// Convert to CompleteOptionResult format for web interface
 	results := make([]CompleteOptionResult, len(calculatedOptions))
 	for i, opt := range calculatedOptions {
@@ -703,9 +703,9 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 		if maxContracts < 0 {
 			maxContracts = 0
 		}
-		
+
 		results[i] = CompleteOptionResult{
-			Symbol:            opt.Symbol,
+			Symbol:           opt.Symbol,
 			StrikePrice:      opt.StrikePrice,
 			TheoreticalPrice: opt.TheoreticalPrice,
 			Delta:            opt.Delta,
@@ -717,7 +717,7 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 			TotalPremium:     opt.TheoreticalPrice * float64(maxContracts),
 		}
 	}
-	
+
 	return results, nil
 }
 

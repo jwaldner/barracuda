@@ -623,7 +623,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	// Major Step: Completion
 	logger.Warn.Printf("✅ COMPLETE: %d results | %.3fs total | ⚡ %.3fs %s COMPUTE | %s engine",
 		len(results), duration.Seconds(), h.lastComputeDuration.Seconds(), engineType, engineType)
-	
+
 	logger.Debug.Printf("🔍 DEBUG: Analysis completed, formatting response")
 
 	// Check if client is still connected
@@ -971,15 +971,15 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 	for symbol, stockPrice := range stockPrices {
 		// Check if this symbol matches our audit ticker
 		isAuditSymbol := auditTicker != nil && symbol == *auditTicker
-		
+
 		if isAuditSymbol {
 			logger.Warn.Printf("🔍 AUDIT: Processing audit ticker %s - creating audit file", symbol)
-			
+
 			// Create minimal audit data - just the ticker for now
 			auditData := map[string]interface{}{
 				"ticker": symbol,
 			}
-			
+
 			// Write audit file immediately when we process the audit symbol
 			filename := "audit.json"
 			file, createErr := os.Create(filename)
@@ -996,7 +996,7 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 				}
 			}
 		}
-		
+
 		// Get options for this symbol (audit ticker is passed through to API calls)
 		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy, auditTicker)
 		if err != nil {
@@ -1416,13 +1416,13 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 		auditSymbol = &req.AuditTicker
 	}
 	// If no AuditTicker set, auditSymbol stays nil (no audit message)
-	
+
 	var completeResults []barracuda.CompleteOptionResult
 	var err error
-	
+
 	// Measure just the compute time
 	computeStartTime := time.Now()
-	
+
 	if h.config.Engine.ExecutionMode == "cpu" {
 		completeResults, err = h.engine.MaximizeCPUUsageComplete(
 			engineContracts,
@@ -1440,9 +1440,9 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 			req.ExpirationDate,
 			auditSymbol)
 	}
-	
+
 	computeDuration := time.Since(computeStartTime)
-	
+
 	if err != nil {
 		logger.Error.Printf("❌ Complete processing failed: %v", err)
 		return nil
@@ -1450,9 +1450,9 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 
 	duration := time.Since(startTime)
 	h.lastComputeDuration = computeDuration
-	
+
 	// DEBUG: Log timing details
-	logger.Warn.Printf("🔍 TIMING DEBUG: Total duration: %.3fms, Compute duration: %.3fms", 
+	logger.Warn.Printf("🔍 TIMING DEBUG: Total duration: %.3fms, Compute duration: %.3fms",
 		duration.Seconds()*1000, h.lastComputeDuration.Seconds()*1000)
 
 	// Convert complete CUDA results to business results
@@ -1539,12 +1539,10 @@ func (h *OptionsHandler) AuditStartupHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-
-
 // AIAnalysisHandler sends data to AI for analysis
 func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Warn.Printf("🤖 GROK: AI Analysis request received")
-	
+
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -1584,7 +1582,7 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	// Load the single audit JSON file (gets overwritten each analysis)
 	auditFile := "audit.json"
 	logger.Warn.Printf("🤖 GROK: Loading audit JSON file: %s", auditFile)
-	
+
 	auditBytes, err := os.ReadFile(auditFile)
 	if err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to read audit file %s: %v", auditFile, err)
@@ -1597,23 +1595,23 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	// Generate AI analysis using YAML prompt
 	// TODO: Integrate with actual Grok API
 	logger.Warn.Printf("🤖 GROK: Generating AI analysis using YAML prompt")
-	
+
 	// Use built-in AI prompt (TODO: move to config)
 	aiPrompt := "You are an expert options trader analyzing put option recommendations. Analyze the provided audit data and determine if this ticker is ranked appropriately based on risk-adjusted premium calculations."
 
 	// Generate analysis (mock for now)
-	mockAnalysis := fmt.Sprintf("%s\n\nAnalysis for %s:\nBased on the provided audit data, this option appears to have reasonable risk-adjusted returns. The calculations show proper Black-Scholes pricing model application.\n\nGenerated at %s", 
+	mockAnalysis := fmt.Sprintf("%s\n\nAnalysis for %s:\nBased on the provided audit data, this option appears to have reasonable risk-adjusted returns. The calculations show proper Black-Scholes pricing model application.\n\nGenerated at %s",
 		aiPrompt, ticker, time.Now().Format("2006-01-02 15:04:05"))
 
 	logger.Warn.Printf("🤖 GROK: AI analysis completed for %s, response length: %d chars", ticker, len(mockAnalysis))
 
 	// Create audit log entry with JSON data
 	logEntry := map[string]interface{}{
-		"ticker": ticker,
-		"timestamp": time.Now().Format(time.RFC3339),
+		"ticker":      ticker,
+		"timestamp":   time.Now().Format(time.RFC3339),
 		"ai_analysis": mockAnalysis,
-		"audit_data": json.RawMessage(auditBytes),
-		"type": "grok_analysis",
+		"audit_data":  json.RawMessage(auditBytes),
+		"type":        "grok_analysis",
 	}
 
 	// Send to audit log handler (creates markdown file)
@@ -1625,7 +1623,7 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	jsonDestination := fmt.Sprintf("%s/audit_%s_%s.json", auditDir, ticker, timestamp)
 	logger.Warn.Printf("🤖 GROK: Moving audit JSON file from %s to %s", auditFile, jsonDestination)
-	
+
 	if err := os.Rename(auditFile, jsonDestination); err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to move JSON file: %v", err)
 	} else {
@@ -1668,7 +1666,7 @@ func (h *OptionsHandler) processAuditLog(logEntry map[string]interface{}) {
 	if analysis, ok := logEntry["ai_analysis"]; ok {
 		analysisText = fmt.Sprintf("%v", analysis)
 	}
-	
+
 	auditData := ""
 	if data, ok := logEntry["audit_data"]; ok {
 		auditDataBytes, _ := json.MarshalIndent(data, "", "  ")
@@ -1676,7 +1674,7 @@ func (h *OptionsHandler) processAuditLog(logEntry map[string]interface{}) {
 	}
 
 	// Create markdown content
-	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n", 
+	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n",
 		ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, analysisText, auditData)
 
 	// Write markdown file
@@ -1700,7 +1698,7 @@ func (h *OptionsHandler) AuditFileExistsHandler(w http.ResponseWriter, r *http.R
 	filename := "audit.json"
 	_, err := os.Stat(filename)
 	exists := err == nil
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"exists": exists})
 }
@@ -1723,7 +1721,7 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	logger.Warn.Printf("📋 AUDIT: Log entry request received")
-	
+
 	// Parse log entry
 	var logEntry map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&logEntry); err != nil {
@@ -1771,19 +1769,19 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 	if t, ok := logEntry["ticker"]; ok {
 		tickerName = fmt.Sprintf("%v", t)
 	}
-	
+
 	analysisText := "No analysis available"
 	if analysis, ok := logEntry["ai_analysis"]; ok {
 		analysisText = fmt.Sprintf("%v", analysis)
 	}
-	
+
 	auditData := ""
 	if data, ok := logEntry["audit_data"]; ok {
 		auditDataBytes, _ := json.MarshalIndent(data, "", "  ")
 		auditData = string(auditDataBytes)
 	}
-	
-	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n", 
+
+	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n",
 		tickerName, time.Now().Format("2006-01-02 15:04:05"), tickerName, analysisText, auditData)
 
 	if _, err := file.WriteString(markdownContent); err != nil {
@@ -1795,7 +1793,7 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 
 	logger.Warn.Printf("📋 AUDIT: File successfully created: %s (%d bytes)", filename, dataSize)
 	logger.Info.Printf("📋 AUDIT FILE CREATED: %s", filename)
-	
+
 	response := map[string]string{
 		"status":   "success",
 		"message":  "Audit file created",

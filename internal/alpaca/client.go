@@ -38,11 +38,11 @@ const (
 type AuditCallback func(symbol, operation string, data map[string]interface{})
 
 type Client struct {
-	APIKey     string
-	SecretKey  string
-	BaseURL    string
-	DataURL    string
-	HTTPClient *http.Client
+	APIKey        string
+	SecretKey     string
+	BaseURL       string
+	DataURL       string
+	HTTPClient    *http.Client
 	AuditCallback AuditCallback
 }
 
@@ -149,7 +149,7 @@ func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map
 		batch := symbols[i:end]
 		batchResults, err := c.getStockPricesBatchInternal(batch)
 		batchDuration := time.Since(batchStartTime)
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("batch %d-%d failed: %v", i, end-1, err)
 		}
@@ -160,9 +160,9 @@ func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map
 			// Check for audit match and append data
 			if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
 				c.AuditCallback(symbol, "GetStockPricesBatch", map[string]interface{}{
-					"symbol": symbol,
-					"price": price.Price,
-					"batch_size": len(batch),
+					"symbol":      symbol,
+					"price":       price.Price,
+					"batch_size":  len(batch),
 					"duration_ms": batchDuration.Milliseconds(),
 					"batch_index": i,
 				})
@@ -285,15 +285,15 @@ func (c *Client) GetStockPrice(symbol string, auditTicker *string) (*StockPrice,
 		Symbol: symbol,
 		Price:  alpacaResp.Bar.Close,
 	}
-	
+
 	duration := time.Since(startTime)
 
 	// Check for audit match and append data
 	if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
 		c.AuditCallback(symbol, "GetStockPrice", map[string]interface{}{
-			"symbol": symbol,
-			"price": stockPrice.Price,
-			"endpoint": endpoint,
+			"symbol":      symbol,
+			"price":       stockPrice.Price,
+			"endpoint":    endpoint,
 			"duration_ms": duration.Milliseconds(),
 			"status_code": resp.StatusCode,
 		})
@@ -428,7 +428,7 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 					"status":            contract.Status,
 					"tradable":          contract.Tradable,
 				}
-				
+
 				// Add optional fields if they exist
 				if contract.BidPrice != nil {
 					contractData["bid_price"] = contract.BidPrice
@@ -457,19 +457,19 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 				if contract.ImpliedVol != 0 {
 					contractData["implied_volatility"] = contract.ImpliedVol
 				}
-				
+
 				contractsData = append(contractsData, contractData)
 			}
-			
+
 			c.AuditCallback(symbol, "GetOptionsChain", map[string]interface{}{
-				"symbol": symbol,
-				"expiration": expiration,
-				"strategy": strategy,
+				"symbol":          symbol,
+				"expiration":      expiration,
+				"strategy":        strategy,
 				"contracts_count": len(contracts),
-				"contracts": contractsData,
-				"stock_price": stockPrice,
-				"duration_ms": symbolDuration.Milliseconds(),
-				"endpoint": endpoint,
+				"contracts":       contractsData,
+				"stock_price":     stockPrice,
+				"duration_ms":     symbolDuration.Milliseconds(),
+				"endpoint":        endpoint,
 			})
 		}
 
@@ -521,11 +521,11 @@ func (c *Client) GetOptionQuote(optionSymbol string, auditTicker *string) (*Opti
 	if auditTicker != nil && *auditTicker == optionSymbol && c.AuditCallback != nil {
 		c.AuditCallback(optionSymbol, "GetOptionQuote", map[string]interface{}{
 			"option_symbol": optionSymbol,
-			"bid_price": quote.BidPrice,
-			"ask_price": quote.AskPrice,
-			"endpoint": endpoint,
-			"duration_ms": duration.Milliseconds(),
-			"status_code": resp.StatusCode,
+			"bid_price":     quote.BidPrice,
+			"ask_price":     quote.AskPrice,
+			"endpoint":      endpoint,
+			"duration_ms":   duration.Milliseconds(),
+			"status_code":   resp.StatusCode,
 		})
 	}
 

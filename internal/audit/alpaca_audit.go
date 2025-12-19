@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"time"
-	"github.com/jwaldner/barracuda/internal/models"
 )
 
 // AlpacaAuditData holds audit data for Alpaca API calls
@@ -16,14 +15,14 @@ type AlpacaAuditData struct {
 
 // APIRequest represents a single API request audit entry
 type APIRequest struct {
-	Type        string                 `json:"type"`
-	URL         string                 `json:"url"`
-	Method      string                 `json:"method"`
-	DurationMs  int64                  `json:"duration_ms"`
-	Timestamp   string                 `json:"timestamp"`
-	Success     bool                   `json:"success"`
-	Error       string                 `json:"error,omitempty"`
-	Response    map[string]interface{} `json:"response,omitempty"`
+	Type       string                 `json:"type"`
+	URL        string                 `json:"url"`
+	Method     string                 `json:"method"`
+	DurationMs int64                  `json:"duration_ms"`
+	Timestamp  string                 `json:"timestamp"`
+	Success    bool                   `json:"success"`
+	Error      string                 `json:"error,omitempty"`
+	Response   map[string]interface{} `json:"response,omitempty"`
 }
 
 // Summary holds summary information for the audit
@@ -49,19 +48,19 @@ func NewAlpacaAudit() *AlpacaAudit {
 // AddRequest adds an API request to the audit log
 func (aa *AlpacaAudit) AddRequest(reqType, url, method string, duration time.Duration, success bool, errorMsg string, response map[string]interface{}) {
 	request := APIRequest{
-		Type:        reqType,
-		URL:         url,
-		Method:      method,
-		DurationMs:  duration.Milliseconds(),
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Success:     success,
-		Response:    response,
+		Type:       reqType,
+		URL:        url,
+		Method:     method,
+		DurationMs: duration.Milliseconds(),
+		Timestamp:  time.Now().Format(time.RFC3339),
+		Success:    success,
+		Response:   response,
 	}
-	
+
 	if errorMsg != "" {
 		request.Error = errorMsg
 	}
-	
+
 	aa.requests = append(aa.requests, request)
 }
 
@@ -72,7 +71,7 @@ func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data ma
 	filename := "audit.json"
 	var existingData AlpacaAuditData
 	isNewAudit := false
-	
+
 	if file, err := os.Open(filename); err == nil {
 		defer file.Close()
 		decoder := json.NewDecoder(file)
@@ -86,7 +85,7 @@ func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data ma
 		isNewAudit = true
 		existingData = AlpacaAuditData{APIRequests: []APIRequest{}, Summary: Summary{}}
 	}
-	
+
 	// If this is new audit or first time seeing this ticker, add init message FIRST
 	needsInit := isNewAudit
 	if !needsInit {
@@ -104,11 +103,11 @@ func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data ma
 		}
 		needsInit = !hasInit
 	}
-	
+
 	if needsInit {
 		// Step 1: Add ticker initialization as FIRST entry
 		initRequest := APIRequest{
-			Type:       "TickerAuditInitialization", 
+			Type:       "TickerAuditInitialization",
 			URL:        "/audit/init",
 			Method:     "INIT",
 			DurationMs: 0,
@@ -119,23 +118,23 @@ func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data ma
 				"message": "🎯 AUDIT INIT: Now auditing ticker: " + ticker,
 			},
 		}
-		
+
 		// Insert at beginning
 		existingData.APIRequests = append([]APIRequest{initRequest}, existingData.APIRequests...)
 	}
-	
+
 	// Step 2: APPEND - Add the current audit entry
 	if operation != "" {
 		// Add current request data from aa.requests to existing data
 		existingData.APIRequests = append(existingData.APIRequests, aa.requests...)
 	}
-	
+
 	// Step 3: RENAME/SAVE - Calculate summary and save
 	totalRequests := len(existingData.APIRequests)
 	successCount := 0
 	errorCount := 0
 	totalTime := int64(0)
-	
+
 	for _, req := range existingData.APIRequests {
 		if req.Success {
 			successCount++
@@ -144,21 +143,21 @@ func (aa *AlpacaAudit) InitAppendRename(ticker string, operation string, data ma
 		}
 		totalTime += req.DurationMs
 	}
-	
+
 	existingData.Summary = Summary{
 		TotalRequests: totalRequests,
 		SuccessCount:  successCount,
 		ErrorCount:    errorCount,
 		TotalTimeMs:   totalTime,
 	}
-	
+
 	// Write final file
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create audit file: %v", err)
 	}
 	defer file.Close()
-	
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(existingData)
@@ -171,7 +170,7 @@ func (aa *AlpacaAudit) SaveToFile(filename string) error {
 	successCount := 0
 	errorCount := 0
 	totalTime := int64(0)
-	
+
 	for _, req := range aa.requests {
 		if req.Success {
 			successCount++
@@ -180,25 +179,25 @@ func (aa *AlpacaAudit) SaveToFile(filename string) error {
 		}
 		totalTime += req.DurationMs
 	}
-	
+
 	summary := Summary{
 		TotalRequests: totalRequests,
 		SuccessCount:  successCount,
 		ErrorCount:    errorCount,
 		TotalTimeMs:   totalTime,
 	}
-	
+
 	auditData := AlpacaAuditData{
 		APIRequests: aa.requests,
 		Summary:     summary,
 	}
-	
+
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create audit file %s: %v", filename, err)
 	}
 	defer file.Close()
-	
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(auditData)
@@ -209,7 +208,7 @@ func (aa *AlpacaAudit) AppendToFile(filename string, ticker string) error {
 	if len(aa.requests) == 0 {
 		return nil // Nothing to append
 	}
-	
+
 	// Try to read existing file
 	var existingData AlpacaAuditData
 	if file, err := os.Open(filename); err == nil {
@@ -223,7 +222,7 @@ func (aa *AlpacaAudit) AppendToFile(filename string, ticker string) error {
 		// File doesn't exist, start fresh
 		existingData = AlpacaAuditData{APIRequests: []APIRequest{}}
 	}
-	
+
 	// Add ticker info to each request
 	for i := range aa.requests {
 		if aa.requests[i].Response == nil {
@@ -231,16 +230,16 @@ func (aa *AlpacaAudit) AppendToFile(filename string, ticker string) error {
 		}
 		aa.requests[i].Response["audit_ticker"] = ticker
 	}
-	
+
 	// Append new requests
 	existingData.APIRequests = append(existingData.APIRequests, aa.requests...)
-	
+
 	// Recalculate summary
 	totalRequests := len(existingData.APIRequests)
 	successCount := 0
 	errorCount := 0
 	totalTime := int64(0)
-	
+
 	for _, req := range existingData.APIRequests {
 		if req.Success {
 			successCount++
@@ -249,21 +248,21 @@ func (aa *AlpacaAudit) AppendToFile(filename string, ticker string) error {
 		}
 		totalTime += req.DurationMs
 	}
-	
+
 	existingData.Summary = Summary{
 		TotalRequests: totalRequests,
 		SuccessCount:  successCount,
 		ErrorCount:    errorCount,
 		TotalTimeMs:   totalTime,
 	}
-	
+
 	// Write back to file
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create audit file %s: %v", filename, err)
 	}
 	defer file.Close()
-	
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(existingData)

@@ -103,22 +103,22 @@ func main() {
 
 	// Create AuditCoordinator (this will immediately log initialization)
 	_ = audit.NewAuditCoordinator() // Create coordinator but don't use it yet
-	
+
 	// Create Alpaca audit component for logging API calls
 	alpacaAudit := audit.NewAlpacaAudit()
 	globalAuditComponent = alpacaAudit
-	
+
 	// Register components in audit registry and coordinator
 	audit.RegisterAudit("alpaca", alpacaAudit)
-	
+
 	// Register alpaca audit as an auditable component (when implemented)
 	// auditCoordinator.Register("alpaca", alpacaAudit)
-	
+
 	// Set up audit callback function for the base client
 	auditCallback := func(symbol, operation string, data map[string]interface{}) {
 		// Log to console
 		logger.Info.Printf("🔍 AUDIT: %s operation on %s: %v", operation, symbol, data)
-		
+
 		// Add to audit component
 		url := "/unknown"
 		if urlVal, ok := data["endpoint"]; ok {
@@ -126,7 +126,7 @@ func main() {
 				url = urlStr
 			}
 		}
-		
+
 		// Extract duration if present
 		duration := int64(0)
 		if durVal, ok := data["duration_ms"]; ok {
@@ -134,7 +134,7 @@ func main() {
 				duration = durInt
 			}
 		}
-		
+
 		// Extract error if present
 		errorMsg := ""
 		if errVal, ok := data["error"]; ok {
@@ -142,7 +142,7 @@ func main() {
 				errorMsg = errStr
 			}
 		}
-		
+
 		alpacaAudit.AddRequest(
 			operation,
 			url,
@@ -152,7 +152,7 @@ func main() {
 			errorMsg,
 			data,
 		)
-		
+
 		// Save audit data to audit.json (overwrites each time on purpose)
 		if err := alpacaAudit.SaveToFile("audit.json"); err != nil {
 			logger.Info.Printf("❌ Failed to save audit data to audit.json: %v", err)
@@ -160,7 +160,7 @@ func main() {
 			logger.Info.Printf("💾 Audit data saved to audit.json")
 		}
 	}
-	
+
 	// Set audit callback on the base client
 	baseClient.SetAuditCallback(auditCallback)
 
