@@ -14,6 +14,7 @@ import (
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
+	"github.com/jwaldner/barracuda/internal/audit"
 	"github.com/jwaldner/barracuda/internal/config"
 	"github.com/jwaldner/barracuda/internal/logger"
 	"github.com/jwaldner/barracuda/internal/models"
@@ -114,6 +115,7 @@ type OptionsHandler struct {
 	config                  *config.Config
 	engine                  *barracuda.BaracudaEngine
 	symbolService           *symbols.SP500Service
+	auditLogger             audit.OptionsAnalysisAuditor
 	contractsProcessedCount int
 	lastComputeDuration     time.Duration
 }
@@ -125,6 +127,7 @@ func NewOptionsHandler(alpacaClient alpaca.AlpacaInterface, cfg *config.Config, 
 		config:        cfg,
 		engine:        engine,
 		symbolService: symbolService,
+		auditLogger:   audit.NewOptionsAnalysisAuditLogger(),
 	}
 }
 
@@ -440,6 +443,15 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Debug.Printf("Strategy: %s", req.Strategy)
 	if req.AuditTicker != "" {
 		logger.Debug.Printf("Audit Ticker: %s", req.AuditTicker)
+		// Initialize audit for this ticker
+		if err := h.auditLogger.LogOptionsAnalysisOperation(req.AuditTicker, "init", map[string]interface{}{
+			"message":    "Starting options analysis audit",
+			"symbols":    req.Symbols,
+			"strategy":   req.Strategy,
+			"expiration": req.ExpirationDate,
+		}); err != nil {
+			logger.Warn.Printf("⚠️ Failed to initialize audit: %v", err)
+		}
 	}
 
 	// If no symbols provided, use configured symbols or S&P 500
@@ -475,7 +487,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	startTime := time.Now()
-	logger.Info.Printf("📊 Analyzing %s options for %d symbols with batch processing", req.Strategy, len(req.Symbols))
+	fmt.Printf("📊 Analyzing %s options for %d symbols with batch processing\n", req.Strategy, len(req.Symbols))
 
 	// Clean and prepare symbols
 	logger.Debug.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
@@ -519,7 +531,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		auditMode = fmt.Sprintf(" | 🔍 AUDIT: %s", req.AuditTicker)
 		logger.Warn.Printf("🔍 AUDIT: Starting analysis with audit ticker %s - detailed logging enabled", req.AuditTicker)
 	}
-	logger.Warn.Printf("🚀 START: %d symbols | %s | %s%s",
+	fmt.Printf("🚀 START: %d symbols | %s | %s%s\n",
 		len(cleanSymbols), req.Strategy, map[bool]string{true: "CUDA", false: "CPU"}[h.engine.IsCudaAvailable()], auditMode)
 
 	// Get stock prices in batches (up to 100 symbols per API call)
@@ -581,6 +593,32 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Results are already sorted by profit percentage from processRealOptions
 
+	// Log ranking results to audit if audit ticker is set
+	if auditTickerPtr != nil && *auditTickerPtr != "" {
+		rankings := make([]map[string]interface{}, len(results))
+		for i, result := range results {
+			rankings[i] = map[string]interface{}{
+				"rank":      i + 1,
+				"symbol":    result.Ticker,
+				"premium":   result.TotalPremium,
+				"contracts": result.MaxContracts,
+			}
+		}
+
+		rankingData := map[string]interface{}{
+			"operation":      "SortByProfitPercentage",
+			"ranking_method": "profit_percentage_descending",
+			"rankings":       rankings,
+			"total_symbols":  len(results),
+		}
+
+		if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTickerPtr, "RankingResults", rankingData); err != nil {
+			logger.Warn.Printf("📊 RANKING: Failed to log ranking results: %v", err)
+		} else {
+			logger.Warn.Printf("📊 RANKING: Logged ranking results for %d symbols", len(results))
+		}
+	}
+
 	// Apply max_results limit from config (0 = show all)
 	if h.config.MaxResults > 0 && len(results) > h.config.MaxResults {
 		results = results[:h.config.MaxResults]
@@ -635,7 +673,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		logger.Debug.Printf("✅ Client connection still active, proceeding with response")
 	}
 
-	logger.Always.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx",
+	fmt.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx\n",
 		engineType, duration.Seconds(), len(cleanSymbols), len(results), h.config.Engine.ExecutionMode, h.config.Engine.WorkloadFactor)
 
 	// Final processing summary - ALWAYS show real job stats, ADD workload if present
@@ -646,7 +684,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	if h.config.Engine.WorkloadFactor > 0.0 && totalSamplesProcessed > 0 {
 		processingStats += fmt.Sprintf(" | %d Monte Carlo samples", totalSamplesProcessed)
 	}
-	logger.Always.Printf(processingStats)
+	fmt.Printf("%s\n", processingStats)
 
 	// Convert to formatted response with dual values
 	logger.Debug.Printf("🔄 Converting %d results to formatted response", len(results))
@@ -858,7 +896,7 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	startTime := time.Now()
-	logger.Info.Printf("📊 CSV Generation: Analyzing %s options for %d symbols", req.Strategy, len(cleanSymbols))
+	fmt.Printf("📊 CSV Generation: Analyzing %s options for %d symbols\n", req.Strategy, len(cleanSymbols))
 
 	// Get stock prices (same as AnalyzeHandler)
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols, auditTickerPtr)
@@ -889,6 +927,32 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 			if results[j].TotalPremium > results[i].TotalPremium {
 				results[i], results[j] = results[j], results[i]
 			}
+		}
+	}
+
+	// Log ranking results to audit if audit ticker is set
+	if auditTickerPtr != nil && *auditTickerPtr != "" {
+		rankings := make([]map[string]interface{}, len(results))
+		for i, result := range results {
+			rankings[i] = map[string]interface{}{
+				"rank":      i + 1,
+				"symbol":    result.Ticker,
+				"premium":   result.TotalPremium,
+				"contracts": result.MaxContracts,
+			}
+		}
+
+		rankingData := map[string]interface{}{
+			"operation":      "SortByTotalPremium",
+			"ranking_method": "total_premium_descending",
+			"rankings":       rankings,
+			"total_symbols":  len(results),
+		}
+
+		if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTickerPtr, "RankingResults", rankingData); err != nil {
+			logger.Warn.Printf("📊 RANKING: Failed to log ranking results: %v", err)
+		} else {
+			logger.Warn.Printf("📊 RANKING: Logged ranking results for %d symbols", len(results))
 		}
 	}
 
@@ -1605,29 +1669,19 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 
 	logger.Warn.Printf("🤖 GROK: AI analysis completed for %s, response length: %d chars", ticker, len(mockAnalysis))
 
-	// Create audit log entry with JSON data
-	logEntry := map[string]interface{}{
-		"ticker":      ticker,
-		"timestamp":   time.Now().Format(time.RFC3339),
+	// Send analysis to unified audit system - creates both .md and .json files
+	logger.Warn.Printf("🤖 GROK: Finalizing analysis with unified audit system")
+
+	analysisData := map[string]interface{}{
 		"ai_analysis": mockAnalysis,
 		"audit_data":  json.RawMessage(auditBytes),
-		"type":        "grok_analysis",
+		"type":        "grok_analysis_complete",
 	}
 
-	// Send to audit log handler (creates markdown file)
-	logger.Warn.Printf("🤖 GROK: Creating audit log markdown file")
-	h.processAuditLog(logEntry)
-
-	// Move the JSON file to audits folder with same naming format
-	auditDir := "audits"
-	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	jsonDestination := fmt.Sprintf("%s/audit_%s_%s.json", auditDir, ticker, timestamp)
-	logger.Warn.Printf("🤖 GROK: Moving audit JSON file from %s to %s", auditFile, jsonDestination)
-
-	if err := os.Rename(auditFile, jsonDestination); err != nil {
-		logger.Warn.Printf("🤖 GROK: Failed to move JSON file: %v", err)
+	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "finish", analysisData); err != nil {
+		logger.Warn.Printf("🤖 GROK: Failed to finish audit: %v", err)
 	} else {
-		logger.Warn.Printf("🤖 GROK: JSON file moved successfully to %s", jsonDestination)
+		logger.Warn.Printf("🤖 GROK: Analysis completed - both .md and .json files created and archived")
 	}
 
 	response := map[string]string{

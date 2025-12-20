@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -26,16 +28,30 @@ func GetGlobalAuditComponent() *audit.AlpacaAudit {
 }
 
 func main() {
+	fmt.Printf("🚀 Starting Barracuda Options Analyzer...\n")
+
+	if err := run(); err != nil {
+		fmt.Printf("❌ Server failed: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg := config.Load()
 
 	// Initialize proper logging with config level and file path
 	if err := logger.InitWithConfig(cfg.Logging.LogLevel, cfg.Logging.LogFile); err != nil {
 		log.Fatalf("Failed to initialize logging: %v", err)
 	}
-	logger.Always.Printf("🚀 Barracuda Options Analyzer starting - Port: %s", cfg.Port)
+	fmt.Printf("🚀 Barracuda Options Analyzer starting - Port: %s\n", cfg.Port)
+
+	// Log configuration summary
+	fmt.Printf("⚙️  Configuration loaded: MaxResults=%d, DefaultStocks=%d symbols\n", cfg.MaxResults, len(cfg.DefaultStocks))
+	logger.Always.Printf("") // Blank line before startup sequence
+	logger.Always.Printf("📊 Engine config: ExecutionMode=%s, WorkloadFactor=%.1fx", cfg.Engine.ExecutionMode, cfg.Engine.WorkloadFactor)
 
 	if cfg.Logging.LogLevel == "verbose" {
-		logger.Always.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s", cfg.Logging.LogFile)
+		fmt.Printf("⚠️  VERBOSE LOGGING ENABLED - Detailed Alpaca API calls and calculations will be logged to %s\n", cfg.Logging.LogFile)
 	}
 
 	// Validate required config after loading from YAML
@@ -95,16 +111,16 @@ func main() {
 	}
 
 	// Create Alpaca client
-	logger.Always.Printf("📡 Creating Alpaca client...")
-	logger.Info.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets")
-
+	fmt.Printf("📡 Creating Alpaca client...\n")
 	baseClient := alpaca.NewClient(cfg.AlpacaAPIKey, cfg.AlpacaSecretKey)
 	alpacaClient := alpaca.NewPerformanceWrapper(baseClient)
+	fmt.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets\n")
 
 	// Create AuditCoordinator (this will immediately log initialization)
 	_ = audit.NewAuditCoordinator() // Create coordinator but don't use it yet
 
 	// Create Alpaca audit component for logging API calls
+	auditLogger := audit.NewOptionsAnalysisAuditLogger()
 	alpacaAudit := audit.NewAlpacaAudit()
 	globalAuditComponent = alpacaAudit
 
@@ -120,6 +136,11 @@ func main() {
 		logger.Info.Printf("🔍 AUDIT: %s operation on %s: %v", operation, symbol, data)
 
 		// Add to audit component
+		if err := auditLogger.LogOptionsAnalysisOperation(symbol, operation, data); err != nil {
+			logger.Warn.Printf("⚠️ Failed to log unified audit: %v", err)
+		}
+
+		// Legacy audit system for backward compatibility
 		url := "/unknown"
 		if urlVal, ok := data["endpoint"]; ok {
 			if urlStr, isStr := urlVal.(string); isStr {
@@ -165,12 +186,16 @@ func main() {
 	baseClient.SetAuditCallback(auditCallback)
 
 	// Create symbol service for company/sector lookups
+	fmt.Printf("📋 Initializing S&P 500 symbol service...\n")
 	symbolService := symbols.NewSP500Service("assets/symbols")
+	fmt.Printf("✅ Symbol service ready\n")
 
 	// Create options handler with CUDA engine
 	// Initialize handlers
+	fmt.Printf("🔧 Initializing request handlers...\n")
 	optionsHandler := handlers.NewOptionsHandler(alpacaClient, cfg, engine, symbolService)
 	sp500Handler := handlers.NewSP500Handler()
+	fmt.Printf("✅ All handlers initialized\n")
 
 	// Setup router
 	r := mux.NewRouter()
@@ -197,13 +222,17 @@ func main() {
 	r.HandleFunc("/api/sp500/info", sp500Handler.GetSymbolsInfoHandler).Methods("GET")
 	r.HandleFunc("/api/sp500/top25", sp500Handler.GetTop25Handler).Methods("GET")
 
+	fmt.Printf("🌐 API routes configured - All endpoints registered\n")
+
 	// Start server
-	logger.Always.Printf("🌐 Server starting on http://localhost:%s", cfg.Port)
-	logger.Info.Printf("🌐 HTTP server started on port %s", cfg.Port)
+	fmt.Printf("🌐 Server starting on http://localhost:%s\n", cfg.Port)
+	fmt.Printf("🌐 HTTP server started on port %s\n", cfg.Port)
 
 	// Browser opening can be handled externally via OPEN_BROWSER env var if needed
 
 	if err := http.ListenAndServe("0.0.0.0:"+cfg.Port, r); err != nil {
-		log.Fatal("Server failed to start:", err)
+		return fmt.Errorf("server failed to start: %v", err)
 	}
+
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jwaldner/barracuda/internal/audit"
 	"github.com/jwaldner/barracuda/internal/logger"
 )
 
@@ -44,6 +45,7 @@ type Client struct {
 	DataURL       string
 	HTTPClient    *http.Client
 	AuditCallback AuditCallback
+	auditLogger   audit.OptionsAnalysisAuditor
 }
 
 func NewClient(apiKey, secretKey string) *Client {
@@ -58,6 +60,7 @@ func NewClient(apiKey, secretKey string) *Client {
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		auditLogger: audit.NewOptionsAnalysisAuditLogger(),
 	}
 }
 
@@ -157,7 +160,24 @@ func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map
 		// Merge results
 		for symbol, price := range batchResults {
 			results[symbol] = price
-			// Check for audit match and append data
+
+			// Use unified audit package for logging
+			if auditTicker != nil && *auditTicker == symbol {
+				auditData := map[string]interface{}{
+					"symbol":      symbol,
+					"price":       price.Price,
+					"batch_size":  len(batch),
+					"duration_ms": batchDuration.Milliseconds(),
+					"batch_index": i,
+					"method":      "GET",
+				}
+
+				if err := c.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "GetStockPricesBatch", auditData); err != nil {
+					logger.Warn.Printf("⚠️ Failed to log GetStockPricesBatch audit: %v", err)
+				}
+			}
+
+			// Legacy audit callback for backward compatibility
 			if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
 				c.AuditCallback(symbol, "GetStockPricesBatch", map[string]interface{}{
 					"symbol":      symbol,
@@ -288,7 +308,24 @@ func (c *Client) GetStockPrice(symbol string, auditTicker *string) (*StockPrice,
 
 	duration := time.Since(startTime)
 
-	// Check for audit match and append data
+	// Use unified audit package for logging
+	if auditTicker != nil && *auditTicker == symbol {
+		auditData := map[string]interface{}{
+			"symbol":      symbol,
+			"price":       stockPrice.Price,
+			"endpoint":    endpoint,
+			"duration_ms": duration.Milliseconds(),
+			"status_code": resp.StatusCode,
+			"url":         c.DataURL + endpoint,
+			"method":      "GET",
+		}
+
+		if err := c.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "GetStockPrice", auditData); err != nil {
+			logger.Warn.Printf("⚠️ Failed to log GetStockPrice audit: %v", err)
+		}
+	}
+
+	// Legacy audit callback for backward compatibility
 	if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
 		c.AuditCallback(symbol, "GetStockPrice", map[string]interface{}{
 			"symbol":      symbol,
@@ -413,7 +450,75 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 
 		symbolDuration := time.Since(symbolStartTime)
 
-		// Check for audit match and append data
+		// Use unified audit package for logging
+		if auditTicker != nil && *auditTicker == symbol {
+			// Collect all contract data
+			var contractsData []map[string]interface{}
+			for _, contract := range contracts {
+				contractData := map[string]interface{}{
+					"symbol":            contract.Symbol,
+					"expiration_date":   contract.ExpirationDate,
+					"strike_price":      contract.StrikePrice,
+					"type":              contract.Type,
+					"underlying_symbol": contract.UnderlyingSymbol,
+					"multiplier":        contract.Multiplier,
+					"status":            contract.Status,
+					"tradable":          contract.Tradable,
+				}
+
+				if contract.BidPrice != nil {
+					contractData["bid_price"] = contract.BidPrice
+				}
+				if contract.AskPrice != nil {
+					contractData["ask_price"] = contract.AskPrice
+				}
+				if contract.ClosePrice != nil {
+					contractData["close_price"] = contract.ClosePrice
+				}
+				if contract.LastPrice != nil {
+					contractData["last_price"] = contract.LastPrice
+				}
+				if contract.OpenInterest != nil {
+					contractData["open_interest"] = contract.OpenInterest
+				}
+				if contract.Delta != 0 {
+					contractData["delta"] = contract.Delta
+				}
+				if contract.Gamma != 0 {
+					contractData["gamma"] = contract.Gamma
+				}
+				if contract.Theta != 0 {
+					contractData["theta"] = contract.Theta
+				}
+				if contract.Vega != 0 {
+					contractData["vega"] = contract.Vega
+				}
+				if contract.ImpliedVol != 0 {
+					contractData["implied_volatility"] = contract.ImpliedVol
+				}
+
+				contractsData = append(contractsData, contractData)
+			}
+
+			auditData := map[string]interface{}{
+				"symbol":          symbol,
+				"expiration":      expiration,
+				"strategy":        strategy,
+				"contracts_count": len(contracts),
+				"contracts":       contractsData,
+				"stock_price":     stockPrice,
+				"duration_ms":     symbolDuration.Milliseconds(),
+				"endpoint":        endpoint,
+				"url":             c.DataURL + endpoint,
+				"method":          "GET",
+			}
+
+			if err := c.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "GetOptionsChain", auditData); err != nil {
+				logger.Warn.Printf("⚠️ Failed to log GetOptionsChain audit: %v", err)
+			}
+		}
+
+		// Legacy audit callback for backward compatibility
 		if auditTicker != nil && *auditTicker == symbol && c.AuditCallback != nil {
 			// Collect all contract data
 			var contractsData []map[string]interface{}
@@ -517,7 +622,25 @@ func (c *Client) GetOptionQuote(optionSymbol string, auditTicker *string) (*Opti
 
 	duration := time.Since(startTime)
 
-	// Check for audit match and append data
+	// Use unified audit package for logging
+	if auditTicker != nil && *auditTicker == optionSymbol {
+		auditData := map[string]interface{}{
+			"option_symbol": optionSymbol,
+			"bid_price":     quote.BidPrice,
+			"ask_price":     quote.AskPrice,
+			"endpoint":      endpoint,
+			"duration_ms":   duration.Milliseconds(),
+			"status_code":   resp.StatusCode,
+			"url":           c.DataURL + endpoint,
+			"method":        "GET",
+		}
+
+		if err := c.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "GetOptionQuote", auditData); err != nil {
+			logger.Warn.Printf("⚠️ Failed to log GetOptionQuote audit: %v", err)
+		}
+	}
+
+	// Legacy audit callback for backward compatibility
 	if auditTicker != nil && *auditTicker == optionSymbol && c.AuditCallback != nil {
 		c.AuditCallback(optionSymbol, "GetOptionQuote", map[string]interface{}{
 			"option_symbol": optionSymbol,
