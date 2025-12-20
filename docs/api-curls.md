@@ -160,4 +160,16 @@ curl -H "APCA-API-KEY-ID: AKAH5A3VGCR3S9FNWIVC" \
 
 **Response**: Returns complete options chain with puts/calls, all strikes, close prices, and open interest for delta-based mock data construction.
 
+
+
+
+
+curl https://api.x.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_KEY" \
+  -d '{
+    "model": "grok-4",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 50
+  }' --verbose
 ```

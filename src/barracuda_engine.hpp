@@ -174,8 +174,9 @@ private:
     // Helper function to append audit messages to JSON file
     void appendAuditMessage(const std::string& message);
     
-    // Helper function to append detailed calculation data to JSON file
+    // Audit methods for Black-Scholes calculations
     void appendAuditCalculation(const std::string& calculation_data);
+    void appendAuditFailure(const std::string& error_reason);
     
     // Implied volatility calculation
     double CalculateImpliedVolatility(

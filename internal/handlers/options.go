@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/jwaldner/barracuda/internal/alpaca"
 	"github.com/jwaldner/barracuda/internal/audit"
 	"github.com/jwaldner/barracuda/internal/config"
+	"github.com/jwaldner/barracuda/internal/grok"
 	"github.com/jwaldner/barracuda/internal/logger"
 	"github.com/jwaldner/barracuda/internal/models"
 	"github.com/jwaldner/barracuda/internal/symbols"
@@ -1509,7 +1511,62 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 
 	if err != nil {
 		logger.Error.Printf("❌ Complete processing failed: %v", err)
+
+		// Log failed Black-Scholes calculation to audit if this is the audit ticker
+		if auditSymbol != nil {
+			if auditErr := h.auditLogger.LogOptionsAnalysisOperation(*auditSymbol, "BlackScholesCalculation", map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			}); auditErr != nil {
+				logger.Warn.Printf("⚠️ Failed to log Black-Scholes audit entry: %v", auditErr)
+			}
+		}
 		return nil
+	}
+
+	// Log successful Black-Scholes calculation to audit if this is the audit ticker
+	if auditSymbol != nil {
+		// Prepare detailed audit data including first contract sample for mathematical transparency
+		auditData := map[string]interface{}{
+			"success":         true,
+			"contracts":       len(completeResults),
+			"compute_time_ms": h.lastComputeDuration.Seconds() * 1000,
+			"execution_mode":  h.config.Engine.ExecutionMode,
+		}
+
+		// Add detailed calculation breakdown if we have results
+		if len(completeResults) > 0 {
+			sample := completeResults[0]
+			auditData["calculation_details"] = map[string]interface{}{
+				"execution_type": h.config.Engine.ExecutionMode,
+				"symbol":         *auditSymbol,
+				"formula":        "Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls, P = K*e^(-r*T)*N(-d2) - S*N(-d1) for puts",
+				"sample_contract": map[string]interface{}{
+					"symbol": sample.Symbol,
+					"variables": map[string]interface{}{
+						"S":           sample.UnderlyingPrice,
+						"K":           sample.StrikePrice,
+						"T":           float64(sample.DaysToExpiration) / 365.0, // Convert days to years
+						"r":           0.05,                                     // Default risk-free rate (we should get this from config)
+						"sigma":       sample.ImpliedVolatility,
+						"option_type": string(sample.OptionType),
+					},
+					"results": map[string]interface{}{
+						"theoretical_price": sample.TheoreticalPrice,
+						"delta":             sample.Delta,
+						"gamma":             sample.Gamma,
+						"theta":             sample.Theta,
+						"vega":              sample.Vega,
+						"rho":               sample.Rho,
+					},
+				},
+				"contracts_processed": len(completeResults),
+			}
+		}
+
+		if auditErr := h.auditLogger.LogOptionsAnalysisOperation(*auditSymbol, "BlackScholesCalculation", auditData); auditErr != nil {
+			logger.Warn.Printf("⚠️ Failed to log Black-Scholes audit entry: %v", auditErr)
+		}
 	}
 
 	duration := time.Since(startTime)
@@ -1643,37 +1700,69 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 
 	logger.Warn.Printf("🤖 GROK: Processing analysis for ticker %s", ticker)
 
-	// Load the single audit JSON file (gets overwritten each analysis)
-	auditFile := "audit.json"
-	logger.Warn.Printf("🤖 GROK: Loading audit JSON file: %s", auditFile)
+	// Find the most recent audit file for this ticker
+	auditPattern := fmt.Sprintf("audits/audit_%s_*.json", ticker)
+	logger.Warn.Printf("🤖 GROK: Looking for audit files matching: %s", auditPattern)
+
+	matches, err := filepath.Glob(auditPattern)
+	if err != nil || len(matches) == 0 {
+		logger.Warn.Printf("🤖 GROK: No audit files found for ticker %s: %v", ticker, err)
+		http.Error(w, fmt.Sprintf("No audit data found for ticker %s. Run analysis first.", ticker), http.StatusNotFound)
+		return
+	}
+
+	// Get the most recent audit file (they're named with timestamps, so last alphabetically is most recent)
+	sort.Strings(matches)
+	auditFile := matches[len(matches)-1]
+	logger.Warn.Printf("🤖 GROK: Using most recent audit file: %s", auditFile)
 
 	auditBytes, err := os.ReadFile(auditFile)
 	if err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to read audit file %s: %v", auditFile, err)
-		http.Error(w, fmt.Sprintf("Audit file not found. Run analysis first with audit ticker set."), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("Failed to read audit file: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	logger.Warn.Printf("🤖 GROK: Loaded audit data: %d bytes", len(auditBytes))
 
-	// Generate AI analysis using YAML prompt
-	// TODO: Integrate with actual Grok API
-	logger.Warn.Printf("🤖 GROK: Generating AI analysis using YAML prompt")
+	// Generate AI analysis using Grok API
+	logger.Warn.Printf("🤖 GROK: Calling Grok API for analysis...")
 
-	// Use built-in AI prompt (TODO: move to config)
-	aiPrompt := "You are an expert options trader analyzing put option recommendations. Analyze the provided audit data and determine if this ticker is ranked appropriately based on risk-adjusted premium calculations."
+	// Create Grok client and call API
+	grokClient, err := grok.NewClient()
+	var analysis string
 
-	// Generate analysis (mock for now)
-	mockAnalysis := fmt.Sprintf("%s\n\nAnalysis for %s:\nBased on the provided audit data, this option appears to have reasonable risk-adjusted returns. The calculations show proper Black-Scholes pricing model application.\n\nGenerated at %s",
-		aiPrompt, ticker, time.Now().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: Failed to create client: %v", err)
+		analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## Analysis Failed\n\nGrok client creation failed: %v\n\nPlease check API configuration and try again.",
+			ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, err)
+	} else {
+		response, err := grokClient.AnalyzeOptions(ticker, string(auditBytes))
+		if err != nil {
+			logger.Warn.Printf("⚠️🤖 GROK WARNING: API call failed: %v", err)
+			analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## Analysis Failed\n\nGrok API call failed: %v\n\nPlease check API key, credits, and network connectivity.",
+				ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, err)
+		} else {
+			// Success - format the analysis as markdown
+			analysis = grok.FormatAnalysis(ticker, response)
+			logger.Warn.Printf("🤖 GROK: Analysis successful - %d tokens used", response.Tokens)
+		}
+	}
 
-	logger.Warn.Printf("🤖 GROK: AI analysis completed for %s, response length: %d chars", ticker, len(mockAnalysis))
+	logger.Warn.Printf("🤖 GROK: AI analysis completed for %s, response length: %d chars", ticker, len(analysis))
+
+	// Log final status for easy monitoring
+	if strings.Contains(analysis, "Analysis Failed") {
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: Final status: FAILED for ticker %s - check .md file for details", ticker)
+	} else {
+		logger.Warn.Printf("🤖 GROK: Final status: SUCCESS for ticker %s", ticker)
+	}
 
 	// Send analysis to unified audit system - creates both .md and .json files
 	logger.Warn.Printf("🤖 GROK: Finalizing analysis with unified audit system")
 
 	analysisData := map[string]interface{}{
-		"ai_analysis": mockAnalysis,
+		"ai_analysis": analysis,
 		"audit_data":  json.RawMessage(auditBytes),
 		"type":        "grok_analysis_complete",
 	}
@@ -1684,13 +1773,13 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		logger.Warn.Printf("🤖 GROK: Analysis completed - both .md and .json files created and archived")
 	}
 
-	response := map[string]string{
-		"analysis": mockAnalysis,
+	httpResponse := map[string]string{
+		"analysis": analysis,
 		"status":   "success",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(httpResponse); err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to encode response: %v", err)
 		return
 	}

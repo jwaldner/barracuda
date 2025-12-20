@@ -1,3 +1,4 @@
+// Package barracuda provides CUDA-accelerated Black-Scholes option calculations
 package barracuda
 
 /*
@@ -85,12 +86,15 @@ typedef struct {
     int contracts_analyzed;
 } CVolatilitySkewResult;
 
-// TODO: Add preprocessing functions when C++ integration is complete
+// BarracudaEngine preprocessing functions will be added when C++ integration is complete
 */
 import "C"
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"time"
 	"unsafe"
 
@@ -276,8 +280,8 @@ func (be *BaracudaEngine) GetDeviceCount() int {
 	return int(C.barracuda_get_device_count(be.engine))
 }
 
-// CalculateBlackScholes performs GPU-accelerated Black-Scholes calculation
-func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract, auditSymbol *string) ([]OptionContract, error) {
+// calculateBlackScholes performs GPU-accelerated Black-Scholes calculation (PRIVATE - use batch functions)
+func (be *BaracudaEngine) calculateBlackScholes(contracts []OptionContract, auditSymbol *string) ([]OptionContract, error) {
 	if len(contracts) == 0 {
 		return contracts, nil
 	}
@@ -337,7 +341,149 @@ func (be *BaracudaEngine) CalculateBlackScholes(contracts []OptionContract, audi
 		results[i].TheoreticalPrice = float64(cContracts[i].theoretical_price)
 	}
 
+	// AUDIT LOGGING: If audit symbol provided, log detailed Black-Scholes calculation
+	if auditSymbol != nil {
+		err := be.logAuditEntry(*auditSymbol, results)
+		if err != nil {
+			logger.Warn.Printf("⚠️ Failed to log audit entry: %v", err)
+		} else {
+			logger.Info.Printf("📋 AUDIT: Logged BlackScholesCalculation for %s (%d contracts)", *auditSymbol, len(results))
+		}
+	}
+
 	return results, nil
+}
+
+// logAuditEntry creates detailed audit log for Black-Scholes calculations
+func (be *BaracudaEngine) logAuditEntry(symbol string, results []OptionContract) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	// Create audits directory if it doesn't exist
+	auditDir := "audits"
+	if err := os.MkdirAll(auditDir, 0755); err != nil {
+		return fmt.Errorf("failed to create audit directory: %v", err)
+	}
+
+	// Create audit entry with detailed Black-Scholes calculation data
+	auditEntry := map[string]interface{}{
+		"ticker":    symbol,
+		"timestamp": time.Now().Format(time.RFC3339),
+		"type":      "BlackScholesCalculation",
+		"success":   true,
+		"calculation_details": map[string]interface{}{
+			"formula":             "Black-Scholes: C = S·N(d1) - K·e^(-r·T)·N(d2) for calls, P = K·e^(-r·T)·N(-d2) - S·N(-d1) for puts",
+			"execution_mode":      be.executionMode,
+			"contracts_processed": len(results),
+			"sample_contract": map[string]interface{}{
+				"symbol": results[0].Symbol,
+				"variables": map[string]interface{}{
+					"S":           results[0].UnderlyingPrice,  // Stock price
+					"K":           results[0].StrikePrice,      // Strike price
+					"T":           results[0].TimeToExpiration, // Time to expiration
+					"r":           results[0].RiskFreeRate,     // Risk-free rate
+					"sigma":       results[0].Volatility,       // Volatility
+					"option_type": string(results[0].OptionType),
+				},
+				"results": map[string]interface{}{
+					"theoretical_price": results[0].TheoreticalPrice,
+					"delta":             results[0].Delta,
+					"gamma":             results[0].Gamma,
+					"theta":             results[0].Theta,
+					"vega":              results[0].Vega,
+					"rho":               results[0].Rho,
+				},
+			},
+		},
+	}
+
+	// Write to timestamped audit file
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	filename := filepath.Join(auditDir, fmt.Sprintf("audit_%s_%s.json", symbol, timestamp))
+
+	data, err := json.MarshalIndent(auditEntry, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal audit data: %v", err)
+	}
+
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write audit file: %v", err)
+	}
+
+	logger.Info.Printf("📋 AUDIT: Created audit file: %s", filename)
+	return nil
+}
+
+// logCompleteAuditEntry creates detailed audit log for complete CUDA/CPU processing
+func (be *BaracudaEngine) logCompleteAuditEntry(symbol string, results []CompleteOptionResult, executionMode string) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	// Create audits directory if it doesn't exist
+	auditDir := "audits"
+	if err := os.MkdirAll(auditDir, 0755); err != nil {
+		return fmt.Errorf("failed to create audit directory: %v", err)
+	}
+
+	// Create audit entry with detailed Black-Scholes calculation data
+	auditEntry := map[string]interface{}{
+		"ticker":    symbol,
+		"timestamp": time.Now().Format(time.RFC3339),
+		"type":      "BlackScholesCalculation",
+		"success":   true,
+		"calculation_details": map[string]interface{}{
+			"formula":             "Black-Scholes: C = S·N(d1) - K·e^(-r·T)·N(d2) for calls, P = K·e^(-r·T)·N(-d2) - S·N(-d1) for puts",
+			"execution_mode":      executionMode,
+			"contracts_processed": len(results),
+			"sample_contract": map[string]interface{}{
+				"symbol": results[0].Symbol,
+				"variables": map[string]interface{}{
+					"S":           results[0].UnderlyingPrice,                   // Stock price
+					"K":           results[0].StrikePrice,                       // Strike price
+					"T":           float64(results[0].DaysToExpiration) / 365.0, // Time to expiration in years
+					"r":           0.05,                                         // Risk-free rate (should get from config)
+					"sigma":       results[0].ImpliedVolatility,                 // Volatility
+					"option_type": string(results[0].OptionType),
+				},
+				"results": map[string]interface{}{
+					"theoretical_price":  results[0].TheoreticalPrice,
+					"delta":              results[0].Delta,
+					"gamma":              results[0].Gamma,
+					"theta":              results[0].Theta,
+					"vega":               results[0].Vega,
+					"rho":                results[0].Rho,
+					"implied_volatility": results[0].ImpliedVolatility,
+				},
+				"business_calculations": map[string]interface{}{
+					"max_contracts":     results[0].MaxContracts,
+					"total_premium":     results[0].TotalPremium,
+					"cash_needed":       results[0].CashNeeded,
+					"profit_percentage": results[0].ProfitPercentage,
+					"annualized_return": results[0].AnnualizedReturn,
+				},
+			},
+		},
+	}
+
+	// Write to timestamped audit file
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	filename := filepath.Join(auditDir, fmt.Sprintf("audit_%s_%s.json", symbol, timestamp))
+
+	data, err := json.MarshalIndent(auditEntry, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal audit data: %v", err)
+	}
+
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write audit file: %v", err)
+	}
+
+	logger.Info.Printf("📋 AUDIT: Created complete audit file: %s", filename)
+	return nil
 }
 
 // Legacy AnalyzeSymbolsBatch function removed - replaced by complete GPU processing
@@ -619,15 +765,6 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 		return nil, fmt.Errorf("CUDA complete processing failed with code %d", result)
 	}
 
-	// Add audit message for complete processing if audit symbol provided
-	if auditSymbol != nil {
-		// Use a simple Black-Scholes calculation to trigger audit message
-		if len(options) > 0 {
-			simpleContract := []OptionContract{options[0]}
-			_, _ = be.CalculateBlackScholes(simpleContract, auditSymbol)
-		}
-	}
-
 	// Convert results back to Go
 	results := make([]CompleteOptionResult, len(options))
 	for i := range options {
@@ -650,6 +787,17 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 			ProfitPercentage:  float64(cContracts[i].profit_percentage),
 			AnnualizedReturn:  float64(cContracts[i].annualized_return),
 			DaysToExpiration:  int(cContracts[i].days_to_expiration),
+		}
+	}
+
+	// Add audit message for complete processing if audit symbol provided
+	if auditSymbol != nil && len(results) > 0 {
+		// Log detailed Black-Scholes audit for complete CUDA processing
+		err := be.logCompleteAuditEntry(*auditSymbol, results, "CUDA")
+		if err != nil {
+			logger.Error.Printf("⚠️ Failed to log complete audit entry: %v", err)
+		} else {
+			logger.Info.Printf("📋 AUDIT: Logged complete CUDA BlackScholesCalculation for %s (%d contracts)", *auditSymbol, len(results))
 		}
 	}
 
@@ -684,37 +832,83 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 	// Set engine to CPU mode
 	be.SetExecutionMode("cpu")
 
+	// Calculate days to expiration
+	expirationTime, err := time.Parse("2006-01-02", expirationDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid expiration date format: %v", err)
+	}
+	daysToExp := int(time.Until(expirationTime).Hours() / 24)
+
+	// Convert Go contracts to C complete contracts (same as CUDA version)
+	cContracts := make([]C.CCompleteOptionContract, len(options))
+	for i, contract := range options {
+		// Copy symbol (truncate if too long)
+		symbolBytes := []byte(contract.Symbol)
+		for j := 0; j < len(symbolBytes) && j < 31; j++ {
+			cContracts[i].symbol[j] = C.char(symbolBytes[j])
+		}
+		cContracts[i].symbol[31] = 0 // Null terminate
+
+		// Input fields
+		cContracts[i].strike_price = C.double(contract.StrikePrice)
+		cContracts[i].underlying_price = C.double(contract.UnderlyingPrice)
+		cContracts[i].time_to_expiration = C.double(contract.TimeToExpiration)
+		cContracts[i].risk_free_rate = C.double(contract.RiskFreeRate)
+		cContracts[i].volatility = C.double(contract.Volatility)
+		cContracts[i].option_type = C.char(contract.OptionType)
+		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
+	}
+
 	// Measure CPU processing time
 	cpuStart := time.Now()
 
-	// Use regular Black-Scholes calculation in CPU mode
-	calculatedOptions, err := be.CalculateBlackScholes(options, auditSymbol)
-	if err != nil {
-		return nil, err
+	// Call CPU complete processing (C++ engine will use CPU path since mode is set to "cpu")
+	result := C.barracuda_calculate_options_complete(
+		be.engine,
+		(*C.CCompleteOptionContract)(unsafe.Pointer(&cContracts[0])),
+		C.int(len(options)),
+		C.double(availableCash),
+		C.int(daysToExp))
+
+	if result != 0 {
+		return nil, fmt.Errorf("CPU complete processing failed with code %d", result)
 	}
 
 	cpuDuration := time.Since(cpuStart)
 	logger.Info.Printf("🖥️  CPU Processing completed in %.2fms", float64(cpuDuration.Nanoseconds())/1e6)
 
-	// Convert to CompleteOptionResult format for web interface
-	results := make([]CompleteOptionResult, len(calculatedOptions))
-	for i, opt := range calculatedOptions {
-		maxContracts := int(availableCash / (opt.TheoreticalPrice * 100))
-		if maxContracts < 0 {
-			maxContracts = 0
-		}
-
+	// Convert results back to Go (same as CUDA version)
+	results := make([]CompleteOptionResult, len(options))
+	for i := range options {
 		results[i] = CompleteOptionResult{
-			Symbol:           opt.Symbol,
-			StrikePrice:      opt.StrikePrice,
-			TheoreticalPrice: opt.TheoreticalPrice,
-			Delta:            opt.Delta,
-			Gamma:            opt.Gamma,
-			Theta:            opt.Theta,
-			Vega:             opt.Vega,
-			Rho:              opt.Rho,
-			MaxContracts:     maxContracts,
-			TotalPremium:     opt.TheoreticalPrice * float64(maxContracts),
+			Symbol:            options[i].Symbol,
+			OptionType:        options[i].OptionType,
+			StrikePrice:       float64(cContracts[i].strike_price),
+			UnderlyingPrice:   float64(cContracts[i].underlying_price),
+			MarketClosePrice:  float64(cContracts[i].market_close_price),
+			Delta:             float64(cContracts[i].delta),
+			Gamma:             float64(cContracts[i].gamma),
+			Theta:             float64(cContracts[i].theta),
+			Vega:              float64(cContracts[i].vega),
+			Rho:               float64(cContracts[i].rho),
+			TheoreticalPrice:  float64(cContracts[i].theoretical_price),
+			ImpliedVolatility: float64(cContracts[i].implied_volatility),
+			MaxContracts:      int(cContracts[i].max_contracts),
+			TotalPremium:      float64(cContracts[i].total_premium),
+			CashNeeded:        float64(cContracts[i].cash_needed),
+			ProfitPercentage:  float64(cContracts[i].profit_percentage),
+			AnnualizedReturn:  float64(cContracts[i].annualized_return),
+			DaysToExpiration:  int(cContracts[i].days_to_expiration),
+		}
+	}
+
+	// Add CPU audit logging if audit symbol provided
+	if auditSymbol != nil && len(results) > 0 {
+		err := be.logCompleteAuditEntry(*auditSymbol, results, "CPU")
+		if err != nil {
+			logger.Error.Printf("⚠️ Failed to log CPU audit entry: %v", err)
+		} else {
+			logger.Info.Printf("📋 AUDIT: Logged complete CPU BlackScholesCalculation for %s (%d contracts)", *auditSymbol, len(results))
 		}
 	}
 

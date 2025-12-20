@@ -655,8 +655,20 @@ void BarracudaEngine::appendAuditMessage(const std::string& message) {
 }
 
 void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data) {
+    // DEBUG: Log entry to this function
+    std::ofstream debugFile("/tmp/barracuda_audit_debug.txt", std::ios::app);
+    if (debugFile.is_open()) {
+        debugFile << "appendAuditCalculation called with " << calculation_data.length() << " bytes of data" << std::endl;
+        debugFile.close();
+    }
+    
     std::ifstream inFile("audit.json");
     if (!inFile.is_open()) {
+        std::ofstream debugFile2("/tmp/barracuda_audit_debug.txt", std::ios::app);
+        if (debugFile2.is_open()) {
+            debugFile2 << "ERROR: Cannot open audit.json for reading" << std::endl;
+            debugFile2.close();
+        }
         return; // File doesn't exist, return silently
     }
     
@@ -694,7 +706,31 @@ void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data
             if (outFile.is_open()) {
                 outFile << content;
                 outFile.close();
+                
+                std::ofstream debugFile3("/tmp/barracuda_audit_debug.txt", std::ios::app);
+                if (debugFile3.is_open()) {
+                    debugFile3 << "SUCCESS: audit.json written with calculation_details" << std::endl;
+                    debugFile3.close();
+                }
+            } else {
+                std::ofstream debugFile4("/tmp/barracuda_audit_debug.txt", std::ios::app);
+                if (debugFile4.is_open()) {
+                    debugFile4 << "ERROR: Cannot open audit.json for writing" << std::endl;
+                    debugFile4.close();
+                }
             }
+        } else {
+            std::ofstream debugFile5("/tmp/barracuda_audit_debug.txt", std::ios::app);
+            if (debugFile5.is_open()) {
+                debugFile5 << "ERROR: Cannot find array start/end positions" << std::endl;
+                debugFile5.close();
+            }
+        }
+    } else {
+        std::ofstream debugFile6("/tmp/barracuda_audit_debug.txt", std::ios::app);
+        if (debugFile6.is_open()) {
+            debugFile6 << "ERROR: Cannot find api_requests in audit.json" << std::endl;
+            debugFile6.close();
         }
     }
 }

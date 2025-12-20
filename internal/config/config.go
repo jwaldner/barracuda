@@ -37,6 +37,11 @@ type Config struct {
 	AlpacaAPIKey    string
 	AlpacaSecretKey string
 
+	// Grok AI API settings
+	GrokAPIKey   string
+	GrokEndpoint string
+	GrokModel    string
+
 	// Default application settings
 	DefaultStocks    []string
 	DefaultCash      int
@@ -70,8 +75,11 @@ type EngineConfig struct {
 }
 
 type YAMLConfig struct {
-	Alpaca  AlpacaConfig  `yaml:"alpaca"`
-	Logging LoggingConfig `yaml:"logging"`
+	Alpaca       AlpacaConfig  `yaml:"alpaca"`
+	GrokAPIKey   string        `yaml:"grok_api_key"`
+	GrokEndpoint string        `yaml:"grok_endpoint"`
+	GrokModel    string        `yaml:"grok_model"`
+	Logging      LoggingConfig `yaml:"logging"`
 
 	Trading struct {
 		DefaultCash      int      `yaml:"default_cash"`
@@ -91,6 +99,9 @@ func Load() *Config {
 		Port:             getEnv("PORT", "8080"),
 		AlpacaAPIKey:     getEnv("ALPACA_API_KEY", ""),
 		AlpacaSecretKey:  getEnv("ALPACA_SECRET_KEY", ""),
+		GrokAPIKey:       getEnv("GROK_API_KEY", ""),
+		GrokEndpoint:     getEnv("GROK_ENDPOINT", "https://api.x.ai/v1/chat/completions"),
+		GrokModel:        getEnv("GROK_MODEL", "grok-3"),
 		DefaultStocks:    getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
 		DefaultCash:      getEnvInt("DEFAULT_CASH", 10000),
 		DefaultStrategy:  getEnv("DEFAULT_STRATEGY", "puts"),
@@ -135,6 +146,20 @@ func Load() *Config {
 				// ALPACA_SECRET_KEY loaded
 			}
 			cfg.AlpacaSecretKey = yamlCfg.Alpaca.SecretKey
+		}
+
+		// Load Grok API config from YAML
+		if yamlCfg.GrokAPIKey != "" && yamlCfg.GrokAPIKey != "YOUR_GROK_API_KEY" {
+			if os.Getenv("GROK_API_KEY") == "" {
+				os.Setenv("GROK_API_KEY", yamlCfg.GrokAPIKey)
+			}
+			cfg.GrokAPIKey = yamlCfg.GrokAPIKey
+		}
+		if yamlCfg.GrokEndpoint != "" {
+			cfg.GrokEndpoint = yamlCfg.GrokEndpoint
+		}
+		if yamlCfg.GrokModel != "" {
+			cfg.GrokModel = yamlCfg.GrokModel
 		}
 
 		if yamlCfg.Trading.DefaultCash > 0 {

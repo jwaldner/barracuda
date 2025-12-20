@@ -1,0 +1,27 @@
+transport := &http.Transport{
+    DialContext: (&net.Dialer{
+        Timeout:   30 * time.Second,
+        KeepAlive: 30 * time.Second,
+    }).DialContext,
+    TLSHandshakeTimeout:   10 * time.Second,
+    ResponseHeaderTimeout: 300 * time.Second,  // NEW: Increase this significantly (e.g., 5-10 minutes or more)
+    ExpectContinueTimeout: 1 * time.Second,
+    MaxIdleConns:          100,
+    MaxIdleConnsPerHost:   10,
+    IdleConnTimeout:       90 * time.Second,
+}
+
+client := &http.Client{
+    Transport: transport,
+    Timeout:   3600 * time.Second,  // Keep 1 hour overall
+}
+
+
+curl https://api.x.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_KEY" \
+  -d '{
+    "model": "grok-4",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 50
+  }' --verbose

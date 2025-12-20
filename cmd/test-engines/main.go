@@ -57,8 +57,16 @@ func testEngine(mode string, options []barracuda.OptionContract, symbol string, 
 
 	startTime := time.Now()
 
-	// Use Black-Scholes calculation function
-	calculatedOptions, err := engine.CalculateBlackScholes(options, nil)
+	// Use appropriate batch calculation function based on engine mode
+	var calculatedOptions []barracuda.CompleteOptionResult
+	var err error
+
+	if mode == "CPU" {
+		calculatedOptions, err = engine.MaximizeCPUUsageComplete(options, stockPrice, 10000.0, "mixed", expiration, nil)
+	} else {
+		calculatedOptions, err = engine.MaximizeCUDAUsageComplete(options, stockPrice, 10000.0, "mixed", expiration, nil)
+	}
+
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n\n", err)
 		return
@@ -91,16 +99,17 @@ func testEngine(mode string, options []barracuda.OptionContract, symbol string, 
 	fmt.Printf("✅ Success! Processed in %.2fms\n", duration.Seconds()*1000)
 	fmt.Printf("🏃 Execution Mode: %s\n", result.ExecutionMode)
 	fmt.Printf("📊 Options Processed: %d\n", result.TotalOptionsProcessed)
+
 	// Separate puts and calls from calculated options
-	var puts, calls []barracuda.OptionContract
+	var putsCount, callsCount int
 	for _, option := range calculatedOptions {
 		if option.OptionType == 'P' {
-			puts = append(puts, option)
+			putsCount++
 		} else {
-			calls = append(calls, option)
+			callsCount++
 		}
 	}
-	fmt.Printf("🎯 Puts calculated: %d, Calls calculated: %d\n", len(puts), len(calls))
+	fmt.Printf("🎯 Puts calculated: %d, Calls calculated: %d\n", putsCount, callsCount)
 
 	// Show sample calculations
 	if len(calculatedOptions) > 0 {
