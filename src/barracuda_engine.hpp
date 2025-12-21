@@ -141,6 +141,8 @@ public:
     // Initialize CUDA context
     bool InitializeCUDA();
     
+    // ⚠️  WARNING: TESTING/INTERNAL FUNCTIONS ONLY - NOT FOR PRODUCTION
+    // ⚠️  Use complete batch processing C interface functions instead
     // Options pricing and Greeks calculation
     std::vector<OptionContract> CalculateBlackScholes(
         const std::vector<OptionContract>& contracts,
@@ -151,7 +153,7 @@ public:
         const std::vector<OptionContract>& contracts,
         int batch_size = 1024);
     
-    // Volatility surface calculations
+    // Volatility surface calculations  
     VolatilitySkew Calculate25DeltaSkew(
         const std::vector<OptionContract>& puts,
         const std::vector<OptionContract>& calls,

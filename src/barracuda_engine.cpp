@@ -61,8 +61,13 @@ bool BarracudaEngine::InitializeCUDA() {
     return true;
 }
 
+// Options pricing and Greeks calculation
+// ⚠️  WARNING: FOR INTERNAL/TESTING USE ONLY - NOT FOR PRODUCTION
+// ⚠️  Use complete batch processing functions instead of this basic calculation
+// ⚠️  This function lacks business logic optimization and proper error handling
 std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
-    const std::vector<OptionContract>& contracts, const char* audit_symbol) {
+    const std::vector<OptionContract>& contracts,
+    const char* audit_symbol) {
     
     std::vector<OptionContract> results = contracts;
     
@@ -165,6 +170,11 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
                 contract.theta += r * K * exp(-r * T);
                 contract.rho = -contract.rho;
             }
+            
+            // Apply market standard scaling
+            contract.theta /= 365.0;  // Convert to daily decay
+            contract.vega /= 100.0;   // Convert to per 1% volatility change
+            contract.rho /= 100.0;    // Convert to per 1% rate change
         }
         
         // Add audit message if audit_symbol is provided

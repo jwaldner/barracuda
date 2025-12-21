@@ -55,6 +55,11 @@ __global__ void black_scholes_kernel(
         opt.theta -= q * S * exp(-q * T) * Nd1 + q * S * exp(-q * T) * (1.0 - Nd1);
         opt.rho = -opt.rho;
     }
+    
+    // Apply market standard scaling
+    opt.theta /= 365.0;  // Convert to daily decay
+    opt.vega /= 100.0;   // Convert to per 1% volatility change
+    opt.rho /= 100.0;    // Convert to per 1% rate change
 }
 
 // Combined CUDA kernel: Calculate Implied Volatility + Black-Scholes in one pass
@@ -149,6 +154,11 @@ __global__ void implied_volatility_black_scholes_kernel(
         opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
         opt.rho = -opt.rho;
     }
+    
+    // Apply market standard scaling
+    opt.theta /= 365.0;  // Convert to daily decay
+    opt.vega /= 100.0;   // Convert to per 1% volatility change
+    opt.rho /= 100.0;    // Convert to per 1% rate change
 }
 
 // CUDA kernel for Monte Carlo simulation
@@ -419,6 +429,11 @@ __global__ void complete_option_analysis_kernel(
         opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
         opt.rho = -opt.rho;
     }
+    
+    // Apply market standard scaling
+    opt.theta /= 365.0;  // Convert to daily decay
+    opt.vega /= 100.0;   // Convert to per 1% volatility change
+    opt.rho /= 100.0;    // Convert to per 1% rate change
     
     // STEP 3: BUSINESS LOGIC CALCULATIONS ON GPU
     double premium_per_share = opt.theoretical_price;

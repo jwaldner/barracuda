@@ -1536,28 +1536,39 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 
 		// Add detailed calculation breakdown if we have results
 		if len(completeResults) > 0 {
-			sample := completeResults[0]
+			// Find contract that matches the audit ticker for audit response data
+			var auditContract *barracuda.CompleteOptionResult
+			for i := range completeResults {
+				if completeResults[i].Symbol == *auditSymbol {
+					auditContract = &completeResults[i]
+					break
+				}
+			}
+			// Fallback to first result if audit ticker not found
+			if auditContract == nil {
+				auditContract = &completeResults[0]
+			}
 			auditData["calculation_details"] = map[string]interface{}{
 				"execution_type": h.config.Engine.ExecutionMode,
 				"symbol":         *auditSymbol,
 				"formula":        "Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls, P = K*e^(-r*T)*N(-d2) - S*N(-d1) for puts",
-				"sample_contract": map[string]interface{}{
-					"symbol": sample.Symbol,
+				fmt.Sprintf("%s_contract", *auditSymbol): map[string]interface{}{
+					"symbol": auditContract.Symbol,
 					"variables": map[string]interface{}{
-						"S":           sample.UnderlyingPrice,
-						"K":           sample.StrikePrice,
-						"T":           float64(sample.DaysToExpiration) / 365.0, // Convert days to years
+						"S":           auditContract.UnderlyingPrice,
+						"K":           auditContract.StrikePrice,
+						"T":           float64(auditContract.DaysToExpiration) / 365.0, // Convert days to years
 						"r":           0.05,                                     // Default risk-free rate (we should get this from config)
-						"sigma":       sample.ImpliedVolatility,
-						"option_type": string(sample.OptionType),
+						"sigma":       auditContract.ImpliedVolatility,
+						"option_type": string(auditContract.OptionType),
 					},
 					"results": map[string]interface{}{
-						"theoretical_price": sample.TheoreticalPrice,
-						"delta":             sample.Delta,
-						"gamma":             sample.Gamma,
-						"theta":             sample.Theta,
-						"vega":              sample.Vega,
-						"rho":               sample.Rho,
+						"theoretical_price": auditContract.TheoreticalPrice,
+						"delta":             auditContract.Delta,
+						"gamma":             auditContract.Gamma,
+						"theta":             auditContract.Theta,
+						"vega":              auditContract.Vega,
+						"rho":               auditContract.Rho,
 					},
 				},
 				"contracts_processed": len(completeResults),
