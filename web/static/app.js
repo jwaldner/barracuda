@@ -64,6 +64,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // ✅ THIS JAVASCRIPT CHANGE REQUIRES NO REBUILD!
     console.log('🚀 Web assets loaded - no rebuild needed for web changes!');
     
+    // Ensure footer is visible on page load
+    const statusFooter = document.getElementById('statusFooter');
+    if (statusFooter) {
+        statusFooter.style.display = 'block';
+        console.log('👀 Footer made visible');
+    }
+    
     // Use Go-calculated expiration date, with JavaScript fallback
     const datePickerEl = document.getElementById('expirationDate');
     if (datePickerEl && (!datePickerEl.value || datePickerEl.value === '')) {
@@ -775,23 +782,40 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function handleGrokAnalysis() {
-    const auditInput = document.getElementById('audit-ticker-input');
+async function handleGrokAnalysis() {
     const grokBtn = document.getElementById('grok-btn');
     
-    if (!auditInput || !grokBtn) return;
+    if (!grokBtn) return;
     
-    const ticker = auditInput.value.trim().toUpperCase();
-    if (!ticker) {
-        showNotification('❌ Please enter a ticker to audit first', 'error');
+    // Only check that audit.json exists - ticker doesn't matter for Grok analysis
+    try {
+        const response = await fetch('/api/audit-exists');
+        const result = await response.json();
+        
+        if (!result.exists) {
+            showNotification('❌ No audit data available - run analysis with ticker first', 'error');
+            return;
+        }
+    } catch (error) {
+        console.error('Failed to check audit file:', error);
+        showNotification('❌ Failed to verify audit data availability', 'error');
+        return;
+    }
+
+    // Simple confirmation without credits checking
+    const confirmMessage = `🤖 Grok AI Analysis Confirmation\n\n⚠️ This will make a paid API call to xAI Grok\n💰 Estimated cost: ~$0.15\n\nProceed with analysis of existing audit data?`;
+    
+    if (!confirm(confirmMessage)) {
+        showNotification('❌ Analysis cancelled by user', 'info');
         return;
     }
     
+    // Proceed with analysis using existing audit.json
     // Disable button during processing
     grokBtn.disabled = true;
     
-    // Read audit data from JSON file via server
-    sendToGrok(ticker, null, grokBtn);
+    // Send to Grok with empty ticker (server will read from audit.json)
+    sendToGrok("", null, grokBtn);
 }
 
 async function sendToGrok(ticker, auditData, grokBtn) {

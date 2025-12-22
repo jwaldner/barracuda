@@ -284,7 +284,7 @@
     </script>
 
     <!-- System Status Footer -->
-    <footer id="statusFooter" class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 py-3 px-4">
+    <footer id="statusFooter" class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 py-3 px-4 z-50">
         <div class="max-w-6xl mx-auto flex justify-between items-center text-sm">
             <!-- Left: System Info -->
             <div class="flex space-x-3 items-center">
@@ -303,6 +303,9 @@
             <div class="flex space-x-3 items-center text-gray-300">
                 <span>📊 Max: {{maxResults}}</span>
                 <span id="computeTimeDisplay" class="hidden">⚡ 0.000s COMPUTE</span>
+                <a href="https://console.x.ai" target="_blank" class="text-blue-400 hover:text-blue-300 transition-colors">
+                    🤖 xAI Console
+                </a>
             </div>
         </div>
     </footer>

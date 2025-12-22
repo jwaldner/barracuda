@@ -122,25 +122,31 @@ func (c *Client) TestConnectivity() error {
 func (c *Client) AnalyzeOptions(ticker, auditData string) (*AnalysisResponse, error) {
 	logger.Warn.Printf("🤖 GROK: Starting analysis for ticker: %s (audit data: %d bytes)", ticker, len(auditData))
 
+	// Optimize audit data size if too large (keep only essential parts)
+	optimizedData := auditData
+	if len(auditData) > 50000 { // If larger than 50KB, truncate
+		logger.Warn.Printf("🤖 GROK: Large audit data detected (%d bytes), truncating for API efficiency", len(auditData))
+		optimizedData = auditData[:50000] + "\n... [truncated for API efficiency]"
+	}
+
 	// Track start time for performance monitoring
 	startTime := time.Now()
 
-	// Construct the expert prompt with audit data
-	prompt := fmt.Sprintf(`You are an expert quantitative analyst specializing in Black-Scholes option pricing models. Validate the mathematical accuracy of the provided calculations for %s.
+	// Construct a concise, cost-effective prompt with audit data
+	prompt := fmt.Sprintf(`Analyze Black-Scholes calculations for %s. Focus on mathematical accuracy:
 
 AUDIT DATA:
 %s
 
-Please provide:
-1. **Calculation Verification**: Verify the Black-Scholes formula implementation and Greek calculations
-2. **Input Validation**: Check if S, K, T, r, sigma inputs are reasonable and properly formatted
-3. **Mathematical Accuracy**: Confirm delta, gamma, theta, vega, rho calculations match expected values
-4. **Formula Consistency**: Validate the theoretical price against the Black-Scholes formula
-5. **Data Integrity**: Identify any inconsistencies, errors, or anomalies in the calculations
+Verify:
+1. Formula correctness (C = S*N(d1) - K*e^(-r*T)*N(d2))
+2. Input validation (S, K, T, r, sigma reasonable)
+3. Greek calculations accuracy
+4. Any calculation errors or anomalies
 
-Focus on mathematical correctness, not investment advice. Verify calculations using: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls, P = K*e^(-r*T)*N(-d2) - S*N(-d1) for puts.`, ticker, auditData)
+Be concise and focus on numerical validation.`, ticker, optimizedData)
 
-	// Prepare Grok API request with enhanced parameters
+	// Prepare Grok API request with cost-optimized parameters
 	requestBody := map[string]interface{}{
 		"messages": []map[string]interface{}{
 			{
@@ -150,8 +156,9 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 		},
 		"model":       c.model,
 		"stream":      false,
-		"temperature": 0.3,  // More focused, less creative
-		"max_tokens":  4000, // Ensure sufficient response length
+		"temperature": 0.1,  // More focused, faster responses
+		"max_tokens":  2000, // Reduced from 4000 to limit costs
+		"top_p":       0.9,  // Add top_p for more efficient generation
 	}
 
 	reqBytes, err := json.Marshal(requestBody)
@@ -162,8 +169,8 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 
 	logger.Warn.Printf("🤖 GROK: Sending API request to X.AI (payload: %d bytes, max_tokens: 4000)", len(reqBytes))
 
-	// Create context with timeout for better error handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// Create context with extended timeout for Grok's potentially long processing time
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute) // Increased to 15 minutes
 	defer cancel()
 
 	// Make HTTP request to Grok API with proper context
@@ -177,10 +184,30 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("User-Agent", "barracuda-options-analyzer/1.0")
 
-	// Progress tracking
+	// Progress tracking with periodic updates
 	logger.Warn.Printf("🤖 GROK: Request sent, waiting for response...")
 
+	// Start progress monitoring in a goroutine
+	progressDone := make(chan bool)
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-progressDone:
+				return
+			case <-ticker.C:
+				elapsed := time.Since(startTime)
+				logger.Warn.Printf("🤖 GROK: Still waiting for response... elapsed: %v (timeout in %v)", elapsed, 15*time.Minute-elapsed)
+			}
+		}
+	}()
+
 	resp, err := c.client.Do(req)
+
+	// Stop progress monitoring
+	close(progressDone)
 	if err != nil {
 		duration := time.Since(startTime)
 		// Enhanced error logging for network diagnosis
