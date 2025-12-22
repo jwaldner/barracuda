@@ -27,6 +27,19 @@ function loadBackendConfig() {
             window.csvHeaders = backendConfig.csvHeaders || [];
             window.errorMessages = backendConfig.errorMessages || {};
             
+            // Make template functions available globally
+            window.tableFieldKeys = function() {
+                return backendConfig.tableFieldKeys || [];
+            };
+            window.tableHeaders = function() {
+                return backendConfig.tableHeaders || [];
+            };
+            window.generateCSVFilename = function(targetDelta, expirationDate, strategy, symbolCount) {
+                // Generate filename using config pattern - if available from backend
+                const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false }).replace(/:/g, '-');
+                return `${timestamp}_${expirationDate}_delta${targetDelta.toFixed(2)}_${strategy}_${symbolCount}.csv`;
+            };
+            
             console.log('🚀 Barracuda initialized with backend defaults');
             console.log('📊 Default Cash:', backendConfig.defaultCash);
             console.log('📅 Default Expiration:', backendConfig.defaultExpirationDate);
@@ -84,9 +97,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const copyCSVBtn = document.getElementById('copy-csv-btn');
     if (copyCSVBtn) {
         copyCSVBtn.addEventListener('click', function() {
-            if (!window.lastResults) return;
+            if (!window.lastResults || !window.lastResults.length) {
+                showNotification('❌ No analysis data available. Run analysis first.', 'error');
+                return;
+            }
             
             const headers = window.csvHeaders || [];
+            if (!headers.length) {
+                showNotification('❌ CSV headers not available. Please refresh the page.', 'error');
+                return;
+            }
+            
             let csvContent = headers.join(',') + '\n';
             
             // Helper function to get raw value for CSV
@@ -99,7 +120,11 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             // Get field mapping from backend - NO hardcoded fields
-            const fieldKeys = window.tableFieldKeys() || [];
+            const fieldKeys = window.tableFieldKeys ? window.tableFieldKeys() : [];
+            if (!fieldKeys.length) {
+                showNotification('❌ Field mapping not available. Please refresh the page.', 'error');
+                return;
+            }
             
             window.lastResults.forEach((option, index) => {
                 const row = [];
@@ -130,10 +155,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 csvContent += row.join(',') + '\n';
             });
             
-            // Copy to clipboard
-            navigator.clipboard.writeText(csvContent).then(function() {
-                showNotification('📋 CSV copied to clipboard!', 'success');
-            });
+            // Copy to clipboard with error handling
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(csvContent).then(function() {
+                    showNotification('📋 CSV copied to clipboard!', 'success');
+                }).catch(function(err) {
+                    console.error('Clipboard copy failed:', err);
+                    showNotification('❌ Failed to copy to clipboard. Browser may not support this feature.', 'error');
+                });
+            } else {
+                showNotification('❌ Clipboard not supported in this browser.', 'error');
+            }
         });
     }
     
@@ -191,13 +223,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 csvContent += row.join(',') + '\n';
             });
             
-			// Use template function directly - standard pattern
-			const filename = window.generateCSVFilename(
-				window.lastAnalysisRequest.target_delta || 0.30,
-				window.lastAnalysisRequest.expiration_date || 'unknown',
-				window.lastAnalysisRequest.strategy || 'options',
-				window.lastResults.length
-			);            // ⚡ Instant download - no network request!
+            // Use template function directly - standard pattern
+            const filename = window.generateCSVFilename(
+                window.lastAnalysisRequest.target_delta || 0.30,
+                window.lastAnalysisRequest.expiration_date || 'unknown',
+                window.lastAnalysisRequest.strategy || 'options',
+                window.lastResults.length
+            );
+            
+            // ⚡ Instant download - no network request!
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -216,8 +250,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.removeChild(a);
             }, 1000);
             
-            // Show success notification
-            showNotification(`⚡ CSV downloaded instantly! (${window.lastResults.length} results)`, 'success');
+            // Show sticky download notification with generic message
+            showStickyDownloadNotification();
         });
     }
 });
@@ -291,21 +325,76 @@ function displayResults(data) {
         const assetInfo = window.assetData && window.assetData[ticker];
         const sectorName = assetInfo ? assetInfo.sector : '';
         
-        row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.rank)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${getValue(option.ticker)}</td>
-            <td class="company-tooltip px-6 py-4 whitespace-nowrap text-sm text-gray-700" data-sector="${sectorName}">${companyName}</td>
-            <td class="sector-column px-6 py-4 whitespace-nowrap text-sm text-gray-600">${sectorName}</td>
-            <td class="${getCSSClass(option.strike, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.strike)}</td>
-            <td class="${getCSSClass(option.stock_price, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.stock_price)}</td>
-            <td class="${getCSSClass(option.max_contracts, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.max_contracts)}</td>
-            <td class="${getCSSClass(option.premium, 'px-6 py-4 whitespace-nowrap text-sm')}">${getValue(option.premium)}</td>
-            <td class="${getCSSClass(option.total_premium, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.total_premium)}</td>
-
-            <td class="${getCSSClass(option.profit_percentage, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.profit_percentage)}</td>
-            <td class="${getCSSClass(option.annualized, 'px-6 py-4 whitespace-nowrap text-sm font-bold')}">${getValue(option.annualized)}</td>
-            <td class="${getCSSClass(option.expiration, 'px-6 py-4 whitespace-nowrap text-sm text-gray-500')}">${getValue(option.expiration)}</td>
-        `;
+        // Build row dynamically using backend field mapping to match headers
+        const fieldKeys = window.tableFieldKeys() || [];
+        let rowHTML = '';
+        
+        fieldKeys.forEach(fieldKey => {
+            let value = '';
+            let cssClass = 'px-6 py-4 whitespace-nowrap text-sm';
+            
+            switch(fieldKey) {
+                case 'rank':
+                    value = getValue(option.rank) || (index + 1);
+                    cssClass += ' font-bold text-gray-900';
+                    break;
+                case 'ticker':
+                    value = getValue(option.ticker);
+                    cssClass += ' font-bold text-gray-900';
+                    break;
+                case 'company':
+                    value = companyName;
+                    cssClass = 'company-tooltip px-6 py-4 whitespace-nowrap text-sm text-gray-700';
+                    rowHTML += `<td class="${cssClass}" data-sector="${sectorName}">${value}</td>`;
+                    return;
+                case 'sector':
+                    value = sectorName;
+                    cssClass = 'sector-column px-6 py-4 whitespace-nowrap text-sm text-gray-600';
+                    break;
+                case 'strike':
+                    value = getValue(option.strike);
+                    cssClass = getCSSClass(option.strike, cssClass);
+                    break;
+                case 'stock_price':
+                    value = getValue(option.stock_price);
+                    cssClass = getCSSClass(option.stock_price, cssClass);
+                    break;
+                case 'premium':
+                    value = getValue(option.premium);
+                    cssClass = getCSSClass(option.premium, cssClass);
+                    break;
+                case 'max_contracts':
+                    value = getValue(option.max_contracts);
+                    cssClass = getCSSClass(option.max_contracts, cssClass);
+                    break;
+                case 'total_premium':
+                    value = getValue(option.total_premium);
+                    cssClass = getCSSClass(option.total_premium, cssClass + ' font-bold');
+                    break;
+                case 'profit_percentage':
+                    value = getValue(option.profit_percentage);
+                    cssClass = getCSSClass(option.profit_percentage, cssClass + ' font-bold');
+                    break;
+                case 'delta':
+                    value = getValue(option.delta);
+                    cssClass = getCSSClass(option.delta, cssClass);
+                    break;
+                case 'expiration':
+                    value = getValue(option.expiration);
+                    cssClass = getCSSClass(option.expiration, cssClass + ' text-gray-500');
+                    break;
+                case 'days_to_exp':
+                    value = getValue(option.days_to_exp);
+                    cssClass = getCSSClass(option.days_to_exp, cssClass);
+                    break;
+                default:
+                    value = getValue(option[fieldKey]) || '';
+            }
+            
+            rowHTML += `<td class="${cssClass}">${value}</td>`;
+        });
+        
+        row.innerHTML = rowHTML;
         
         if (tbody) {
             tbody.appendChild(row);
@@ -437,46 +526,154 @@ function openDownloadsFolder() {
 }async function copyTableToCSV() {
     const table = document.querySelector('#results table');
     if (!table) {
+        console.error('No table found with selector "#results table"');
         alert(window.errorMessages?.noResults || 'No table data available to copy');
         return;
     }
 
+    console.log('Found table:', table);
     const rows = table.querySelectorAll('tr');
+    console.log('Found rows:', rows.length);
+    
+    if (rows.length === 0) {
+        alert('No data rows found in table');
+        return;
+    }
+
     const csvContent = [];
 
     // Process each row
-    rows.forEach(row => {
+    rows.forEach((row, rowIndex) => {
+        console.log(`Processing row ${rowIndex}:`, row);
         const cells = row.querySelectorAll('th, td');
+        console.log(`Row ${rowIndex} has ${cells.length} cells`);
         const rowData = [];
         
-        cells.forEach(cell => {
+        cells.forEach((cell, cellIndex) => {
             // Get text content and clean it up
-            let text = cell.textContent.trim();
+            let text = cell.textContent ? cell.textContent.trim() : '';
+            console.log(`Cell ${cellIndex} raw content: "${cell.textContent}"`);
+            console.log(`Cell ${cellIndex} cleaned content: "${text}"`);
             
-            // Remove extra whitespace and newlines
-            text = text.replace(/\s+/g, ' ');
+            // Clean the text but keep it simple for Google Sheets
+            text = text.replace(/\s+/g, ' ').replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, ' ');
             
-            // Handle commas in values by wrapping in quotes
-            if (text.includes(',')) {
-                text = `"${text}"`;
-            }
-            
+            // Always add the cell content to maintain column structure
             rowData.push(text);
         });
         
-        csvContent.push(rowData.join(','));
+        console.log(`Row ${rowIndex} final data array:`, rowData);
+        console.log(`Row ${rowIndex} joined with tabs: "${rowData.join('\t')}"`);
+        
+        // Always add the row to maintain consistent structure
+        if (rowData.length > 0) {
+            csvContent.push(rowData.join('\t'));
+        }
     });
+    
+    console.log('Final csvContent array:', csvContent);
+
+    console.log('Final csvContent array:', csvContent);
 
     const csvString = csvContent.join('\n');
+    
+    console.log('Raw TSV string:', csvString);
+    
+    // For Google Sheets: Convert to proper CSV format as per RFC 4180
+    // Google Sheets expects commas, proper quoting, and escaped quotes
+    const properCSV = csvContent.map((row, rowIndex) => {
+        console.log(`Converting row ${rowIndex}: "${row}"`);
+        const fields = row.split('\t');
+        console.log(`Row ${rowIndex} split into fields:`, fields);
+        
+        // Remove empty trailing fields
+        while (fields.length > 0 && fields[fields.length - 1].trim() === '') {
+            fields.pop();
+        }
+        console.log(`Row ${rowIndex} after removing trailing empties:`, fields);
+        
+        // Convert each field to proper CSV format
+        const csvFields = fields.map((field, fieldIndex) => {
+            // Always trim the field
+            field = field.trim();
+            console.log(`Field ${fieldIndex}: "${field}"`);
+            
+            // If field contains comma, quote, or newline - wrap in quotes and escape quotes
+            if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
+                // Escape existing quotes by doubling them
+                field = field.replace(/"/g, '""');
+                // Wrap in quotes
+                const quotedField = `"${field}"`;
+                console.log(`Field ${fieldIndex} needs quoting: "${quotedField}"`);
+                return quotedField;
+            }
+            
+            return field;
+        });
+        
+        const csvRow = csvFields.join(',');
+        console.log(`Row ${rowIndex} final CSV: "${csvRow}"`);
+        return csvRow;
+    }).join('\n');
+    
+    console.log('=== FINAL CSV OUTPUT ===');
+    console.log(properCSV);
+    console.log('=== END CSV OUTPUT ===');
 
     try {
-        await navigator.clipboard.writeText(csvString);
+        // For Google Sheets paste: Use simple format without quotes unless absolutely necessary
+        // Google Sheets paste is more forgiving with simple comma separation
+        const googleSheetsCSV = csvContent.map(row => {
+            const fields = row.split('\t');
+            // Remove empty trailing fields
+            while (fields.length > 0 && fields[fields.length - 1].trim() === '') {
+                fields.pop();
+            }
+            
+            // For Google Sheets paste: minimal quoting, just commas
+            return fields.map(field => {
+                field = field.trim();
+                // Only quote if field actually contains a comma
+                if (field.includes(',')) {
+                    return `"${field.replace(/"/g, '""')}"`;
+                }
+                return field;
+            }).join(',');
+        }).join('\n');
+        
+        console.log('Google Sheets paste format:', googleSheetsCSV);
+        
+        // Copy the Google Sheets optimized format
+        await navigator.clipboard.writeText(googleSheetsCSV);
+        
+        // Use the same format for file download
+        // Add UTF-8 BOM for better Google Sheets compatibility
+        const utf8BOM = '\uFEFF';
+        const csvWithBOM = utf8BOM + properCSV;
+        
+        // Create downloadable link that opens instead of saves
+        const csvBlob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8' });
+        const csvUrl = URL.createObjectURL(csvBlob);
+        
+        // Create temporary download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = csvUrl;
+        downloadLink.download = `barracuda_analysis_${new Date().toISOString().slice(0,19).replace(/[:.]/g, '-')}.csv`;
+        downloadLink.target = '_blank';
+        
+        // Trigger download which will open in browser
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // Clean up the URL after a delay
+        setTimeout(() => URL.revokeObjectURL(csvUrl), 1000);
         
         // Visual feedback
         const btn = document.getElementById('copy-csv-btn');
         if (btn) {
             const originalText = btn.innerHTML;
-            btn.innerHTML = '✅ Copied!';
+            btn.innerHTML = '✅ Downloaded!';
             btn.classList.add('bg-green-500/40');
             
             setTimeout(() => {
@@ -487,6 +684,8 @@ function openDownloadsFolder() {
                 }
             }, 2000);
         }
+        
+        showStickyDownloadNotification();
         
     } catch (err) {
         // Fallback for older browsers
@@ -596,31 +795,206 @@ function handleGrokAnalysis() {
 }
 
 async function sendToGrok(ticker, auditData, grokBtn) {
+    let progressModal = null;
+    let startTime = Date.now();
+    
     try {
-        showNotification(`🤖 Sending ${ticker} data to Grok AI...`, 'info');
+        // Show progress modal with animated spinner
+        progressModal = showGrokProgressModal(ticker);
+        
+        // Enhanced timeout handling with progress updates
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+        
+        // Progress tracking interval
+        let elapsed = 0;
+        const progressInterval = setInterval(() => {
+            elapsed = Math.floor((Date.now() - startTime) / 1000);
+            updateGrokProgress(progressModal, elapsed, ticker);
+        }, 1000);
         
         const response = await fetch('/api/ai-analysis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ticker })
+            body: JSON.stringify({ ticker }),
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+        
         if (!response.ok) {
-            throw new Error(`Grok analysis failed: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Grok analysis failed (${response.status}): ${errorText}`);
         }
         
         const result = await response.json();
         
+        // Close progress modal and show results
+        closeGrokProgressModal(progressModal);
+        
+        // Show analysis in modal instead of just notification
+        showGrokAnalysisModal(ticker, result.analysis, elapsed);
+        
         // Append to audit log
         await appendAIAnalysisToLog(ticker, result.analysis);
         
-        showNotification(`✅ Grok analysis complete for ${ticker}! Added to audit log.`, 'success');
+        showNotification(`✅ Grok analysis complete for ${ticker}! (${elapsed}s)`, 'success');
         
     } catch (error) {
+        if (progressModal) {
+            closeGrokProgressModal(progressModal);
+        }
+        
         console.error('Grok analysis failed:', error);
-        showNotification(`❌ Grok analysis failed: ${error.message}`, 'error');
+        
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+            errorMsg = 'Request timed out after 5 minutes. Grok may be experiencing high load.';
+        } else if (error.message.includes('fetch')) {
+            errorMsg = 'Network error. Check internet connection and try again.';
+        }
+        
+        showNotification(`❌ Grok analysis failed: ${errorMsg}`, 'error');
+        
+        // Show detailed error modal
+        showGrokErrorModal(ticker, errorMsg, Math.floor((Date.now() - startTime) / 1000));
+        
     } finally {
         grokBtn.disabled = false;
+    }
+}
+
+// Grok Progress Modal Functions
+function showGrokProgressModal(ticker) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md mx-4 shadow-2xl">
+            <div class="text-center">
+                <div class="mb-4">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">🤖 Grok AI Analysis</h3>
+                <p class="text-gray-600 mb-4">Analyzing <strong>${ticker}</strong> options data...</p>
+                <div class="bg-gray-100 rounded p-3 text-sm">
+                    <div id="grok-status">📡 Connecting to xAI servers...</div>
+                    <div id="grok-timer" class="text-xs text-gray-500 mt-2">Elapsed: 0s</div>
+                </div>
+                <div class="mt-4 text-xs text-gray-400">
+                    ⏱️ This may take 30-90 seconds for complex analysis<br>
+                    💡 Grok is processing Black-Scholes calculations
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+function updateGrokProgress(modal, elapsed, ticker) {
+    const statusEl = modal.querySelector('#grok-status');
+    const timerEl = modal.querySelector('#grok-timer');
+    
+    let status = '📡 Connecting to xAI servers...';
+    if (elapsed > 3) status = '🧮 Processing Black-Scholes calculations...';
+    if (elapsed > 10) status = '🔍 Analyzing option Greeks and pricing...';
+    if (elapsed > 20) status = '📊 Validating mathematical accuracy...';
+    if (elapsed > 40) status = '📝 Generating detailed analysis report...';
+    if (elapsed > 60) status = '⏳ Finalizing comprehensive review...';
+    
+    if (statusEl) statusEl.textContent = status;
+    if (timerEl) timerEl.textContent = `Elapsed: ${elapsed}s`;
+}
+
+function closeGrokProgressModal(modal) {
+    if (modal && modal.parentNode) {
+        modal.parentNode.removeChild(modal);
+    }
+}
+
+function showGrokAnalysisModal(ticker, analysis, elapsed) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg max-w-4xl max-h-[90vh] mx-4 shadow-2xl flex flex-col">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">🤖 Grok AI Analysis - ${ticker}</h3>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-500">⏱️ ${elapsed}s</span>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="prose max-w-none" id="grok-analysis-content">
+                    ${formatAnalysisAsHTML(analysis)}
+                </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    💾 Analysis saved to audit logs
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="copyGrokAnalysis('${ticker}')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">📋 Copy</button>
+                    <button onclick="this.closest('.fixed').remove()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function showGrokErrorModal(ticker, errorMsg, elapsed) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg max-w-md mx-4 shadow-2xl">
+            <div class="p-6">
+                <div class="text-center">
+                    <div class="text-red-500 text-4xl mb-4">❌</div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">Grok Analysis Failed</h3>
+                    <p class="text-gray-600 mb-4">Ticker: <strong>${ticker}</strong></p>
+                    <div class="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700 mb-4">
+                        ${errorMsg}
+                    </div>
+                    <div class="text-xs text-gray-500 mb-4">Duration: ${elapsed}s</div>
+                    <div class="text-xs text-gray-400 mb-4">
+                        💡 <strong>Troubleshooting:</strong><br>
+                        • Check if ticker has recent audit data<br>
+                        • Verify API key configuration<br>
+                        • Try again in a few minutes<br>
+                        • Check network connectivity
+                    </div>
+                </div>
+                <button onclick="this.closest('.fixed').remove()" class="w-full bg-gray-500 text-white py-2 rounded hover:bg-gray-600">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function formatAnalysisAsHTML(markdownText) {
+    // Convert markdown to HTML (basic conversion)
+    return markdownText
+        .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mb-4">$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mb-3 mt-6">$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3 class="text-lg font-medium mb-2 mt-4">$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n\n/g, '</p><p class="mb-4">')
+        .replace(/^(?!<[h|p])(.+)$/gm, '<p class="mb-4">$1</p>')
+        .replace(/^- (.+)$/gm, '<li class="ml-4">• $1</li>');
+}
+
+function copyGrokAnalysis(ticker) {
+    const content = document.getElementById('grok-analysis-content');
+    if (content) {
+        const text = content.innerText || content.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('📋 Analysis copied to clipboard!', 'success');
+        }).catch(() => {
+            showNotification('❌ Failed to copy to clipboard', 'error');
+        });
     }
 }
 

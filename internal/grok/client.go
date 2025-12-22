@@ -118,9 +118,12 @@ func (c *Client) TestConnectivity() error {
 	return nil
 }
 
-// AnalyzeOptions calls the Grok API to analyze options data
+// AnalyzeOptions calls the Grok API to analyze options data with enhanced progress tracking
 func (c *Client) AnalyzeOptions(ticker, auditData string) (*AnalysisResponse, error) {
-	logger.Warn.Printf("🤖 GROK: Starting analysis for ticker: %s", ticker)
+	logger.Warn.Printf("🤖 GROK: Starting analysis for ticker: %s (audit data: %d bytes)", ticker, len(auditData))
+
+	// Track start time for performance monitoring
+	startTime := time.Now()
 
 	// Construct the expert prompt with audit data
 	prompt := fmt.Sprintf(`You are an expert quantitative analyst specializing in Black-Scholes option pricing models. Validate the mathematical accuracy of the provided calculations for %s.
@@ -137,7 +140,7 @@ Please provide:
 
 Focus on mathematical correctness, not investment advice. Verify calculations using: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls, P = K*e^(-r*T)*N(-d2) - S*N(-d1) for puts.`, ticker, auditData)
 
-	// Prepare Grok API request
+	// Prepare Grok API request with enhanced parameters
 	requestBody := map[string]interface{}{
 		"messages": []map[string]interface{}{
 			{
@@ -147,7 +150,8 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 		},
 		"model":       c.model,
 		"stream":      false,
-		"temperature": 0.3, // More focused, less creative
+		"temperature": 0.3,  // More focused, less creative
+		"max_tokens":  4000, // Ensure sufficient response length
 	}
 
 	reqBytes, err := json.Marshal(requestBody)
@@ -156,10 +160,14 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	logger.Warn.Printf("🤖 GROK: Sending API request to X.AI (payload: %d bytes)", len(reqBytes))
+	logger.Warn.Printf("🤖 GROK: Sending API request to X.AI (payload: %d bytes, max_tokens: 4000)", len(reqBytes))
+
+	// Create context with timeout for better error handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	// Make HTTP request to Grok API with proper context
-	req, err := http.NewRequestWithContext(context.Background(), "POST", c.endpoint, bytes.NewBuffer(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.endpoint, bytes.NewBuffer(reqBytes))
 	if err != nil {
 		logger.Warn.Printf("⚠️🤖 GROK WARNING: Failed to create HTTP request: %v", err)
 		return nil, fmt.Errorf("failed to create request: %v", err)
@@ -169,25 +177,46 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("User-Agent", "barracuda-options-analyzer/1.0")
 
+	// Progress tracking
+	logger.Warn.Printf("🤖 GROK: Request sent, waiting for response...")
+
 	resp, err := c.client.Do(req)
 	if err != nil {
+		duration := time.Since(startTime)
 		// Enhanced error logging for network diagnosis
-		logger.Warn.Printf("⚠️🤖 GROK WARNING: HTTP request failed - Endpoint: %s", c.endpoint)
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Warn.Printf("⚠️🤖 GROK WARNING: Request timeout after %v - API may be experiencing high load", duration)
+			return nil, fmt.Errorf("request timed out after %v - Grok may be experiencing high load", duration)
+		}
+
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: HTTP request failed after %v - Endpoint: %s", duration, c.endpoint)
 		logger.Warn.Printf("⚠️🤖 GROK WARNING: Error details: %v", err)
 		logger.Warn.Printf("⚠️🤖 GROK WARNING: This may indicate network connectivity issues or API service problems")
 		return nil, fmt.Errorf("API request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	logger.Warn.Printf("🤖 GROK: Received response - Status: %d %s", resp.StatusCode, resp.Status)
+	duration := time.Since(startTime)
+	logger.Warn.Printf("🤖 GROK: Received response after %v - Status: %d %s", duration, resp.StatusCode, resp.Status)
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		logger.Warn.Printf("⚠️🤖 GROK WARNING: API error response (Status %d): %s", resp.StatusCode, string(body))
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: API error response (Status %d) after %v: %s", resp.StatusCode, duration, string(body))
+
+		// Enhanced error messages based on status codes
+		switch resp.StatusCode {
+		case 401:
+			return nil, fmt.Errorf("authentication failed - check API key (Status %d)", resp.StatusCode)
+		case 429:
+			return nil, fmt.Errorf("rate limit exceeded - please try again later (Status %d)", resp.StatusCode)
+		case 500, 502, 503, 504:
+			return nil, fmt.Errorf("Grok service temporarily unavailable - try again in a few minutes (Status %d)", resp.StatusCode)
+		default:
+			return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		}
 	}
 
-	// Parse response
+	// Parse response with enhanced error handling
 	var grokResponse struct {
 		Choices []struct {
 			Message struct {
@@ -195,24 +224,42 @@ Focus on mathematical correctness, not investment advice. Verify calculations us
 			} `json:"message"`
 		} `json:"choices"`
 		Usage struct {
-			TotalTokens int `json:"total_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
 		} `json:"usage"`
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+		} `json:"error"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&grokResponse); err != nil {
-		logger.Warn.Printf("⚠️🤖 GROK WARNING: Failed to decode API response: %v", err)
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: Failed to decode API response after %v: %v", duration, err)
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
 
+	// Check for API-level errors in response
+	if grokResponse.Error.Message != "" {
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: API returned error after %v: %s (Type: %s)", duration, grokResponse.Error.Message, grokResponse.Error.Type)
+		return nil, fmt.Errorf("Grok API error: %s", grokResponse.Error.Message)
+	}
+
 	if len(grokResponse.Choices) == 0 {
-		logger.Warn.Printf("⚠️🤖 GROK WARNING: API returned empty choices array")
-		return nil, fmt.Errorf("no response from Grok API")
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: API returned empty choices array after %v", duration)
+		return nil, fmt.Errorf("no response from Grok API - empty choices")
 	}
 
 	analysis := grokResponse.Choices[0].Message.Content
 	tokens := grokResponse.Usage.TotalTokens
 
-	logger.Warn.Printf("🤖 GROK: Analysis completed successfully - %d tokens used, response: %d chars", tokens, len(analysis))
+	// Validate response quality
+	if len(analysis) < 100 {
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: Suspiciously short analysis response (%d chars) after %v", len(analysis), duration)
+	}
+
+	logger.Warn.Printf("🤖 GROK: Analysis completed successfully in %v - %d tokens used (prompt: %d, completion: %d), response: %d chars",
+		duration, tokens, grokResponse.Usage.PromptTokens, grokResponse.Usage.CompletionTokens, len(analysis))
 
 	return &AnalysisResponse{
 		Content: analysis,
