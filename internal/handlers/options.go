@@ -489,7 +489,6 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	startTime := time.Now()
-	fmt.Printf("📊 Analyzing %s options for %d symbols with batch processing\n", req.Strategy, len(req.Symbols))
 
 	// Clean and prepare symbols
 	logger.Debug.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
@@ -528,13 +527,9 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Major Step: Analysis Start
-	auditMode := ""
 	if req.AuditTicker != "" {
-		auditMode = fmt.Sprintf(" | 🔍 AUDIT: %s", req.AuditTicker)
 		logger.Warn.Printf("🔍 AUDIT: Starting analysis with audit ticker %s - detailed logging enabled", req.AuditTicker)
 	}
-	fmt.Printf("🚀 START: %d symbols | %s | %s%s\n",
-		len(cleanSymbols), req.Strategy, map[bool]string{true: "CUDA", false: "CPU"}[h.engine.IsCudaAvailable()], auditMode)
 
 	// Get stock prices in batches (up to 100 symbols per API call)
 	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
@@ -675,8 +670,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 		logger.Debug.Printf("✅ Client connection still active, proceeding with response")
 	}
 
-	fmt.Printf("⚡ PROCESSING STATS: Engine=%s | Duration=%.3fs | Symbols=%d | Results=%d | Mode=%s | Workload=%.1fx\n",
-		engineType, duration.Seconds(), len(cleanSymbols), len(results), h.config.Engine.ExecutionMode, h.config.Engine.WorkloadFactor)
+	// Processing stats logged internally
 
 	// Final processing summary - ALWAYS show real job stats, ADD workload if present
 	processingStats := fmt.Sprintf("✅ Processed %d symbols | Returned %d results | %.3f seconds | Engine: %s",
@@ -686,7 +680,6 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	if h.config.Engine.WorkloadFactor > 0.0 && totalSamplesProcessed > 0 {
 		processingStats += fmt.Sprintf(" | %d Monte Carlo samples", totalSamplesProcessed)
 	}
-	fmt.Printf("%s\n", processingStats)
 
 	// Convert to formatted response with dual values
 	logger.Debug.Printf("🔄 Converting %d results to formatted response", len(results))
@@ -898,7 +891,6 @@ func (h *OptionsHandler) DownloadCSVHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	startTime := time.Now()
-	fmt.Printf("📊 CSV Generation: Analyzing %s options for %d symbols\n", req.Strategy, len(cleanSymbols))
 
 	// Get stock prices (same as AnalyzeHandler)
 	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols, auditTickerPtr)
@@ -1064,7 +1056,7 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 		}
 
 		// Get options for this symbol (audit ticker is passed through to API calls)
-		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy, auditTicker)
+		optionsChain, err := h.alpacaClient.GetOptionsChain([]string{symbol}, req.ExpirationDate, req.Strategy, req.TargetDelta, auditTicker)
 		if err != nil {
 			logger.Error.Printf("❌ Error getting options for %s: %v", symbol, err)
 			continue
@@ -1142,26 +1134,20 @@ func (h *OptionsHandler) findBestOptionContract(contracts []*alpaca.OptionContra
 	var bestContract *alpaca.OptionContract
 	bestDistance := float64(999999)
 
-	// Calculate target strike based on delta/risk level
+	// Calculate target strike based on delta/risk level for PUTS ONLY
+	// Must match the Alpaca client filtering thresholds exactly
 	var targetMultiplier float64
-	if strategy == "puts" {
-		if targetDelta <= 0.30 {
-			targetMultiplier = 0.88 // 12% OTM for LOW risk
-		} else if targetDelta <= 0.60 {
-			targetMultiplier = 0.95 // 5% OTM for MOD risk
-		} else {
-			targetMultiplier = 0.98 // 2% OTM for HIGH risk
-		}
-	} else {
-		if targetDelta <= 0.30 {
-			targetMultiplier = 1.12 // 12% ITM for LOW risk calls
-		} else if targetDelta <= 0.60 {
-			targetMultiplier = 1.05 // 5% ITM for MOD risk calls
-		} else {
-			targetMultiplier = 1.02 // 2% ITM for HIGH risk calls
-		}
+	if targetDelta <= 0.15 { // LOW risk (low delta)
+		targetMultiplier = 0.88 // 12% OTM for LOW risk (far from stock, low delta)
+	} else if targetDelta <= 0.25 { // MOD risk
+		targetMultiplier = 0.95 // 5% OTM for MOD risk
+	} else { // HIGH risk (high delta)
+		targetMultiplier = 0.98 // 2% OTM for HIGH risk (close to stock, high delta)
 	}
 	targetStrike := stockPrice * targetMultiplier
+
+	logger.Verbose.Printf("🎯 TARGET STRIKE: $%.2f (%.1f%% of stock $%.2f) for delta %.3f",
+		targetStrike, targetMultiplier*100, stockPrice, targetDelta)
 
 	for _, contract := range contracts {
 		// Parse strike price
@@ -1558,7 +1544,7 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 						"S":           auditContract.UnderlyingPrice,
 						"K":           auditContract.StrikePrice,
 						"T":           float64(auditContract.DaysToExpiration) / 365.0, // Convert days to years
-						"r":           0.05,                                     // Default risk-free rate (we should get this from config)
+						"r":           0.05,                                            // Default risk-free rate (we should get this from config)
 						"sigma":       auditContract.ImpliedVolatility,
 						"option_type": string(auditContract.OptionType),
 					},

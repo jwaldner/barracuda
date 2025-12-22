@@ -56,16 +56,16 @@ func (pw *PerformanceWrapper) GetStockPricesBatch(symbols []string, auditTicker 
 }
 
 // GetOptionsChain wraps the original method with performance monitoring
-func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, strategy string, auditTicker *string) (map[string][]*OptionContract, error) {
+func (pw *PerformanceWrapper) GetOptionsChain(symbols []string, expirationDate, strategy string, targetDelta float64, auditTicker *string) (map[string][]*OptionContract, error) {
 	start := time.Now()
-	result, err := pw.client.GetOptionsChain(symbols, expirationDate, strategy, auditTicker)
+	result, err := pw.client.GetOptionsChain(symbols, expirationDate, strategy, targetDelta, auditTicker)
 	duration := time.Since(start)
 
 	pw.recordRequest(duration)
 
-	logger.Debug.Printf("📡 API CALL: GetOptionsChain(%d symbols, %s) took %v", len(symbols), expirationDate, duration)
+	logger.Debug.Printf("📡 API CALL: GetOptionsChain(%d symbols, %s, delta %.3f) took %v", len(symbols), expirationDate, targetDelta, duration)
 	if duration > 10*time.Second {
-		logger.Debug.Printf("⚠️  SLOW API CALL: GetOptionsChain(%d symbols, %s) took %v", len(symbols), expirationDate, duration)
+		logger.Debug.Printf("⚠️  SLOW API CALL: GetOptionsChain(%d symbols, %s, delta %.3f) took %v", len(symbols), expirationDate, targetDelta, duration)
 	}
 
 	return result, err

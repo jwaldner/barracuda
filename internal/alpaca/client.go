@@ -17,7 +17,7 @@ import (
 type AlpacaInterface interface {
 	GetStockPrice(symbol string, auditTicker *string) (*StockPrice, error)
 	GetStockPricesBatch(symbols []string, auditTicker *string) (map[string]*StockPrice, error)
-	GetOptionsChain(symbols []string, expirationDate, strategy string, auditTicker *string) (map[string][]*OptionContract, error)
+	GetOptionsChain(symbols []string, expirationDate, strategy string, targetDelta float64, auditTicker *string) (map[string][]*OptionContract, error)
 	GetOptionQuote(symbol string, auditTicker *string) (*OptionQuote, error)
 }
 
@@ -340,7 +340,7 @@ func (c *Client) GetStockPrice(symbol string, auditTicker *string) (*StockPrice,
 }
 
 // Get options chain from Alpaca with filtering per symbol
-func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy string, auditTicker *string) (map[string][]*OptionContract, error) {
+func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy string, targetDelta float64, auditTicker *string) (map[string][]*OptionContract, error) {
 	contractsBySymbol := make(map[string][]*OptionContract)
 
 	// Get stock prices in batches first to determine strike limits
@@ -382,15 +382,25 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 			q.Add("expiration_date", expiration)
 		}
 
-		// Filter by option type - PUTS ONLY
+		// Filter by option type - PUTS ONLY (system never uses calls)
 		q.Add("type", "put")
-		// For puts: get MUCH wider range to have plenty of options to pick from
-		maxStrike := fmt.Sprintf("%.0f", stockPrice*1.05) // 105% of stock price (ITM puts)
-		minStrike := fmt.Sprintf("%.0f", stockPrice*0.75) // 75% of stock price (deep OTM puts)
+		// For puts: get OTM strikes only (below stock price) based on target delta
+		var maxMultiplier float64
+		if targetDelta <= 0.15 { // LOW risk (low delta)
+			maxMultiplier = 0.88 // 12% OTM (far from stock price, low delta)
+		} else if targetDelta <= 0.25 { // MOD risk
+			maxMultiplier = 0.95 // 5% OTM (medium distance)
+		} else { // HIGH risk (high delta)
+			maxMultiplier = 0.98 // 2% OTM (close to stock price, high delta)
+		}
+
+		// Always OTM puts: strikes below stock price only
+		maxStrike := fmt.Sprintf("%.0f", stockPrice*maxMultiplier) // Below stock price
+		minStrike := fmt.Sprintf("%.0f", stockPrice*0.70)          // Deep OTM (70% of stock price)
 		q.Add("strike_price_gte", minStrike)
 		q.Add("strike_price_lte", maxStrike)
-		logger.Verbose.Printf("🔍 ALPACA FILTER: %s PUTS - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
-			symbol, minStrike, maxStrike, 75.0, 105.0, stockPrice)
+		logger.Verbose.Printf("🔍 ALPACA FILTER: %s PUTS (delta %.3f) - strikes $%s to $%s (%.0f%% to %.0f%% of stock $%.2f)",
+			symbol, targetDelta, minStrike, maxStrike, 70.0, maxMultiplier*100, stockPrice)
 
 		q.Add("limit", "1000")
 		req.URL.RawQuery = q.Encode()
