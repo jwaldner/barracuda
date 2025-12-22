@@ -195,7 +195,7 @@ func Load() *Config {
 		cfg.CSV = yamlCfg.CSV
 		// Set default filename format if not specified
 		if cfg.CSV.FilenameFormat == "" {
-			cfg.CSV.FilenameFormat = "{time}_{exp_date}_{delta}_{strategy}.csv"
+			cfg.CSV.FilenameFormat = "{time}_{exp_date}_{delta}_{strategy}_{symbols}symbols.csv"
 		}
 
 		// Validate execution mode

@@ -206,7 +206,6 @@ func run() error {
 	// Main application endpoints
 	r.HandleFunc("/", optionsHandler.HomeHandler).Methods("GET")
 	r.HandleFunc("/api/analyze", optionsHandler.AnalyzeHandler).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/download-csv", optionsHandler.DownloadCSVHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/test-connection", optionsHandler.TestConnectionHandler).Methods("GET", "OPTIONS")
 
 	// Audit system endpoints

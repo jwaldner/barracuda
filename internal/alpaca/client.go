@@ -23,7 +23,7 @@ type AlpacaInterface interface {
 
 const (
 	// Rate limiting for Alpaca Basic Plan (200 requests per minute)
-	BasicPlanDelay = 350 * time.Millisecond
+	BasicPlanDelay = 320 * time.Millisecond
 
 	// Rate limiting for Alpaca Algo Trader Plus (10,000 requests per minute)
 	AlgoPlusDelay = 10 * time.Millisecond
@@ -136,22 +136,30 @@ type AlpacaOptionsResponse struct {
 	NextPageToken interface{}      `json:"next_page_token"`
 }
 
-// Get batch stock prices from Alpaca (up to 100 symbols per request)
+// Get batch stock prices from Alpaca (up to 50 symbols per batch for rate limiting)
 func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map[string]*StockPrice, error) {
 	results := make(map[string]*StockPrice)
+	totalStartTime := time.Now()
+	totalRequests := 0
 
-	// Process in batches of 100 (Alpaca limit)
-	batchSize := 100
+	// Process in batches of 50 (rate limit optimization)
+	batchSize := 50
+	totalBatches := (len(symbols) + batchSize - 1) / batchSize
+	logger.Info.Printf("📦 STOCK_BATCH_LOOP: Starting %d batches of %d symbols each", totalBatches, batchSize)
+
 	for i := 0; i < len(symbols); i += batchSize {
 		batchStartTime := time.Now()
+		batchNum := (i / batchSize) + 1
 		end := i + batchSize
 		if end > len(symbols) {
 			end = len(symbols)
 		}
 
 		batch := symbols[i:end]
+		logger.Info.Printf("📦 STOCK_BATCH_LOOP: Batch %d/%d processing %d symbols", batchNum, totalBatches, len(batch))
 		batchResults, err := c.getStockPricesBatchInternal(batch)
 		batchDuration := time.Since(batchStartTime)
+		totalRequests++
 
 		if err != nil {
 			return nil, fmt.Errorf("batch %d-%d failed: %v", i, end-1, err)
@@ -189,11 +197,18 @@ func (c *Client) GetStockPricesBatch(symbols []string, auditTicker *string) (map
 			}
 		}
 
+		logger.Info.Printf("📦 STOCK_BATCH_LOOP: Batch %d/%d completed in %v", batchNum, totalBatches, batchDuration)
+
 		// Rate limiting - 200 requests per minute
 		if i+batchSize < len(symbols) {
+			logger.Info.Printf("😴 STOCK_BATCH_LOOP: Sleeping %v for rate limiting", BasicPlanDelay)
 			time.Sleep(BasicPlanDelay)
 		}
 	}
+
+	totalDuration := time.Since(totalStartTime)
+	reqPerMin := float64(totalRequests) / totalDuration.Minutes()
+	logger.Info.Printf("🏁 STOCK_BATCH_LOOP: Finished %d batches in %v (%.1f req/min)", totalBatches, totalDuration, reqPerMin)
 
 	return results, nil
 }
@@ -360,9 +375,14 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 	}
 
 	// Process each symbol individually for options
-	for _, symbol := range cleanSymbols {
+	optionsStartTime := time.Now()
+	optionsRequests := 0
+	logger.Info.Printf("📋 OPTIONS_LOOP: Starting options lookup for %d symbols", len(cleanSymbols))
+
+	for symbolIndex, symbol := range cleanSymbols {
 		symbolStartTime := time.Now()
 		symbol = strings.TrimSpace(symbol)
+		logger.Info.Printf("📋 OPTIONS_LOOP: Symbol %d/%d processing %s", symbolIndex+1, len(cleanSymbols), symbol)
 
 		stockPrice, exists := stockPrices[symbol]
 		if !exists {
@@ -588,9 +608,18 @@ func (c *Client) GetOptionsChain(symbols []string, expiration string, strategy s
 			})
 		}
 
-		// Rate limiting between options requests
+		currentSymbolDuration := time.Since(symbolStartTime)
+		optionsRequests++
+		logger.Info.Printf("📋 OPTIONS_LOOP: Symbol %d/%d (%s) completed in %v", symbolIndex+1, len(cleanSymbols), symbol, currentSymbolDuration)
+
+		// Rate limiting between options requests (300ms minimum for 200 req/min)
+		logger.Info.Printf("😴 OPTIONS_LOOP: Sleeping %v for rate limiting", BasicPlanDelay)
 		time.Sleep(BasicPlanDelay)
 	}
+
+	optionsDuration := time.Since(optionsStartTime)
+	optionsReqPerMin := float64(optionsRequests) / optionsDuration.Minutes()
+	logger.Info.Printf("🏁 OPTIONS_LOOP: Finished %d symbols in %v (%.1f req/min)", len(cleanSymbols), optionsDuration, optionsReqPerMin)
 
 	return contractsBySymbol, nil
 }

@@ -1,3 +1,11 @@
+/*
+ * CRITICAL RULES - NEVER VIOLATE:
+ * 1. NO hardcoded strings, arrays, or config values in this file
+ * 2. ALL data comes from window.templateFunction() from backend
+ * 3. Config changes in YAML should never require JS changes
+ * 4. Use backend template functions for ALL dynamic content
+ */
+
 // Global variables
 let selectedDelta;
 let backendConfig;
@@ -62,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Setup risk selector event listeners
+	// Standard config utilities are provided by template - no setup needed    // Setup risk selector event listeners
     setupRiskSelector();
     
     // Set default risk level from backend config
@@ -90,25 +98,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 return field;
             };
             
+            // Get field mapping from backend - NO hardcoded fields
+            const fieldKeys = window.tableFieldKeys() || [];
+            
             window.lastResults.forEach((option, index) => {
-                const ticker = getRawValue(option.ticker);
-                const company = getRawValue(option.company) || ticker;
-                const sector = getRawValue(option.sector) || 'Unknown';
+                const row = [];
+                
+                // Build row dynamically using backend field mapping
+                fieldKeys.forEach(fieldKey => {
+                    let value = getRawValue(option[fieldKey]);
                     
-                const row = [
-                    getRawValue(option.rank) || (index + 1),
-                    ticker,
-                    company,
-                    sector,
-                    getRawValue(option.strike),
-                    getRawValue(option.stock_price),
-                    getRawValue(option.premium),
-                    getRawValue(option.max_contracts),
-                    getRawValue(option.total_premium),
-                    getRawValue(option.profit_percentage),
-                    getRawValue(option.annualized),
-                    getRawValue(option.expiration)
-                ];
+                    // Handle special cases
+                    if (fieldKey === 'rank' && !value) {
+                        value = index + 1;
+                    }
+                    if (fieldKey === 'company' && !value) {
+                        value = getRawValue(option.ticker) || '';
+                    }
+                    if (fieldKey === 'sector' && !value) {
+                        value = 'Unknown';
+                    }
+                    
+                    // Quote values that contain commas
+                    if (typeof value === 'string' && value.includes(',')) {
+                        value = `"${value}"`;
+                    }
+                    
+                    row.push(value || '');
+                });
+                
                 csvContent += row.join(',') + '\n';
             });
             
@@ -119,92 +137,87 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // CSV Download functionality (Download file)
+    // CSV Download functionality (Download file) - LIGHTNING FAST using cached data
     const downloadCSVBtn = document.getElementById('downloadCSVBtn');
     if (downloadCSVBtn) {
-        downloadCSVBtn.addEventListener('click', async function() {
-            if (!window.lastAnalysisRequest) {
-                showNotification('❌ No analysis data available for download', 'error');
+        downloadCSVBtn.addEventListener('click', function() {
+            if (!window.lastResults || !window.lastAnalysisRequest) {
+                showNotification('❌ No analysis data available for download. Run analysis first.', 'error');
                 return;
             }
             
-            try {
-                // Use current frontend selection for filename
-                const csvRequest = Object.assign({}, window.lastAnalysisRequest);
-                csvRequest.target_delta = selectedDelta; // Use what's actually selected now
+            // ⚡ Generate CSV from cached data instantly - NO API CALLS!
+            const headers = window.csvHeaders || [];
+            let csvContent = headers.join(',') + '\n';
+            
+            // Helper function to get raw value for CSV
+            const getRawValue = (field) => {
+                if (!field) return '';
+                if (typeof field === 'object' && field.raw !== undefined) {
+                    return field.raw;
+                }
+                return field;
+            };
+            
+            // Get field mapping from backend - NO hardcoded fields
+            const fieldKeys = window.tableFieldKeys() || [];
+            
+            window.lastResults.forEach((option, index) => {
+                const row = [];
                 
-                console.log('Making fetch request to /api/download-csv');
-                const response = await fetch('/api/download-csv', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(csvRequest)
+                // Build row dynamically using backend field mapping
+                fieldKeys.forEach(fieldKey => {
+                    let value = getRawValue(option[fieldKey]);
+                    
+                    // Handle special cases
+                    if (fieldKey === 'rank' && !value) {
+                        value = index + 1;
+                    }
+                    if (fieldKey === 'company' && !value) {
+                        value = getRawValue(option.ticker) || '';
+                    }
+                    if (fieldKey === 'sector' && !value) {
+                        value = 'Unknown';
+                    }
+                    
+                    // Quote values that contain commas
+                    if (typeof value === 'string' && value.includes(',')) {
+                        value = `"${value}"`;
+                    }
+                    
+                    row.push(value || '');
                 });
                 
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.log('Error response:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-                }
-                
-                // Get filename from response headers or generate default
-                const contentDisposition = response.headers.get('Content-Disposition');
-                console.log('Content-Disposition:', contentDisposition);
-                let filename = 'options-analysis.csv';
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                    if (filenameMatch) {
-                        filename = filenameMatch[1];
-                    }
-                }
-                console.log('Filename:', filename);
-                
-                // Save the file first
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                
-                // Then open the same content in new tab
-                setTimeout(() => {
-                    window.open(url, '_blank');
-                }, 100);
-                
-                // Clean up
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                }, 1000);
-                
-                // Show notification
-                showNotification('💾 CSV saved & opened!', 'success');
-                
-                // Make notification open the CSV file 
-                setTimeout(() => {
-                    const notification = document.getElementById('notification');
-                    if (notification) {
-                        notification.onclick = function() {
-                            if (window.lastCSVBlob) {
-                                const csvUrl = URL.createObjectURL(window.lastCSVBlob);
-                                window.open(csvUrl, '_blank');
-                                setTimeout(() => URL.revokeObjectURL(csvUrl), 1000);
-                            }
-                        };
-                    }
-                }, 100);
-                
-            } catch (error) {
-                console.error('CSV download failed:', error);
-                showNotification(`❌ Download failed: ${error.message}`, 'error');
-            }
+                csvContent += row.join(',') + '\n';
+            });
+            
+			// Use template function directly - standard pattern
+			const filename = window.generateCSVFilename(
+				window.lastAnalysisRequest.target_delta || 0.30,
+				window.lastAnalysisRequest.expiration_date || 'unknown',
+				window.lastAnalysisRequest.strategy || 'options',
+				window.lastResults.length
+			);            // ⚡ Instant download - no network request!
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Store for potential reuse
+            window.lastCSVBlob = blob;
+            
+            // Clean up
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 1000);
+            
+            // Show success notification
+            showNotification(`⚡ CSV downloaded instantly! (${window.lastResults.length} results)`, 'success');
         });
     }
 });
