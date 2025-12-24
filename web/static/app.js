@@ -828,7 +828,9 @@ async function sendToGrok(ticker, auditData, grokBtn) {
         
         // Enhanced timeout handling with progress updates
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+        window.grokController = controller;  // Store globally for cancel function
+        window.grokProgressModal = progressModal;  // Store globally for cancel function
+        const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 minute timeout
         
         // Progress tracking interval
         let elapsed = 0;
@@ -840,7 +842,10 @@ async function sendToGrok(ticker, auditData, grokBtn) {
         const response = await fetch('/api/ai-analysis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ticker }),
+            body: JSON.stringify({ 
+                ticker,
+                custom_prompt: getCustomPrompt()
+            }),
             signal: controller.signal
         });
         
@@ -885,11 +890,39 @@ async function sendToGrok(ticker, auditData, grokBtn) {
         showGrokErrorModal(ticker, errorMsg, Math.floor((Date.now() - startTime) / 1000));
         
     } finally {
-        grokBtn.disabled = false;
+        // Clean up
+        if (grokBtn) grokBtn.disabled = false;
+        if (progressModal) closeGrokProgressModal(progressModal);
+        
+        // Clean up global variables
+        window.grokController = null;
+        window.grokProgressModal = null;
     }
 }
 
 // Grok Progress Modal Functions
+function cancelGrokAnalysis() {
+    console.log('🚫 Canceling Grok analysis');
+    
+    if (window.grokController) {
+        window.grokController.abort();
+        showNotification('❌ Grok analysis cancelled', 'info');
+        
+        // Close progress modal
+        if (window.grokProgressModal) {
+            closeGrokProgressModal(window.grokProgressModal);
+        }
+        
+        // Re-enable Grok button
+        const grokBtn = document.getElementById('grok-btn');
+        if (grokBtn) grokBtn.disabled = false;
+        
+        // Clean up
+        window.grokController = null;
+        window.grokProgressModal = null;
+    }
+}
+
 function showGrokProgressModal(ticker) {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -900,15 +933,20 @@ function showGrokProgressModal(ticker) {
                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
                 </div>
                 <h3 class="text-lg font-bold text-gray-800 mb-2">🤖 Grok AI Analysis</h3>
-                <p class="text-gray-600 mb-4">Analyzing <strong>${ticker}</strong> options data...</p>
+                <p class="text-gray-600 mb-4">Analyzing <strong>${ticker}</strong> data...</p>
                 <div class="bg-gray-100 rounded p-3 text-sm">
                     <div id="grok-status">📡 Connecting to xAI servers...</div>
                     <div id="grok-timer" class="text-xs text-gray-500 mt-2">Elapsed: 0s</div>
                 </div>
                 <div class="mt-4 text-xs text-gray-400">
                     ⏱️ This may take 30-90 seconds for complex analysis<br>
-                    💡 Grok is processing Black-Scholes calculations
+                    💡 Grok is analyzing data
                 </div>
+                <button id="cancel-grok-btn" 
+                    class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors"
+                    onclick="cancelGrokAnalysis()">
+                    Cancel Analysis
+                </button>
             </div>
         </div>
     `;
@@ -921,14 +959,36 @@ function updateGrokProgress(modal, elapsed, ticker) {
     const timerEl = modal.querySelector('#grok-timer');
     
     let status = '📡 Connecting to xAI servers...';
-    if (elapsed > 3) status = '🧮 Processing Black-Scholes calculations...';
-    if (elapsed > 10) status = '🔍 Analyzing option Greeks and pricing...';
-    if (elapsed > 20) status = '📊 Validating mathematical accuracy...';
-    if (elapsed > 40) status = '📝 Generating detailed analysis report...';
-    if (elapsed > 60) status = '⏳ Finalizing comprehensive review...';
+    if (elapsed > 3) status = '🧮 Processing analysis...';
+    if (elapsed > 10) status = '🔍 Analyzing data...';
+    if (elapsed > 20) status = '📊 Validating results...';
+    if (elapsed > 40) status = '📝 Generating analysis report...';
+    if (elapsed > 60) status = '⏳ Finalizing review...';
     
     if (statusEl) statusEl.textContent = status;
     if (timerEl) timerEl.textContent = `Elapsed: ${elapsed}s`;
+}
+
+function cancelGrokAnalysis() {
+    console.log('🚫 Canceling Grok analysis');
+    
+    if (window.grokController) {
+        window.grokController.abort();
+        showNotification('❌ Grok analysis cancelled', 'info');
+        
+        // Close progress modal
+        if (window.grokProgressModal) {
+            closeGrokProgressModal(window.grokProgressModal);
+        }
+        
+        // Re-enable Grok button
+        const grokBtn = document.getElementById('grok-btn');
+        if (grokBtn) grokBtn.disabled = false;
+        
+        // Clean up
+        window.grokController = null;
+        window.grokProgressModal = null;
+    }
 }
 
 function closeGrokProgressModal(modal) {
@@ -1312,6 +1372,10 @@ async function handleSubmit(e) {
     const errorEl = document.getElementById('error-message');
     if (errorEl) errorEl.classList.add('hidden');
     
+    // Hide analyze button during processing
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (analyzeBtn) analyzeBtn.classList.add('hidden');
+    
     // Hide footer when job starts
     const statusFooter = document.getElementById('statusFooter');
     if (statusFooter) {
@@ -1355,13 +1419,17 @@ async function handleSubmit(e) {
 	// Store for CSV download
 	window.lastAnalysisRequest = requestData;
 	
+	// Create abort controller for cancellation
+	window.analysisController = new AbortController();
+	
 	try {
         const response = await fetch('/api/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(requestData),
+            signal: window.analysisController.signal
         });
 
         if (!response.ok) {
@@ -1406,6 +1474,13 @@ async function handleSubmit(e) {
         }
     } finally {
         document.getElementById('loading').classList.add('hidden');
+        
+        // Restore button state
+        const analyzeBtn = document.getElementById('analyze-btn');
+        if (analyzeBtn) analyzeBtn.classList.remove('hidden');
+        
+        // Clean up abort controller
+        window.analysisController = null;
     }
 }
 
@@ -1439,9 +1514,55 @@ document.addEventListener('DOMContentLoaded', function () {
     const analyzeBtn = document.getElementById('analyze-btn');
     if (analyzeBtn) analyzeBtn.addEventListener('click', handleSubmit);
 
+    // Setup cancel button
     // Set default strategy and risk level
     switchStrategy('puts');
     setTimeout(() => {
         selectRiskDeltaQuest(0.10);
     }, 100);
+    
+    // Initialize custom prompt section
+    initializeCustomPrompt();
 });
+
+// Custom Prompt Functions
+function initializeCustomPrompt() {
+    // Set initial state - collapsed by default
+    const section = document.getElementById('custom-prompt-section');
+    const icon = document.getElementById('prompt-toggle-icon');
+    
+    if (section && icon) {
+        section.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+function toggleCustomPrompt() {
+    const section = document.getElementById('custom-prompt-section');
+    const icon = document.getElementById('prompt-toggle-icon');
+    
+    if (section && icon) {
+        const isVisible = section.style.display !== 'none';
+        
+        if (isVisible) {
+            section.style.display = 'none';
+            icon.textContent = '▶';
+        } else {
+            section.style.display = 'block';
+            icon.textContent = '▼';
+        }
+    }
+}
+
+function getCustomPrompt() {
+    const textarea = document.getElementById('custom-prompt');
+    return textarea ? textarea.value.trim() : '';
+}
+
+function clearPrompt() {
+    const textarea = document.getElementById('custom-prompt');
+    if (textarea) {
+        textarea.value = '';
+        textarea.focus();
+    }
+}

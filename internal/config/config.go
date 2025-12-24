@@ -44,9 +44,10 @@ type Config struct {
 	AlpacaSecretKey string
 
 	// Grok AI API settings
-	GrokAPIKey   string
-	GrokEndpoint string
-	GrokModel    string
+	GrokAPIKey         string
+	GrokEndpoint       string
+	GrokModel          string
+	GrokTimeoutMinutes int
 
 	// Default application settings
 	DefaultStocks    []string
@@ -81,11 +82,12 @@ type EngineConfig struct {
 }
 
 type YAMLConfig struct {
-	Alpaca       AlpacaConfig  `yaml:"alpaca"`
-	GrokAPIKey   string        `yaml:"grok_api_key"`
-	GrokEndpoint string        `yaml:"grok_endpoint"`
-	GrokModel    string        `yaml:"grok_model"`
-	Logging      LoggingConfig `yaml:"logging"`
+	Alpaca             AlpacaConfig  `yaml:"alpaca"`
+	GrokAPIKey         string        `yaml:"grok_api_key"`
+	GrokEndpoint       string        `yaml:"grok_endpoint"`
+	GrokModel          string        `yaml:"grok_model"`
+	GrokTimeoutMinutes int           `yaml:"grok_timeout_minutes"`
+	Logging            LoggingConfig `yaml:"logging"`
 
 	Trading struct {
 		DefaultCash      int      `yaml:"default_cash"`
@@ -103,17 +105,18 @@ type YAMLConfig struct {
 
 func Load() *Config {
 	cfg := &Config{
-		Port:             getEnv("PORT", "8080"),
-		AlpacaAPIKey:     getEnv("ALPACA_API_KEY", ""),
-		AlpacaSecretKey:  getEnv("ALPACA_SECRET_KEY", ""),
-		GrokAPIKey:       getEnv("GROK_API_KEY", ""),
-		GrokEndpoint:     getEnv("GROK_ENDPOINT", "https://api.x.ai/v1/chat/completions"),
-		GrokModel:        getEnv("GROK_MODEL", "grok-3"),
-		DefaultStocks:    getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
-		DefaultCash:      getEnvInt("DEFAULT_CASH", 10000),
-		DefaultStrategy:  getEnv("DEFAULT_STRATEGY", "puts"),
-		DefaultRiskLevel: getEnv("DEFAULT_RISK_LEVEL", "LOW"),
-		MaxResults:       getEnvInt("MAX_RESULTS", 25), // Default logging configuration
+		Port:               getEnv("PORT", "8080"),
+		AlpacaAPIKey:       getEnv("ALPACA_API_KEY", ""),
+		AlpacaSecretKey:    getEnv("ALPACA_SECRET_KEY", ""),
+		GrokAPIKey:         getEnv("GROK_API_KEY", ""),
+		GrokEndpoint:       getEnv("GROK_ENDPOINT", "https://api.x.ai/v1/chat/completions"),
+		GrokModel:          getEnv("GROK_MODEL", "grok-3"),
+		GrokTimeoutMinutes: getEnvInt("GROK_TIMEOUT_MINUTES", 15),
+		DefaultStocks:      getEnvStringSlice("DEFAULT_STOCKS", []string{}), // No defaults - use S&P 500 ranking
+		DefaultCash:        getEnvInt("DEFAULT_CASH", 10000),
+		DefaultStrategy:    getEnv("DEFAULT_STRATEGY", "puts"),
+		DefaultRiskLevel:   getEnv("DEFAULT_RISK_LEVEL", "LOW"),
+		MaxResults:         getEnvInt("MAX_RESULTS", 25), // Default logging configuration
 		Logging: LoggingConfig{
 			LogLevel: getEnv("LOG_LEVEL", "info"),
 			LogFile:  getEnv("LOG_FILE", "barracuda.log"),
@@ -167,6 +170,9 @@ func Load() *Config {
 		}
 		if yamlCfg.GrokModel != "" {
 			cfg.GrokModel = yamlCfg.GrokModel
+		}
+		if yamlCfg.GrokTimeoutMinutes > 0 {
+			cfg.GrokTimeoutMinutes = yamlCfg.GrokTimeoutMinutes
 		}
 
 		if yamlCfg.Trading.DefaultCash > 0 {
@@ -315,6 +321,7 @@ func GetAuditConfig() *AuditLogConfig {
 	}
 	// Return defaults if no config loaded
 	return &AuditLogConfig{
-		FilenameFormat: "{ticker}-{exp_date}",
+		FilenameFormat:   "{ticker}-{exp_date}",
+		AIAnalysisPrompt: "Please analyze the provided options data and calculations for accuracy and completeness.",
 	}
 }

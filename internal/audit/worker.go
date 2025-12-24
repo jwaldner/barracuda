@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jwaldner/barracuda/internal/config"
+	"github.com/jwaldner/barracuda/internal/grok"
 	"github.com/jwaldner/barracuda/internal/logger"
 )
 
@@ -260,6 +261,72 @@ func auditWorker(ch chan AuditAction) {
 				logger.Warn.Printf("⚠️ AUDIT: Failed to move %s to %s: %v", auditFileName, archiveName, err)
 			} else {
 				logger.Warn.Printf("📁 AUDIT: Moved %s to %s (analysis complete)", auditFileName, archiveName)
+			}
+
+		case "grok_analyze":
+			// Grok analysis operation - call grok client and create .md file
+			var customPrompt string
+			if action.Data != nil {
+				if dataMap, ok := action.Data.(map[string]interface{}); ok {
+					if prompt, exists := dataMap["custom_prompt"]; exists && prompt != nil {
+						if promptStr, ok := prompt.(string); ok {
+							customPrompt = promptStr
+						}
+					}
+				}
+			}
+
+			// Read audit.json file
+			auditData, err := os.ReadFile(auditFileName)
+			if err != nil {
+				logger.Warn.Printf("🤖 GROK: No audit.json file found: %v", err)
+				continue
+			}
+
+			// Call Grok API through worker
+			grokClient := grok.NewClient()
+
+			response, err := grokClient.AnalyzeOptions(string(auditData), customPrompt)
+			if err != nil {
+				logger.Warn.Printf("⚠️🤖 GROK WARNING: API call failed: %v", err)
+				continue
+			}
+
+			// Format analysis with custom prompt
+			analysis := grok.FormatAnalysisWithPrompt(response, customPrompt)
+
+			// Parse audit file to get ticker and expiry
+			var auditFile AuditFile
+			if err := json.Unmarshal(auditData, &auditFile); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to parse audit file: %v", err)
+				continue
+			}
+
+			ticker := auditFile.Header.Ticker
+			expiry := auditFile.Header.ExpiryDate
+
+			// Save markdown file
+			auditConfig := config.GetAuditConfig()
+			baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, ticker, expiry, "")
+			mdName := fmt.Sprintf("audits/%s.md", baseName)
+
+			if err := os.MkdirAll("audits", 0755); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to create audits directory: %v", err)
+				continue
+			}
+
+			if err := os.WriteFile(mdName, []byte(analysis), 0644); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to create analysis file %s: %v", mdName, err)
+			} else {
+				logger.Warn.Printf("📋 AUDIT: Created analysis %s", mdName)
+			}
+
+			// Move audit.json to audits directory
+			archiveName := fmt.Sprintf("audits/%s.json", baseName)
+			if err := os.Rename(auditFileName, archiveName); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to move %s to %s: %v", auditFileName, archiveName, err)
+			} else {
+				logger.Warn.Printf("📁 AUDIT: Moved %s to %s (grok analysis complete)", auditFileName, archiveName)
 			}
 		}
 	}

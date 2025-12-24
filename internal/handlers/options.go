@@ -1512,15 +1512,20 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Parse request body - no ticker needed
+	// Parse request body to get custom prompt
 	var requestData struct {
-		// Removed ticker field - will read from audit.json
+		Ticker       string `json:"ticker"`
+		CustomPrompt string `json:"custom_prompt"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to parse request body: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Extract custom prompt
+	customPrompt := strings.TrimSpace(requestData.CustomPrompt)
+	logger.Warn.Printf("🤖 GROK: Received custom prompt: '%s' (length: %d)", customPrompt, len(customPrompt))
 
 	// Read ticker from audit.json file instead of API request
 	auditFileName := "audit.json"
@@ -1562,91 +1567,84 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	logger.Warn.Printf("🤖 GROK: Calling Grok API for analysis... (audit data: %d bytes)", len(auditBytes))
 
 	// Create Grok client and call API with comprehensive error handling
-	grokClient, err := grok.NewClient()
+	grokClient := grok.NewClient()
 	var analysis string
 	var processingTime time.Duration
 	startTime := time.Now()
 
+	response, err := grokClient.AnalyzeOptions(string(auditBytes), customPrompt)
+	processingTime = time.Since(startTime)
+
 	if err != nil {
-		processingTime = time.Since(startTime)
-		logger.Warn.Printf("⚠️🤖 GROK WARNING: Failed to create client after %v: %v", processingTime, err)
-		analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n**Status:** FAILED\n**Duration:** %v\n\n## Analysis Failed\n\n**Error:** Grok client creation failed\n\n**Details:** %v\n\n**Troubleshooting Steps:**\n1. ✅ Check API key configuration in config.yaml\n2. ✅ Verify network connectivity to api.x.ai\n3. ✅ Ensure sufficient API credits\n4. ✅ Try again in a few minutes\n\n---\n*If problems persist, check logs for detailed error information*",
-			ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, processingTime, err)
-	} else {
-		response, err := grokClient.AnalyzeOptions(string(auditBytes))
-		processingTime = time.Since(startTime)
+		logger.Warn.Printf("⚠️🤖 GROK WARNING: API call failed after %v: %v", processingTime, err)
 
-		if err != nil {
-			logger.Warn.Printf("⚠️🤖 GROK WARNING: API call failed after %v: %v", processingTime, err)
-
-			// Enhanced error categorization for better user feedback
-			var errorCategory, troubleshooting string
-			if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline") {
-				errorCategory = "Request Timeout"
-				troubleshooting = `**Timeout Issues:**
+		// Enhanced error categorization for better user feedback
+		var errorCategory, troubleshooting string
+		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline") {
+			errorCategory = "Request Timeout"
+			troubleshooting = `**Timeout Issues:**
 1. ⏱️ Grok AI is experiencing high load - try again in 5-10 minutes
 2. 🌐 Check your internet connection stability
 3. 📊 Complex analysis may require multiple attempts
 4. 🔄 Consider retrying with a smaller audit dataset`
-			} else if strings.Contains(err.Error(), "authentication") || strings.Contains(err.Error(), "401") {
-				errorCategory = "Authentication Error"
-				troubleshooting = `**Authentication Issues:**
+		} else if strings.Contains(err.Error(), "authentication") || strings.Contains(err.Error(), "401") {
+			errorCategory = "Authentication Error"
+			troubleshooting = `**Authentication Issues:**
 1. 🔑 Verify API key in config.yaml is correct
 2. 💳 Check if you have sufficient API credits
 3. 🔐 Ensure API key hasn't expired
 4. 📧 Contact xAI support if key should be valid`
-			} else if strings.Contains(err.Error(), "rate limit") || strings.Contains(err.Error(), "429") {
-				errorCategory = "Rate Limit"
-				troubleshooting = `**Rate Limiting:**
+		} else if strings.Contains(err.Error(), "rate limit") || strings.Contains(err.Error(), "429") {
+			errorCategory = "Rate Limit"
+			troubleshooting = `**Rate Limiting:**
 1. ⏳ Wait 60 seconds and try again
 2. 📊 Reduce analysis frequency
 3. 💎 Consider upgrading API plan for higher limits
 4. 🔄 Retry during off-peak hours`
-			} else if strings.Contains(err.Error(), "network") || strings.Contains(err.Error(), "connection") {
-				errorCategory = "Network Error"
-				troubleshooting = `**Network Issues:**
+		} else if strings.Contains(err.Error(), "network") || strings.Contains(err.Error(), "connection") {
+			errorCategory = "Network Error"
+			troubleshooting = `**Network Issues:**
 1. 🌐 Check internet connectivity
 2. 🔥 Verify firewall allows api.x.ai access
 3. 📡 Try different network connection
 4. 🔄 Retry request in a few minutes`
-			} else {
-				errorCategory = "API Error"
-				troubleshooting = `**General API Issues:**
+		} else {
+			errorCategory = "API Error"
+			troubleshooting = `**General API Issues:**
 1. 🔄 Retry the request
 2. 📊 Check if audit data is valid JSON
 3. 🎯 Verify ticker symbol exists and has data
 4. 🛠️ Contact support if error persists`
-			}
+		}
 
-			analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n**Status:** FAILED\n**Duration:** %v\n**Error Category:** %s\n\n## Analysis Failed\n\n**Error Details:**\n%v\n\n## Troubleshooting\n\n%s\n\n## Next Steps\n- ✅ Review the troubleshooting steps above\n- 📊 Check server logs for detailed error information\n- 🔄 Try again in a few minutes\n- 📧 Contact support if issues persist\n\n---\n*Generated by Barracuda Options Analysis System*",
-				ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, processingTime, errorCategory, err.Error(), troubleshooting)
-		} else {
-			// Success - format the analysis as markdown with performance metrics
-			analysis = grok.FormatAnalysis(response)
+		analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n**Status:** FAILED\n**Duration:** %v\n**Error Category:** %s\n\n## Analysis Failed\n\n**Error Details:**\n%v\n\n## Troubleshooting\n\n%s\n\n## Next Steps\n- ✅ Review the troubleshooting steps above\n- 📊 Check server logs for detailed error information\n- 🔄 Try again in a few minutes\n- 📧 Contact support if issues persist\n\n---\n*Generated by Barracuda Options Analysis System*",
+			ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, processingTime, errorCategory, err.Error(), troubleshooting)
+	} else {
+		// Success - format the analysis as markdown with performance metrics
+		analysis = grok.FormatAnalysisWithPrompt(response, customPrompt)
 
-			// Add performance metrics to successful analysis
-			performanceFooter := fmt.Sprintf("\n\n---\n## Analysis Performance\n- **Processing Time:** %v\n- **Tokens Used:** %d\n- **Response Length:** %d characters\n- **Status:** ✅ SUCCESS\n\n*Analysis completed by Grok AI via xAI API*", processingTime, response.Tokens, len(response.Content))
-			analysis += performanceFooter
+		// Add performance metrics to successful analysis
+		performanceFooter := fmt.Sprintf("\n\n---\n## Analysis Performance\n- **Processing Time:** %v\n- **Tokens Used:** %d\n- **Response Length:** %d characters\n- **Status:** ✅ SUCCESS\n\n*Analysis completed by Grok AI via xAI API*", processingTime, response.Tokens, len(response.Content))
+		analysis += performanceFooter
 
-			logger.Warn.Printf("🤖 GROK: Analysis successful in %v - %d tokens used", processingTime, response.Tokens)
+		logger.Warn.Printf("🤖 GROK: Analysis successful in %v - %d tokens used", processingTime, response.Tokens)
 
-			// Log audit completion and trigger file archiving via audit worker
-			if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "GrokAnalysisComplete", map[string]interface{}{
-				"analysis_content": analysis,
-				"processing_time":  processingTime.String(),
-				"tokens_used":      response.Tokens,
-				"status":           "success",
-			}); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to log Grok analysis completion: %v", err)
-			}
+		// Log audit completion and trigger file archiving via audit worker
+		if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "GrokAnalysisComplete", map[string]interface{}{
+			"analysis_content": analysis,
+			"processing_time":  processingTime.String(),
+			"tokens_used":      response.Tokens,
+			"status":           "success",
+		}); err != nil {
+			logger.Warn.Printf("⚠️ AUDIT: Failed to log Grok analysis completion: %v", err)
+		}
 
-			// Trigger analyze action to create .md file and archive audit.json
-			if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "complete", map[string]interface{}{
-				"grok_analysis": analysis,
-				"status":        "analysis_complete",
-			}); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to trigger audit archiving: %v", err)
-			}
+		// Trigger analyze action to create .md file and archive audit.json
+		if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "complete", map[string]interface{}{
+			"grok_analysis": analysis,
+			"status":        "analysis_complete",
+		}); err != nil {
+			logger.Warn.Printf("⚠️ AUDIT: Failed to trigger audit archiving: %v", err)
 		}
 	}
 
@@ -1663,9 +1661,9 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	logger.Warn.Printf("🤖 GROK: Finalizing analysis with unified audit system")
 
 	analysisData := map[string]interface{}{
-		"ai_analysis": analysis,
-		"audit_data":  json.RawMessage(auditBytes),
-		"type":        "grok_analysis_complete",
+		"grok_analysis": analysis,
+		"audit_data":    json.RawMessage(auditBytes),
+		"type":          "grok_analysis_complete",
 	}
 
 	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "finish", analysisData); err != nil {
