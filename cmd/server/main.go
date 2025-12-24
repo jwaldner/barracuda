@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 	"github.com/jwaldner/barracuda/internal/alpaca"
@@ -18,14 +17,6 @@ import (
 
 	"github.com/gorilla/mux"
 )
-
-// Global audit component that handlers can access
-var globalAuditComponent *audit.AlpacaAudit
-
-// GetGlobalAuditComponent returns the global audit component for use by handlers
-func GetGlobalAuditComponent() *audit.AlpacaAudit {
-	return globalAuditComponent
-}
 
 func main() {
 	fmt.Printf("🚀 Starting Barracuda Options Analyzer...\n")
@@ -117,72 +108,15 @@ func run() error {
 	fmt.Printf("📡 Alpaca client created - Base URL: https://api.alpaca.markets\n")
 
 	// Create AuditCoordinator (this will immediately log initialization)
-	_ = audit.NewAuditCoordinator() // Create coordinator but don't use it yet
-
-	// Create Alpaca audit component for logging API calls
+	// Create audit logger
 	auditLogger := audit.NewOptionsAnalysisAuditLogger()
-	alpacaAudit := audit.NewAlpacaAudit()
-	globalAuditComponent = alpacaAudit
 
-	// Register components in audit registry and coordinator
-	audit.RegisterAudit("alpaca", alpacaAudit)
-
-	// Register alpaca audit as an auditable component (when implemented)
-	// auditCoordinator.Register("alpaca", alpacaAudit)
-
-	// Set up audit callback function for the base client
+	// Set up audit callback function
 	auditCallback := func(symbol, operation string, data map[string]interface{}) {
-		// Log to console
-		logger.Info.Printf("🔍 AUDIT: %s operation on %s: %v", operation, symbol, data)
-
-		// Add to audit component
 		if err := auditLogger.LogOptionsAnalysisOperation(symbol, operation, data); err != nil {
-			logger.Warn.Printf("⚠️ Failed to log unified audit: %v", err)
+			logger.Warn.Printf("⚠️ Failed to log audit: %v", err)
 		}
-
-		// Legacy audit system for backward compatibility
-		url := "/unknown"
-		if urlVal, ok := data["endpoint"]; ok {
-			if urlStr, isStr := urlVal.(string); isStr {
-				url = urlStr
-			}
-		}
-
-		// Extract duration if present
-		duration := int64(0)
-		if durVal, ok := data["duration_ms"]; ok {
-			if durInt, isInt := durVal.(int64); isInt {
-				duration = durInt
-			}
-		}
-
-		// Extract error if present
-		errorMsg := ""
-		if errVal, ok := data["error"]; ok {
-			if errStr, isStr := errVal.(string); isStr {
-				errorMsg = errStr
-			}
-		}
-
-		alpacaAudit.AddRequest(
-			operation,
-			url,
-			"GET",
-			time.Duration(duration)*time.Millisecond,
-			errorMsg == "",
-			errorMsg,
-			data,
-		)
-
-		// Save audit data to audit.json (overwrites each time on purpose)
-		if err := alpacaAudit.SaveToFile("audit.json"); err != nil {
-			logger.Info.Printf("❌ Failed to save audit data to audit.json: %v", err)
-		} else {
-			logger.Info.Printf("💾 Audit data saved to audit.json")
-		}
-	}
-
-	// Set audit callback on the base client
+	} // Set audit callback on the base client
 	baseClient.SetAuditCallback(auditCallback)
 
 	// Create symbol service for company/sector lookups

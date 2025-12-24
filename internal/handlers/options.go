@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -479,6 +478,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Debug.Printf("Target Delta: %.2f", req.TargetDelta)
 	logger.Debug.Printf("Available Cash: $%.2f", req.AvailableCash)
 	logger.Debug.Printf("Strategy: %s", req.Strategy)
+
 	if req.AuditTicker != "" {
 		logger.Debug.Printf("Audit Ticker: %s", req.AuditTicker)
 		// Initialize audit for this ticker
@@ -877,27 +877,15 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 		isAuditSymbol := auditTicker != nil && symbol == *auditTicker
 
 		if isAuditSymbol {
-			logger.Warn.Printf("🔍 AUDIT: Processing audit ticker %s - creating audit file", symbol)
+			logger.Warn.Printf("🔍 AUDIT: Processing audit ticker %s - sending to audit system", symbol)
 
-			// Create minimal audit data - just the ticker for now
-			auditData := map[string]interface{}{
-				"ticker": symbol,
-			}
-
-			// Write audit file immediately when we process the audit symbol
-			filename := "audit.json"
-			file, createErr := os.Create(filename)
-			if createErr != nil {
-				logger.Error.Printf("🔍 AUDIT: Failed to create audit file: %v", createErr)
-			} else {
-				defer file.Close()
-				encoder := json.NewEncoder(file)
-				encoder.SetIndent("", "  ")
-				if encodeErr := encoder.Encode(auditData); encodeErr != nil {
-					logger.Error.Printf("🔍 AUDIT: Failed to write audit data: %v", encodeErr)
-				} else {
-					logger.Info.Printf("🔍 AUDIT: Created audit file: %s", filename)
-				}
+			// Send to audit system instead of direct file write
+			if err := h.auditLogger.LogOptionsAnalysisOperation(symbol, "ProcessingSymbol", map[string]interface{}{
+				"ticker":    symbol,
+				"operation": "processing_symbol",
+				"message":   "Starting analysis for audit symbol",
+			}); err != nil {
+				logger.Error.Printf("🔍 AUDIT: Failed to log to audit system: %v", err)
 			}
 		}
 
@@ -1524,9 +1512,9 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Parse request body
+	// Parse request body - no ticker needed
 	var requestData struct {
-		Ticker string `json:"ticker"`
+		// Removed ticker field - will read from audit.json
 	}
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		logger.Warn.Printf("🤖 GROK: Failed to parse request body: %v", err)
@@ -1534,37 +1522,39 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ticker := requestData.Ticker
-	if ticker == "" {
-		logger.Warn.Printf("🤖 GROK: No ticker provided")
-		http.Error(w, "Ticker required", http.StatusBadRequest)
-		return
-	}
-
-	logger.Warn.Printf("🤖 GROK: Processing analysis for ticker %s", ticker)
-
-	// Find the most recent audit file for this ticker
-	auditPattern := fmt.Sprintf("audits/audit_%s_*.json", ticker)
-	logger.Warn.Printf("🤖 GROK: Looking for audit files matching: %s", auditPattern)
-
-	matches, err := filepath.Glob(auditPattern)
-	if err != nil || len(matches) == 0 {
-		logger.Warn.Printf("🤖 GROK: No audit files found for ticker %s: %v", ticker, err)
-		http.Error(w, fmt.Sprintf("No audit data found for ticker %s. Run analysis first.", ticker), http.StatusNotFound)
-		return
-	}
-
-	// Get the most recent audit file (they're named with timestamps, so last alphabetically is most recent)
-	sort.Strings(matches)
-	auditFile := matches[len(matches)-1]
-	logger.Warn.Printf("🤖 GROK: Using most recent audit file: %s", auditFile)
-
-	auditBytes, err := os.ReadFile(auditFile)
+	// Read ticker from audit.json file instead of API request
+	auditFileName := "audit.json"
+	auditData, err := os.ReadFile(auditFileName)
 	if err != nil {
-		logger.Warn.Printf("🤖 GROK: Failed to read audit file %s: %v", auditFile, err)
-		http.Error(w, fmt.Sprintf("Failed to read audit file: %v", err), http.StatusInternalServerError)
+		logger.Warn.Printf("🤖 GROK: No audit.json file found: %v", err)
+		http.Error(w, "No active audit found. Run analysis first.", http.StatusNotFound)
 		return
 	}
+
+	// Parse audit file to get ticker from header
+	var auditFile struct {
+		Header struct {
+			Ticker string `json:"ticker"`
+		} `json:"header"`
+	}
+	if err := json.Unmarshal(auditData, &auditFile); err != nil {
+		logger.Warn.Printf("🤖 GROK: Failed to parse audit.json: %v", err)
+		http.Error(w, "Invalid audit file format", http.StatusInternalServerError)
+		return
+	}
+
+	ticker := auditFile.Header.Ticker
+	if ticker == "" {
+		logger.Warn.Printf("🤖 GROK: No ticker found in audit.json header")
+		http.Error(w, "No ticker found in audit file", http.StatusBadRequest)
+		return
+	}
+
+	logger.Warn.Printf("🤖 GROK: Processing analysis for ticker %s (from audit.json)", ticker)
+
+	// Use the current audit.json file directly
+	logger.Warn.Printf("🤖 GROK: Using current audit.json file for analysis")
+	auditBytes := auditData
 
 	logger.Warn.Printf("🤖 GROK: Loaded audit data: %d bytes", len(auditBytes))
 
@@ -1583,7 +1573,7 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		analysis = fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n**Status:** FAILED\n**Duration:** %v\n\n## Analysis Failed\n\n**Error:** Grok client creation failed\n\n**Details:** %v\n\n**Troubleshooting Steps:**\n1. ✅ Check API key configuration in config.yaml\n2. ✅ Verify network connectivity to api.x.ai\n3. ✅ Ensure sufficient API credits\n4. ✅ Try again in a few minutes\n\n---\n*If problems persist, check logs for detailed error information*",
 			ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, processingTime, err)
 	} else {
-		response, err := grokClient.AnalyzeOptions(ticker, string(auditBytes))
+		response, err := grokClient.AnalyzeOptions(string(auditBytes))
 		processingTime = time.Since(startTime)
 
 		if err != nil {
@@ -1632,13 +1622,31 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 				ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, processingTime, errorCategory, err.Error(), troubleshooting)
 		} else {
 			// Success - format the analysis as markdown with performance metrics
-			analysis = grok.FormatAnalysis(ticker, response)
+			analysis = grok.FormatAnalysis(response)
 
 			// Add performance metrics to successful analysis
 			performanceFooter := fmt.Sprintf("\n\n---\n## Analysis Performance\n- **Processing Time:** %v\n- **Tokens Used:** %d\n- **Response Length:** %d characters\n- **Status:** ✅ SUCCESS\n\n*Analysis completed by Grok AI via xAI API*", processingTime, response.Tokens, len(response.Content))
 			analysis += performanceFooter
 
 			logger.Warn.Printf("🤖 GROK: Analysis successful in %v - %d tokens used", processingTime, response.Tokens)
+
+			// Log audit completion and trigger file archiving via audit worker
+			if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "GrokAnalysisComplete", map[string]interface{}{
+				"analysis_content": analysis,
+				"processing_time":  processingTime.String(),
+				"tokens_used":      response.Tokens,
+				"status":           "success",
+			}); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to log Grok analysis completion: %v", err)
+			}
+
+			// Trigger analyze action to create .md file and archive audit.json
+			if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "complete", map[string]interface{}{
+				"grok_analysis": analysis,
+				"status":        "analysis_complete",
+			}); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to trigger audit archiving: %v", err)
+			}
 		}
 	}
 
@@ -1713,20 +1721,20 @@ func (h *OptionsHandler) processAuditLog(logEntry map[string]interface{}) {
 	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n",
 		ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, analysisText, auditData)
 
-	// Write markdown file
-	file, err := os.Create(filename)
-	if err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to create audit file %s: %v", filename, err)
+	// Send markdown content to audit system instead of direct file write
+	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "GrokAnalysisComplete", map[string]interface{}{
+		"ticker":           ticker,
+		"operation":        "grok_analysis",
+		"analysis_text":    analysisText,
+		"audit_data":       auditData,
+		"markdown_content": markdownContent,
+		"filename":         filename,
+	}); err != nil {
+		logger.Warn.Printf("📋 AUDIT: Failed to log analysis to audit system: %v", err)
 		return
 	}
-	defer file.Close()
 
-	if _, err := file.WriteString(markdownContent); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to write markdown: %v", err)
-		return
-	}
-
-	logger.Warn.Printf("📋 AUDIT: Markdown file created: %s", filename)
+	logger.Warn.Printf("📋 AUDIT: Analysis logged to audit system for %s", ticker)
 }
 
 // AuditFileExistsHandler checks if audit.json exists
@@ -1781,59 +1789,19 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 	if t, ok := logEntry["ticker"]; ok {
 		ticker = fmt.Sprintf("%v", t)
 	}
-	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	filename := fmt.Sprintf("%s/audit_%s_%s.md", auditDir, ticker, timestamp)
-	logger.Warn.Printf("📋 AUDIT: Creating audit file for %s: %s", ticker, filename)
 
-	// Write JSON file
-	logger.Warn.Printf("📋 AUDIT: Opening file for writing: %s", filename)
-	file, err := os.Create(filename)
-	if err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to create audit file %s: %v", filename, err)
-		logger.Error.Printf("❌ Failed to create audit file %s: %v", filename, err)
-		http.Error(w, "Failed to create audit file", http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	// Calculate data size
-	dataSize := len(fmt.Sprintf("%v", logEntry))
-	logger.Warn.Printf("📋 AUDIT: Writing %d bytes of audit data to file", dataSize)
-
-	// Format as human-readable markdown
-	tickerName := "UNKNOWN"
-	if t, ok := logEntry["ticker"]; ok {
-		tickerName = fmt.Sprintf("%v", t)
-	}
-
-	analysisText := "No analysis available"
-	if analysis, ok := logEntry["ai_analysis"]; ok {
-		analysisText = fmt.Sprintf("%v", analysis)
-	}
-
-	auditData := ""
-	if data, ok := logEntry["audit_data"]; ok {
-		auditDataBytes, _ := json.MarshalIndent(data, "", "  ")
-		auditData = string(auditDataBytes)
-	}
-
-	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n",
-		tickerName, time.Now().Format("2006-01-02 15:04:05"), tickerName, analysisText, auditData)
-
-	if _, err := file.WriteString(markdownContent); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to write audit file %s: %v", filename, err)
-		logger.Error.Printf("❌ Failed to write audit file %s: %v", filename, err)
-		http.Error(w, "Failed to write audit file", http.StatusInternalServerError)
+	// Send to audit system instead of direct file write
+	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "ManualLogEntry", logEntry); err != nil {
+		logger.Warn.Printf("📋 AUDIT: Failed to log entry to audit system: %v", err)
+		http.Error(w, "Failed to log to audit system", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Warn.Printf("📋 AUDIT: File successfully created: %s (%d bytes)", filename, dataSize)
-	logger.Info.Printf("📋 AUDIT FILE CREATED: %s", filename)
+	logger.Warn.Printf("📋 AUDIT: Log entry sent to audit system for %s", ticker)
 
 	response := map[string]string{
-		"status":   "success",
-		"message":  "Audit file created",
-		"filename": filename,
+		"status":  "success",
+		"message": fmt.Sprintf("Audit log entry recorded for %s", ticker),
 	}
 
 	logger.Warn.Printf("📋 AUDIT: Sending success response for %s", ticker)
@@ -1842,5 +1810,5 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 		logger.Warn.Printf("📋 AUDIT: Failed to encode response: %v", err)
 		return
 	}
-	logger.Warn.Printf("📋 AUDIT: Complete - audit file created and response sent for %s", ticker)
+	logger.Warn.Printf("📋 AUDIT: Complete - audit entry logged for %s", ticker)
 }

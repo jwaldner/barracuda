@@ -18,3 +18,6 @@ cuda premium: $38.00
 # Here is how delta is used in options trading:
 As a Decimal/Whole Number: While mathematically it is a value between 0 and 1 (or 0 and -1 for puts), traders often refer to it as a whole number from 0 to 100. So, a delta of 0.20 is called a "20 delta" option.
 
+the next issue is the grok package i want it to use our new audit so that when it ptocesses the same worker can move the json and create the proper .md.  grok can no longer be dependant on the ticker it will be extraced from the json.  No fallbacks! we control the file.
+
+this is close to done but the audit.json should not be moved unless another audit is done.  if i do cat cat is in audits but the audit.json is for cat  [that is ok grok needs that]  but the json does not get renamed until grok has tried to analyse it or ANY new audit is done.

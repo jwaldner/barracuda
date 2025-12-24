@@ -29,6 +29,12 @@ type CSVConfig struct {
 	FilenameFormat string `yaml:"filename_format"`
 }
 
+// AuditLogConfig represents audit log configuration
+type AuditLogConfig struct {
+	AIAnalysisPrompt string `yaml:"ai_analysis_prompt"`
+	FilenameFormat   string `yaml:"filename_format"`
+}
+
 type Config struct {
 	// Server settings
 	Port string
@@ -89,9 +95,10 @@ type YAMLConfig struct {
 		DefaultRiskLevel string   `yaml:"default_risk_level"`
 	} `yaml:"trading"`
 
-	Engine  EngineConfig  `yaml:"engine"`
-	Compute ComputeConfig `yaml:"compute"`
-	CSV     CSVConfig     `yaml:"csv"`
+	Engine   EngineConfig   `yaml:"engine"`
+	Compute  ComputeConfig  `yaml:"compute"`
+	CSV      CSVConfig      `yaml:"csv"`
+	AuditLog AuditLogConfig `yaml:"audit_log"`
 }
 
 func Load() *Config {
@@ -290,4 +297,24 @@ func CalculateDefaultExpirationDate() string {
 	}
 
 	return thirdFriday.Format("2006-01-02")
+}
+
+// FormatAuditFilename formats audit filenames using the configured template
+func FormatAuditFilename(format, ticker, expDate, timestamp string) string {
+	result := format
+	result = strings.ReplaceAll(result, "{ticker}", ticker)
+	result = strings.ReplaceAll(result, "{exp_date}", expDate)
+	result = strings.ReplaceAll(result, "{timestamp}", timestamp)
+	return result
+}
+
+// GetAuditConfig returns audit log configuration from loaded YAML
+func GetAuditConfig() *AuditLogConfig {
+	if yamlCfg := loadYAMLConfig(); yamlCfg != nil {
+		return &yamlCfg.AuditLog
+	}
+	// Return defaults if no config loaded
+	return &AuditLogConfig{
+		FilenameFormat: "{ticker}-{exp_date}",
+	}
 }
