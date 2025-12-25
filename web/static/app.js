@@ -557,13 +557,18 @@ function openDownloadsFolder() {
         const rowData = [];
         
         cells.forEach((cell, cellIndex) => {
-            // Get text content and clean it up
-            let text = cell.textContent ? cell.textContent.trim() : '';
-            console.log(`Cell ${cellIndex} raw content: "${cell.textContent}"`);
+            // Get text content and clean it up - handle undefined/null safely
+            let text = '';
+            if (cell && cell.textContent !== undefined && cell.textContent !== null) {
+                text = cell.textContent.trim();
+            }
+            console.log(`Cell ${cellIndex} raw content: "${cell ? cell.textContent : 'null/undefined'}"`);
             console.log(`Cell ${cellIndex} cleaned content: "${text}"`);
             
-            // Clean the text but keep it simple for Google Sheets
-            text = text.replace(/\s+/g, ' ').replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, ' ');
+            // Clean the text but keep it simple for Google Sheets - only if text exists
+            if (text) {
+                text = text.replace(/\s+/g, ' ').replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, ' ');
+            }
             
             // Always add the cell content to maintain column structure
             rowData.push(text);
@@ -862,7 +867,7 @@ async function sendToGrok(ticker, auditData, grokBtn) {
         // Close progress modal and show results
         closeGrokProgressModal(progressModal);
         
-        // Show analysis in modal instead of just notification
+        // Show analysis in modal - result should now contain analysis
         showGrokAnalysisModal(ticker, result.analysis, elapsed);
         
         // Append to audit log
@@ -1058,8 +1063,16 @@ function showGrokErrorModal(ticker, errorMsg, elapsed) {
 }
 
 function formatAnalysisAsHTML(markdownText) {
+    // Handle undefined or null input
+    if (!markdownText) {
+        return '<p class="mb-4 text-gray-500">No analysis content available</p>';
+    }
+    
+    // Ensure markdownText is a string
+    const text = String(markdownText);
+    
     // Convert markdown to HTML (basic conversion)
-    return markdownText
+    return text
         .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mb-4">$1</h1>')
         .replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mb-3 mt-6">$1</h2>')
         .replace(/^### (.*$)/gm, '<h3 class="text-lg font-medium mb-2 mt-4">$1</h3>')

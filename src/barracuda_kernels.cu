@@ -47,13 +47,14 @@ __global__ void black_scholes_kernel(
     
     // Greeks calculations
     opt.gamma = exp(-q * T) * nd1 / (S * sigma * sqrt(T));
-    opt.theta = -(S * exp(-q * T) * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2 + q * S * exp(-q * T) * Nd1;
     opt.vega = S * exp(-q * T) * nd1 * sqrt(T);
-    opt.rho = K * T * exp(-r * T) * Nd2;
     
-    if (opt.option_type == 'P') {
-        opt.theta -= q * S * exp(-q * T) * Nd1 + q * S * exp(-q * T) * (1.0 - Nd1);
-        opt.rho = -opt.rho;
+    if (opt.option_type == 'C') {
+        opt.theta = -(S * exp(-q * T) * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2 + q * S * exp(-q * T) * Nd1;
+        opt.rho = K * T * exp(-r * T) * Nd2;
+    } else {
+        opt.theta = -(S * exp(-q * T) * nd1 * sigma) / (2.0 * sqrt(T)) + r * K * exp(-r * T) * N_neg_d2 - q * S * exp(-q * T) * N_neg_d1;
+        opt.rho = -K * T * exp(-r * T) * N_neg_d2;
     }
     
     // Apply market standard scaling
@@ -139,14 +140,17 @@ __global__ void implied_volatility_black_scholes_kernel(
     if (opt.option_type == 'C') {
         opt.theoretical_price = stock_price * exp(-q * time_exp) * Nd1 - strike * exp(-rate * time_exp) * Nd2;
         opt.delta = exp(-q * time_exp) * Nd1;
+        opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
+        opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
     } else {
         opt.theoretical_price = strike * exp(-rate * time_exp) * N_neg_d2 - stock_price * exp(-q * time_exp) * N_neg_d1;
         opt.delta = -exp(-q * time_exp) * N_neg_d1;
+        opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) + rate * strike * exp(-rate * time_exp) * N_neg_d2 - q * stock_price * exp(-q * time_exp) * N_neg_d1;
+        opt.rho = -strike * time_exp * exp(-rate * time_exp) * N_neg_d2;
     }
     
     // Greeks calculations
     opt.gamma = exp(-q * time_exp) * nd1 / (stock_price * sigma * sqrt(time_exp));
-    opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
     opt.vega = stock_price * exp(-q * time_exp) * nd1 * sqrt(time_exp);
     opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
     
@@ -421,13 +425,14 @@ __global__ void complete_option_analysis_kernel(
     
     // Greeks calculations
     opt.gamma = exp(-q * time_exp) * nd1 / (stock_price * sigma * sqrt(time_exp));
-    opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
     opt.vega = stock_price * exp(-q * time_exp) * nd1 * sqrt(time_exp);
-    opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
     
-    if (opt.option_type == 'P') {
-        opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
-        opt.rho = -opt.rho;
+    if (opt.option_type == 'C') {
+        opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) - rate * strike * exp(-rate * time_exp) * Nd2 + q * stock_price * exp(-q * time_exp) * Nd1;
+        opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
+    } else {
+        opt.theta = -(stock_price * exp(-q * time_exp) * nd1 * sigma) / (2.0 * sqrt(time_exp)) + rate * strike * exp(-rate * time_exp) * N_neg_d2 - q * stock_price * exp(-q * time_exp) * N_neg_d1;
+        opt.rho = -strike * time_exp * exp(-rate * time_exp) * N_neg_d2;
     }
     
     // Apply market standard scaling
