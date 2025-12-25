@@ -21,7 +21,7 @@ __global__ void black_scholes_kernel(
     double T = opt.time_to_expiration;
     double r = opt.risk_free_rate;
     double sigma = opt.volatility;
-    double q = 0.005; // Dividend yield (0.5% for most stocks)
+    double q = 0.0; // Zero dividend yield assumption for calculations
     
     // CORRECT Black-Scholes formula with dividend yield
     // d1 = [ln(S/K) + (r - q + σ²/2)T] / (σ√T)
@@ -81,7 +81,7 @@ __global__ void implied_volatility_black_scholes_kernel(
     double strike = opt.strike_price;
     double time_exp = opt.time_to_expiration;
     double rate = opt.risk_free_rate;
-    double q = 0.005; // Dividend yield
+    double q = 0.0; // No dividend assumption for IV calculation
     
     if (market_price > 0.0) {
         // Initial volatility guess
@@ -122,11 +122,29 @@ __global__ void implied_volatility_black_scholes_kernel(
         
         opt.volatility = iv;
     } else {
-        opt.volatility = 0.25; // Default 25% if no market price
+        // Use input volatility as-is (already validated in Go layer)
+        // opt.volatility is already set from input, no need to override
     }
     
     // STEP 2: Calculate Black-Scholes with the derived implied volatility
     double sigma = opt.volatility;
+    
+    // Protect against zero volatility (causes division by zero)
+    if (sigma <= 1e-8) {
+        // For zero volatility, option value is intrinsic value only
+        if (opt.option_type == 'C') {
+            opt.theoretical_price = fmax(0.0, stock_price * exp(-q * time_exp) - strike * exp(-rate * time_exp));
+            opt.delta = (stock_price > strike * exp((rate - q) * time_exp)) ? exp(-q * time_exp) : 0.0;
+        } else {
+            opt.theoretical_price = fmax(0.0, strike * exp(-rate * time_exp) - stock_price * exp(-q * time_exp));
+            opt.delta = (stock_price < strike * exp((rate - q) * time_exp)) ? -exp(-q * time_exp) : 0.0;
+        }
+        opt.gamma = 0.0;
+        opt.theta = 0.0;
+        opt.vega = 0.0;
+        opt.rho = 0.0;
+        return;
+    }
     
     double d1 = (log(stock_price / strike) + (rate - q + 0.5 * sigma * sigma) * time_exp) / (sigma * sqrt(time_exp));
     double d2 = d1 - sigma * sqrt(time_exp);
@@ -149,15 +167,11 @@ __global__ void implied_volatility_black_scholes_kernel(
         opt.rho = -strike * time_exp * exp(-rate * time_exp) * N_neg_d2;
     }
     
-    // Greeks calculations
+    // Greeks calculations (common for both calls and puts)
     opt.gamma = exp(-q * time_exp) * nd1 / (stock_price * sigma * sqrt(time_exp));
     opt.vega = stock_price * exp(-q * time_exp) * nd1 * sqrt(time_exp);
-    opt.rho = strike * time_exp * exp(-rate * time_exp) * Nd2;
     
-    if (opt.option_type == 'P') {
-        opt.theta -= q * stock_price * exp(-q * time_exp) * Nd1 + q * stock_price * exp(-q * time_exp) * (1.0 - Nd1);
-        opt.rho = -opt.rho;
-    }
+    // Rho is already calculated correctly above in the option-specific sections
     
     // Apply market standard scaling
     opt.theta /= 365.0;  // Convert to daily decay
@@ -365,9 +379,9 @@ __global__ void complete_option_analysis_kernel(
     double time_exp = opt.time_to_expiration;
     double rate = opt.risk_free_rate;
     double market_price = opt.market_close_price;
-    double q = 0.005;
+    double q = 0.0; // Market-specific dividend should be passed in
     
-    double iv = 0.25; // Default
+    double iv = fmax(0.10, fmin(1.0, market_price / (stock_price * 0.1))); // Market-derived estimate
     if (market_price > 0.01) {
         iv = fmax(0.10, fmin(2.0, market_price * 2.0 / (stock_price * sqrt(time_exp))));
         
@@ -444,6 +458,16 @@ __global__ void complete_option_analysis_kernel(
     double premium_per_share = opt.theoretical_price;
     double cash_needed_per_contract;
     
+    // Validate inputs to prevent unrealistic calculations
+    if (premium_per_share < 0.01 || available_cash <= 0 || strike <= 0) {
+        opt.max_contracts = 0;
+        opt.total_premium = 0.0;
+        opt.cash_needed = 0.0;
+        opt.profit_percentage = 0.0;
+        opt.annualized_return = 0.0;
+        return;
+    }
+    
     if (opt.option_type == 'P') {
         // Puts: need cash = strike price × 100 (obligation to buy)
         cash_needed_per_contract = strike * 100.0;
@@ -457,11 +481,15 @@ __global__ void complete_option_analysis_kernel(
     if (opt.max_contracts < 0) opt.max_contracts = 0;
     
     // Calculate totals
-    opt.total_premium = (double)opt.max_contracts * premium_per_share * 100.0;
+    opt.total_premium = (double)opt.max_contracts * opt.theoretical_price * 100.0;
     opt.cash_needed = (double)opt.max_contracts * cash_needed_per_contract;
     
-    // Calculate profit percentage and annualized return
-    opt.profit_percentage = (premium_per_share / strike) * 100.0;
+    // Calculate profit percentage based on theoretical price vs cash needed
+    if (opt.cash_needed > 0) {
+        opt.profit_percentage = (opt.total_premium / opt.cash_needed) * 100.0;
+    } else {
+        opt.profit_percentage = 0.0;
+    }
     opt.annualized_return = opt.profit_percentage * (365.0 / (double)days_to_expiration);
     opt.days_to_expiration = days_to_expiration;
 }

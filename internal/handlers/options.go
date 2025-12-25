@@ -485,7 +485,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	if req.AuditTicker != "" {
 		logger.Debug.Printf("Audit Ticker: %s", req.AuditTicker)
 		// Initialize audit for this ticker
-		if err := h.auditLogger.LogOptionsAnalysisOperation(req.AuditTicker, "init", map[string]interface{}{
+		if err := h.auditLogger.LogOptionsAnalysisOperation(req.AuditTicker, "create", map[string]interface{}{
 			"message":    "Starting options analysis audit",
 			"symbols":    req.Symbols,
 			"strategy":   req.Strategy,
@@ -664,6 +664,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			"total_symbols":  len(results),
 		}
 
+		rankingData["operation"] = "SortByProfitPercentage"
 		if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTickerPtr, "RankingResults", rankingData); err != nil {
 			logger.Warn.Printf("📊 RANKING: Failed to log ranking results: %v", err)
 		} else {
@@ -952,6 +953,24 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 		// Debug: Log audit ticker stock price in selected contracts
 		if auditTicker != nil && symbol == *auditTicker {
 			logger.Info.Printf("🔍 DEBUG: Selected contract for %s with stock price: $%.2f", symbol, stockPrice.Price)
+			
+			// Log the selected contract details for audit prompt inclusion
+			selectedContractDetails := map[string]interface{}{
+				"ticker":             symbol,
+				"option_symbol":      bestContract.Symbol,
+				"option_type":        bestContract.Type,
+				"strike_price":       bestContract.StrikePrice,
+				"stock_price":        stockPrice.Price,
+				"expiration":         bestContract.ExpirationDate,
+				"underlying_symbol":  bestContract.UnderlyingSymbol,
+			}
+			
+			if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "SelectedContractForCalculation", selectedContractDetails); err != nil {
+				logger.Warn.Printf("📋 CONTRACT: Failed to log selected contract: %v", err)
+			} else {
+				logger.Warn.Printf("📋 CONTRACT: Logged selected contract %s %s @ $%s for %s calculation", 
+					bestContract.Type, bestContract.Symbol, bestContract.StrikePrice, *auditTicker)
+			}
 		}
 
 		// Verbose: Log all selected contracts with stock prices
@@ -1304,6 +1323,12 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 				marketPrice = closePriceFloat
 			}
 		}
+		
+		// Validate minimum premium to prevent unrealistic calculations
+		if marketPrice < 0.01 {
+			logger.Verbose.Printf("⚠️  Skipping %s: Premium too small ($%.6f), likely data error", sc.symbol, marketPrice)
+			continue
+		}
 
 		engineContracts = append(engineContracts, barracuda.OptionContract{
 			Symbol:           sc.symbol,
@@ -1311,14 +1336,14 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 			UnderlyingPrice:  sc.stockPrice,
 			TimeToExpiration: timeToExp,
 			RiskFreeRate:     h.treasuryClient.GetRiskFreeRateWithLastKnown(),
-			Volatility:       0.25,
+			Volatility:       math.Max(0.15, sc.contract.ImpliedVol), // Ensure minimum 15% volatility to prevent division by zero and unrealistic calculations
 			OptionType:       optionType,
 			MarketClosePrice: marketPrice,
 		})
 
 		// Debug: Log audit ticker price being passed to engine
 		if req.AuditTicker != "" && sc.symbol == req.AuditTicker {
-			logger.Info.Printf("🔍 DEBUG: Engine contract for %s created with UnderlyingPrice: $%.2f", sc.symbol, sc.stockPrice)
+			logger.Info.Printf("🔍 DEBUG: Engine contract for %s created with UnderlyingPrice: $%.2f, StrikePrice: $%.2f", sc.symbol, sc.stockPrice, strikePrice)
 		}
 
 		// Verbose: Log all engine contracts with underlying prices
@@ -1395,7 +1420,7 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 			var auditContract *barracuda.CompleteOptionResult
 			logger.Info.Printf("🔍 AUDIT SEARCH: Looking for '%s' in %d results", *auditSymbol, len(completeResults))
 			for i := range completeResults {
-				logger.Verbose.Printf("🔍 AUDIT SEARCH: Result[%d] symbol='%s' (comparing with '%s')", i, completeResults[i].Symbol, *auditSymbol)
+				logger.Info.Printf("🔍 AUDIT SEARCH: Result[%d] symbol='%s' underlying_price=$%.2f (comparing with '%s')", i, completeResults[i].Symbol, completeResults[i].UnderlyingPrice, *auditSymbol)
 				if completeResults[i].Symbol == *auditSymbol {
 					auditContract = &completeResults[i]
 					logger.Info.Printf("✅ AUDIT SEARCH: Found matching contract for '%s' at index %d", *auditSymbol, i)
@@ -1407,7 +1432,6 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 				auditData["calculation_details"] = map[string]interface{}{
 					"execution_type": h.config.Engine.ExecutionMode,
 					"symbol":         *auditSymbol,
-					"formula":        "Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls, P = K*e^(-r*T)*N(-d2) - S*N(-d1) for puts",
 					fmt.Sprintf("%s_contract", *auditSymbol): map[string]interface{}{
 						"symbol": auditContract.Symbol,
 						"variables": map[string]interface{}{
@@ -1572,6 +1596,28 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Parse audit data to extract ticker
+	var auditHeader struct {
+		Header struct {
+			Ticker     string `json:"ticker"`
+			ExpiryDate string `json:"expiry_date"`
+		} `json:"header"`
+	}
+
+	if err := json.Unmarshal(auditData, &auditHeader); err != nil {
+		logger.Warn.Printf("🤖 GROK: Failed to parse audit data: %v", err)
+		http.Error(w, "Invalid audit data format", http.StatusInternalServerError)
+		return
+	}
+
+	ticker := auditHeader.Header.Ticker
+	if ticker == "" {
+		logger.Warn.Printf("🤖 GROK: No ticker found in audit data")
+		ticker = "UNKNOWN"
+	}
+
+	logger.Warn.Printf("🤖 GROK: Extracted ticker '%s' from audit data", ticker)
+
 	// Perform Grok analysis synchronously for UI
 	grokClient := grok.NewClient()
 
@@ -1589,45 +1635,14 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 
 	logger.Warn.Printf("🤖 GROK: Analysis complete (%.2fs, %d tokens)", elapsed, response.Tokens)
 
-	// Parse audit file to get ticker and expiry for file naming
-	var auditFile struct {
-		Header struct {
-			Ticker     string `json:"ticker"`
-			ExpiryDate string `json:"expiry_date"`
-		} `json:"header"`
-	}
-
-	if err := json.Unmarshal(auditData, &auditFile); err != nil {
-		logger.Warn.Printf("🤖 GROK: Warning - failed to parse audit file for naming: %v", err)
-	}
-
-	// Save analysis as .md file if we have ticker info
-	if auditFile.Header.Ticker != "" {
-		auditConfig := config.GetAuditConfig()
-		baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, auditFile.Header.Ticker, auditFile.Header.ExpiryDate, "")
-		mdName := fmt.Sprintf("audits/%s.md", baseName)
-
-		// Ensure audits directory exists
-		if err := os.MkdirAll("audits", 0755); err != nil {
-			logger.Warn.Printf("🤖 GROK: Failed to create audits directory: %v", err)
-		} else {
-			// Write analysis to .md file
-			if err := os.WriteFile(mdName, []byte(analysis), 0644); err != nil {
-				logger.Warn.Printf("🤖 GROK: Failed to save analysis file %s: %v", mdName, err)
-			} else {
-				logger.Warn.Printf("🤖 GROK: Analysis saved to %s", mdName)
-			}
-		}
-	}
-
-	// Also send to worker channel - ticker is in the JSON data
-	if err := h.auditLogger.LogOptionsAnalysisOperation("", "grok_analyze", map[string]interface{}{
+	// Trigger audit archival by sending analysis_result to worker (always do this)
+	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "analysis_result", map[string]interface{}{
+		"grok_result":   analysis,
 		"custom_prompt": req.CustomPrompt,
-		"analysis":      analysis,
 		"tokens":        response.Tokens,
 		"elapsed":       elapsed,
 	}); err != nil {
-		logger.Warn.Printf("🤖 GROK: Failed to send to worker channel: %v", err)
+		logger.Warn.Printf("🤖 GROK: Failed to trigger audit archival: %v", err)
 	}
 
 	// Return analysis results for UI
@@ -1646,56 +1661,6 @@ func (h *OptionsHandler) AIAnalysisHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	logger.Warn.Printf("🤖 GROK: Analysis complete - sent %d tokens to UI (%.2fs)", response.Tokens, elapsed)
-}
-
-// processAuditLog processes audit log entry and creates markdown file
-func (h *OptionsHandler) processAuditLog(logEntry map[string]interface{}) {
-	// Create audits directory if it doesn't exist
-	auditDir := "audits"
-	if err := os.MkdirAll(auditDir, 0755); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to create audit directory: %v", err)
-		return
-	}
-
-	// Generate timestamped filename: audit_ticker_YYYY-MM-DD_HH-MM-SS.md
-	ticker := "UNKNOWN"
-	if t, ok := logEntry["ticker"]; ok {
-		ticker = fmt.Sprintf("%v", t)
-	}
-	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	filename := fmt.Sprintf("%s/audit_%s_%s.md", auditDir, ticker, timestamp)
-	logger.Warn.Printf("📋 AUDIT: Creating audit file for %s: %s", ticker, filename)
-
-	// Extract data for markdown
-	analysisText := "No analysis available"
-	if analysis, ok := logEntry["ai_analysis"]; ok {
-		analysisText = fmt.Sprintf("%v", analysis)
-	}
-
-	auditData := ""
-	if data, ok := logEntry["audit_data"]; ok {
-		auditDataBytes, _ := json.MarshalIndent(data, "", "  ")
-		auditData = string(auditDataBytes)
-	}
-
-	// Create markdown content
-	markdownContent := fmt.Sprintf("# Grok AI Analysis - %s\n\n**Generated:** %s\n**Ticker:** %s\n\n## AI Analysis\n\n%s\n\n## Audit Data\n\n<details>\n<summary>Click to view detailed audit data</summary>\n\n```json\n%s\n```\n\n</details>\n\n---\n*Generated by Barracuda Options Analysis System with Grok AI*\n",
-		ticker, time.Now().Format("2006-01-02 15:04:05"), ticker, analysisText, auditData)
-
-	// Send markdown content to audit system instead of direct file write
-	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "GrokAnalysisComplete", map[string]interface{}{
-		"ticker":           ticker,
-		"operation":        "grok_analysis",
-		"analysis_text":    analysisText,
-		"audit_data":       auditData,
-		"markdown_content": markdownContent,
-		"filename":         filename,
-	}); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to log analysis to audit system: %v", err)
-		return
-	}
-
-	logger.Warn.Printf("📋 AUDIT: Analysis logged to audit system for %s", ticker)
 }
 
 // AuditFileExistsHandler checks if audit.json exists
@@ -1727,7 +1692,7 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 
 	logger.Warn.Printf("📋 AUDIT: Log entry request received")
 
-	// Parse log entry
+	// Parse log entry (just to validate it's valid JSON)
 	var logEntry map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&logEntry); err != nil {
 		logger.Warn.Printf("📋 AUDIT: Failed to parse log entry: %v", err)
@@ -1735,41 +1700,18 @@ func (h *OptionsHandler) AuditLogHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Create audits directory if it doesn't exist
-	auditDir := "audits"
-	logger.Warn.Printf("📋 AUDIT: Ensuring audit directory exists: %s", auditDir)
-	if err := os.MkdirAll(auditDir, 0755); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to create audit directory: %v", err)
-		logger.Error.Printf("❌ Failed to create audit directory: %v", err)
-		http.Error(w, "Failed to create audit directory", http.StatusInternalServerError)
-		return
-	}
-
-	// Generate timestamped filename: audit_ticker_YYYY-MM-DD_HH-MM-SS.md
-	ticker := "UNKNOWN"
-	if t, ok := logEntry["ticker"]; ok {
-		ticker = fmt.Sprintf("%v", t)
-	}
-
-	// Send to audit system instead of direct file write
-	if err := h.auditLogger.LogOptionsAnalysisOperation(ticker, "ManualLogEntry", logEntry); err != nil {
-		logger.Warn.Printf("📋 AUDIT: Failed to log entry to audit system: %v", err)
-		http.Error(w, "Failed to log to audit system", http.StatusInternalServerError)
-		return
-	}
-
-	logger.Warn.Printf("📋 AUDIT: Log entry sent to audit system for %s", ticker)
+	// Log entry received - no audit system needed, just respond
+	logger.Warn.Printf("📋 AUDIT: Log entry acknowledged (no auditing performed)")
 
 	response := map[string]string{
 		"status":  "success",
-		"message": fmt.Sprintf("Audit log entry recorded for %s", ticker),
+		"message": "Log entry acknowledged",
 	}
 
-	logger.Warn.Printf("📋 AUDIT: Sending success response for %s", ticker)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		logger.Warn.Printf("📋 AUDIT: Failed to encode response: %v", err)
 		return
 	}
-	logger.Warn.Printf("📋 AUDIT: Complete - audit entry logged for %s", ticker)
+	logger.Warn.Printf("📋 AUDIT: Response sent successfully")
 }

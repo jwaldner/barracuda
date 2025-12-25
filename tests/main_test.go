@@ -59,7 +59,7 @@ func TestAuditFunctionality(t *testing.T) {
 			Symbol:           "TEST",
 			StrikePrice:      100.0,
 			UnderlyingPrice:  100.0,
-			TimeToExpiration: 0.25,
+			TimeToExpiration: 91.0 / 365.0, // ~3 months
 			RiskFreeRate:     0.05,
 			Volatility:       0.20,
 			OptionType:       'C',
@@ -102,11 +102,11 @@ func TestBlackScholesFormula(t *testing.T) {
 	fmt.Println("🧪 Testing Black-Scholes Formula...")
 
 	// Implement basic Black-Scholes for comparison
-	S := 100.0    // Stock price
-	K := 100.0    // Strike price
-	T := 0.25     // Time to expiration
-	r := 0.05     // Risk-free rate
-	sigma := 0.20 // Volatility
+	S := 100.0        // Stock price
+	K := 100.0        // Strike price
+	T := 91.0 / 365.0 // Time to expiration (~3 months)
+	r := 0.05         // Risk-free rate
+	sigma := 0.20     // Volatility
 
 	// Simple Black-Scholes implementation for testing
 	d1 := (ln(S/K) + (r+0.5*sigma*sigma)*T) / (sigma * sqrt(T))
@@ -141,7 +141,7 @@ func TestBlackScholesFormula(t *testing.T) {
 func BenchmarkCalculations(b *testing.B) {
 	S := 100.0
 	K := 100.0
-	T := 0.25
+	T := 91.0 / 365.0 // ~3 months
 	r := 0.05
 	sigma := 0.20
 

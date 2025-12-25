@@ -38,7 +38,7 @@ func main() {
 	err = auditor.LogOptionsAnalysisOperation("TSLA", "CalculateBlackScholes", map[string]interface{}{
 		"strike":     200.0,
 		"expiration": "2025-01-17",
-		"iv":         0.25,
+		"iv":         0.32, // Realistic TSLA IV
 	})
 
 	if err != nil {

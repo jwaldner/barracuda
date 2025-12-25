@@ -10,11 +10,21 @@ alpaca:
 # Grok AI API Configuration
 # Best practice: set via env var `GROK_API_KEY` or replace locally
 grok_api_key: "<GROK_API_KEY>"
+grok_endpoint: "https://api.x.ai/v1/chat/completions"
+grok_model: "grok-4"
+grok_timeout_minutes: 15  # Timeout for Grok API requests in minutes
 
 # Logging Configuration
 logging:
   log_level: "info"          # Log level: error, warn, info, debug, verbose (verbose details only in log file)
   log_file: "barracuda.log"  # Log file path (default: barracuda.log)
+  
+  # Log Level Details (hierarchical - higher levels include lower):
+  # error   (0): Critical errors, API failures, system crashes
+  # warn    (1): Config issues, audit failures, missing data (+ error)
+  # info    (2): Batch progress, loop timing, sleep notifications, req/min calculations (+ warn + error)
+  # debug   (3): Individual API calls, symbol processing, request durations (+ info + warn + error)
+  # verbose (4): Full request/response bodies, raw JSON data, detailed headers (+ all above)
 
 # Trading Configuration
 trading:
@@ -34,7 +44,6 @@ trading:
 engine:
   execution_mode: "auto"   # "auto" or "manual" or "cpu" or "cuda" - controls execution mode
   batch_size: 1000          # Number of items processed per batch (int)
-  enable_benchmarks: true   # Enable benchmark logging (bool)
   
   # Computational workload multiplier for performance benchmarking and stress testing.
   # This parameter is designed to artificially increase computational load by repeating
@@ -45,6 +54,27 @@ engine:
   # How it works: Acts as a MULTIPLIER - 0.0 = OFF (default), 1.0 = baseline work,
   # 2.0 = double work, 0.5 = half work, 5.0 = extreme stress
   workload_factor: 0.0      # 1.0 = baseline test (matches C++ benchmark) (float)
+
+# CSV Export Configuration
+csv:
+  # Filename format for CSV downloads. Available variables:
+  # {time} = HH-MM-SS (military time)
+  # {exp_date} = YYYY-MM-DD (expiration date)
+  # {delta} = delta0.XX (target delta)
+  # {strategy} = puts/calls
+  # {symbols} = number of symbols processed
+  filename_format: "{time}_{exp_date}_{delta}_{strategy}_{symbols}.csv"
+
+# Audit Log Configuration
+audit_log:
+  # Filename format for audit files (without extension). Available variables:
+  # {ticker} = stock symbol (e.g., JNJ)
+  # {exp_date} = YYYY-MM-DD (expiration date)
+  # {timestamp} = YYYY-MM-DD_HH-MM-SS (file creation time)
+  filename_format: "{ticker}-{exp_date} {timestamp}"
+    
+  ai_analysis_prompt: |
+    Extract and validate Black-Scholes calculations from the provided JSON. Handle variations such as multiple contracts, mismatched tickers, or missing fields by noting them explicitly. Be specific, constructive, and focus on mathematical accuracy.
 
 # S&P 500 Configuration
 sp500:

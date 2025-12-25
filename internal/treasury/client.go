@@ -95,9 +95,6 @@ func (tc *TreasuryClient) GetRiskFreeRate() (float64, error) {
 	tc.lastKnownRate = rate
 	tc.lastFetchTime = time.Now()
 
-	fmt.Printf("📈 Fetched Treasury Bill rate: %.3f%% (%.6f decimal) - updated cache\n",
-		rate*100, rate)
-
 	return rate, nil
 }
 
@@ -109,10 +106,6 @@ func (tc *TreasuryClient) GetRiskFreeRateWithLastKnown() float64 {
 	}
 
 	// Use last known rate if fetch failed
-	age := time.Since(tc.lastFetchTime)
-	fmt.Printf("⚠️ Treasury API failed, using last known rate: %.6f (%.3f%%) from %v ago\n",
-		tc.lastKnownRate, tc.lastKnownRate*100, age.Round(time.Minute))
-
 	return tc.lastKnownRate
 }
 

@@ -7,13 +7,12 @@ import (
 	"time"
 
 	"github.com/jwaldner/barracuda/internal/config"
-	"github.com/jwaldner/barracuda/internal/grok"
 	"github.com/jwaldner/barracuda/internal/logger"
 )
 
 // AuditAction represents operations sent to the audit channel
 type AuditAction struct {
-	Type   string      `json:"type"`   // "append", "analyze"
+	Type   string      `json:"type"`   // "create_audit", "append_entry", "analysis_result"
 	Ticker string      `json:"ticker"` // ticker symbol
 	Expiry string      `json:"expiry"` // expiry date
 	Data   interface{} `json:"data"`   // audit data
@@ -54,39 +53,37 @@ func NewOptionsAnalysisAuditLogger() OptionsAnalysisAuditor {
 
 // LogOptionsAnalysisOperation handles audit operations via channel
 func (oaal *OptionsAnalysisAuditLogger) LogOptionsAnalysisOperation(ticker string, operation string, data interface{}) error {
-	if logger.Debug != nil {
-		logger.Debug.Printf("🔍 AUDIT: LogOptionsAnalysisOperation called - ticker='%s', operation='%s'", ticker, operation)
-	}
+	logger.Debug.Printf("🔍 AUDIT: Operation='%s', Ticker='%s'", operation, ticker)
 
-	// Extract expiry date from data if available
+	// Extract expiry from data
 	var expiry string
 	if dataMap, ok := data.(map[string]interface{}); ok {
-		if exp, exists := dataMap["expiration"]; exists {
+		if exp, exists := dataMap["expiration"]; exists && exp != nil {
 			if expStr, ok := exp.(string); ok {
 				expiry = expStr
+				logger.Debug.Printf("🔍 AUDIT: Extracted expiry='%s' from data", expiry)
 			}
+		} else {
+			logger.Debug.Printf("🔍 AUDIT: No 'expiration' key found in data: %+v", dataMap)
 		}
+	} else {
+		logger.Debug.Printf("🔍 AUDIT: Data is not a map: %T %+v", data, data)
 	}
 
 	var action AuditAction
 
 	switch operation {
-	case "finish", "complete", "archive":
-		action = AuditAction{Type: "analyze", Data: data}
+	case "create":
+		action = AuditAction{Type: "create_audit", Ticker: ticker, Expiry: expiry, Data: data}
+	case "analysis_result":
+		action = AuditAction{Type: "analysis_result", Data: data}
 	default:
-		// Send append message with ticker and expiry info
-		auditData := map[string]interface{}{
-			"operation": operation,
-			"ticker":    ticker,
-			"expiry":    expiry,
-			"data":      data,
-		}
-		action = AuditAction{
-			Type:   "append",
-			Ticker: ticker,
-			Expiry: expiry,
-			Data:   auditData,
-		}
+		action = AuditAction{Type: "append_entry", Ticker: ticker, Expiry: expiry, Data: data}
+	}
+
+	// VALIDATE: Only 3 action types allowed
+	if action.Type != "create_audit" && action.Type != "append_entry" && action.Type != "analysis_result" {
+		return fmt.Errorf("INVALID ACTION TYPE: %s", action.Type)
 	}
 
 	select {
@@ -103,231 +100,147 @@ func auditWorker(ch chan AuditAction) {
 
 	for action := range ch {
 		switch action.Type {
-		case "append":
+		case "create_audit":
 			ticker := action.Ticker
 			expiry := action.Expiry
-			data := action.Data
 
-			// Try to read existing audit file
-			file, err := os.Open(auditFileName)
-			var currentFile AuditFile
-			fileExists := err == nil
-
-			if fileExists {
-				if decodeErr := json.NewDecoder(file).Decode(&currentFile); decodeErr != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Corrupted audit.json, treating as non-existent: %v", decodeErr)
-					fileExists = false
-				}
-				file.Close()
+			if ticker == "" {
+				logger.Warn.Printf("⚠️ AUDIT: Cannot create audit without ticker")
+				continue
 			}
 
-			// NEW AUDIT DETECTION: If ticker is provided and differs from current audit
-			if ticker != "" && fileExists && currentFile.Header.Ticker != "" && currentFile.Header.Ticker != ticker {
-				// Archive existing audit.json using configurable format
-				if err := os.MkdirAll("audits", 0755); err != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to create audits directory: %v", err)
+			// Check if audit.json exists and move it to audits/ using ticker from header
+			if _, err := os.Stat(auditFileName); err == nil {
+				var existingFile AuditFile
+				if data, readErr := os.ReadFile(auditFileName); readErr == nil {
+					if json.Unmarshal(data, &existingFile) == nil && existingFile.Header.Ticker != "" {
+						// Move existing audit using ticker from its header
+						if err := os.MkdirAll("audits", 0755); err == nil {
+							auditConfig := config.GetAuditConfig()
+							timestamp := time.Now().Format("2006-01-02_15-04-05")
+							baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, existingFile.Header.Ticker, existingFile.Header.ExpiryDate, timestamp)
+							archiveName := fmt.Sprintf("audits/%s.json", baseName)
+							if os.Rename(auditFileName, archiveName) == nil {
+								logger.Warn.Printf("📁 AUDIT: Moved existing audit to %s", archiveName)
+							}
+						}
+					}
 				}
-				auditConfig := config.GetAuditConfig()
-				baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, currentFile.Header.Ticker, currentFile.Header.ExpiryDate, "")
-				archiveName := fmt.Sprintf("audits/%s.json", baseName)
-				if err := os.Rename(auditFileName, archiveName); err != nil {
-					if logger.Warn != nil {
-						logger.Warn.Printf("⚠️ AUDIT: Failed to archive %s to %s: %v", auditFileName, archiveName, err)
+			}
+
+			// Create new audit file
+			newAudit := AuditFile{
+				Header: AuditHeader{
+					Ticker:     ticker,
+					ExpiryDate: expiry,
+					StartTime:  time.Now(),
+				},
+				Entries: []map[string]interface{}{},
+			}
+
+			if data, err := json.MarshalIndent(newAudit, "", "  "); err == nil {
+				if err := os.WriteFile(auditFileName, data, 0644); err == nil {
+					logger.Warn.Printf("📝 AUDIT: Created new audit for %s-%s", ticker, expiry)
+				} else {
+					logger.Warn.Printf("⚠️ AUDIT: Failed to write audit file: %v", err)
+				}
+			}
+
+		case "append_entry":
+			// Read existing audit file - FAIL if it doesn't exist!
+			var currentFile AuditFile
+			auditData, err := os.ReadFile(auditFileName)
+			if err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: FAILED - No audit.json exists for append_entry: %v", err)
+				continue
+			}
+
+			if err := json.Unmarshal(auditData, &currentFile); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: FAILED - Corrupted audit.json: %v", err)
+				continue
+			}
+
+			// Verify ticker matches (if provided)
+			if action.Ticker != "" && currentFile.Header.Ticker != action.Ticker {
+				logger.Warn.Printf("⚠️ AUDIT: FAILED - Ticker mismatch: existing=%s, new=%s", currentFile.Header.Ticker, action.Ticker)
+				continue
+			}
+
+			// Add entry with timestamp to EXISTING file only
+			entry := map[string]interface{}{
+				"timestamp": time.Now().Format(time.RFC3339),
+				"data":      action.Data,
+			}
+			currentFile.Entries = append(currentFile.Entries, entry)
+
+			// Write back to file
+			if data, err := json.MarshalIndent(currentFile, "", "  "); err == nil {
+				if err := os.WriteFile(auditFileName, data, 0644); err == nil {
+					if logger.Debug != nil {
+						logger.Debug.Printf("📝 AUDIT: Added entry (total: %d)", len(currentFile.Entries))
 					}
 				} else {
-					if logger.Warn != nil {
-						logger.Warn.Printf("📁 AUDIT: Archived %s to %s (new audit detected)", auditFileName, archiveName)
-					}
+					logger.Warn.Printf("⚠️ AUDIT: Failed to write audit file: %v", err)
 				}
-				fileExists = false // Force creation of new audit
 			}
 
-			// Create new audit if none exists or new ticker detected
-			if !fileExists && ticker != "" {
-				currentFile = AuditFile{
-					Header: AuditHeader{
-						Ticker:     ticker,
-						ExpiryDate: expiry,
-						StartTime:  time.Now(),
-					},
-					Entries: []map[string]interface{}{},
-				}
-				if logger.Warn != nil {
-					logger.Warn.Printf("📝 AUDIT: Creating new audit.json for %s-%s", ticker, expiry)
-				}
-			} else if !fileExists {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: No audit.json exists and no ticker provided - skipping entry")
-				}
-				continue
-			}
-
-			// Add new entry to audit
-			if entryMap, ok := data.(map[string]interface{}); ok {
-				entryMap["timestamp"] = time.Now().Format(time.RFC3339)
-				currentFile.Entries = append(currentFile.Entries, entryMap)
-			} else {
-				entry := map[string]interface{}{
-					"timestamp": time.Now().Format(time.RFC3339),
-					"data":      data,
-				}
-				currentFile.Entries = append(currentFile.Entries, entry)
-			}
-
-			// Write updated audit file
-			outFile, err := os.Create(auditFileName)
+		case "analysis_result":
+			// Read audit.json to get ticker info
+			auditData, err := os.ReadFile(auditFileName)
 			if err != nil {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to create %s: %v", auditFileName, err)
-				}
+				logger.Warn.Printf("⚠️ AUDIT: No audit.json found for analysis")
 				continue
 			}
 
-			encoder := json.NewEncoder(outFile)
-			encoder.SetIndent("", "  ")
-			if err := encoder.Encode(currentFile); err != nil {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to write %s: %v", auditFileName, err)
-				}
-				outFile.Close()
-				continue
-			}
-			outFile.Close()
-
-			if logger.Debug != nil {
-				logger.Debug.Printf("📝 AUDIT: Added entry to %s-%s (total: %d)",
-					currentFile.Header.Ticker, currentFile.Header.ExpiryDate, len(currentFile.Entries))
-			}
-
-		case "analyze":
-			// Analysis operation - extract Grok content and create .md file
 			var auditFile AuditFile
-			file, err := os.Open(auditFileName)
-			if err != nil {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to open %s for analysis: %v", auditFileName, err)
-				}
+			if err := json.Unmarshal(auditData, &auditFile); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Corrupted audit.json: %v", err)
 				continue
 			}
-
-			if err := json.NewDecoder(file).Decode(&auditFile); err != nil {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to decode %s for analysis: %v", auditFileName, err)
-				}
-				file.Close()
-				continue
-			}
-			file.Close()
 
 			ticker := auditFile.Header.Ticker
 			expiry := auditFile.Header.ExpiryDate
 
 			// Create audits directory
 			if err := os.MkdirAll("audits", 0755); err != nil {
-				if logger.Warn != nil {
-					logger.Warn.Printf("⚠️ AUDIT: Failed to create audits directory: %v", err)
-				}
-			}
-
-			// Extract Grok analysis content from action data
-			var markdownContent string
-			if action.Data != nil {
-				if dataMap, ok := action.Data.(map[string]interface{}); ok {
-					if grokAnalysis, exists := dataMap["grok_analysis"]; exists && grokAnalysis != nil {
-						markdownContent = grokAnalysis.(string)
-					}
-				}
-			}
-
-			// Fallback to generic content if no Grok analysis found
-			if markdownContent == "" {
-				markdownContent = fmt.Sprintf("# Audit Analysis - %s (Expiry: %s)\n\n**Generated:** %s\n\n## Analysis\n\nNo Grok analysis content available.\n\n---\n*Generated by Barracuda Audit System*\n",
-					ticker, expiry, time.Now().Format("2006-01-02 15:04:05"))
-			}
-
-			// Save markdown in audits directory using same base name as JSON
-			auditConfig := config.GetAuditConfig()
-			baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, ticker, expiry, "")
-			mdName := fmt.Sprintf("audits/%s.md", baseName)
-			if err := os.WriteFile(mdName, []byte(markdownContent), 0644); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to create analysis file %s: %v", mdName, err)
-			} else {
-				logger.Warn.Printf("📋 AUDIT: Created analysis %s", mdName)
-			}
-
-			// Move audit.json to audits directory after analysis using same base name
-			archiveName := fmt.Sprintf("audits/%s.json", baseName)
-			if err := os.Rename(auditFileName, archiveName); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to move %s to %s: %v", auditFileName, archiveName, err)
-			} else {
-				logger.Warn.Printf("📁 AUDIT: Moved %s to %s (analysis complete)", auditFileName, archiveName)
-			}
-
-		case "grok_analyze":
-			// Grok analysis operation - call grok client and create .md file
-			var customPrompt string
-			if action.Data != nil {
-				if dataMap, ok := action.Data.(map[string]interface{}); ok {
-					if prompt, exists := dataMap["custom_prompt"]; exists && prompt != nil {
-						if promptStr, ok := prompt.(string); ok {
-							customPrompt = promptStr
-						}
-					}
-				}
-			}
-
-			// Read audit.json file
-			auditData, err := os.ReadFile(auditFileName)
-			if err != nil {
-				logger.Warn.Printf("🤖 GROK: No audit.json file found: %v", err)
-				continue
-			}
-
-			// Call Grok API through worker
-			grokClient := grok.NewClient()
-
-			response, err := grokClient.AnalyzeOptions(string(auditData), customPrompt)
-			if err != nil {
-				logger.Warn.Printf("⚠️🤖 GROK WARNING: API call failed: %v", err)
-				continue
-			}
-
-			// Format analysis with custom prompt
-			analysis := grok.FormatAnalysisWithPrompt(response, customPrompt)
-
-			// Parse audit file to get ticker and expiry
-			var auditFile AuditFile
-			if err := json.Unmarshal(auditData, &auditFile); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to parse audit file: %v", err)
-				continue
-			}
-
-			ticker := auditFile.Header.Ticker
-			expiry := auditFile.Header.ExpiryDate
-
-			// Save markdown file
-			auditConfig := config.GetAuditConfig()
-			baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, ticker, expiry, "")
-			mdName := fmt.Sprintf("audits/%s.md", baseName)
-
-			if err := os.MkdirAll("audits", 0755); err != nil {
 				logger.Warn.Printf("⚠️ AUDIT: Failed to create audits directory: %v", err)
 				continue
 			}
 
-			if err := os.WriteFile(mdName, []byte(analysis), 0644); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to create analysis file %s: %v", mdName, err)
-			} else {
-				logger.Warn.Printf("📋 AUDIT: Created analysis %s", mdName)
+			// Generate filename using config format
+			auditConfig := config.GetAuditConfig()
+			timestamp := time.Now().Format("2006-01-02_15-04-05")
+			baseName := config.FormatAuditFilename(auditConfig.FilenameFormat, ticker, expiry, timestamp)
+
+			// Move JSON to audits
+			jsonName := fmt.Sprintf("audits/%s.json", baseName)
+			if err := os.Rename(auditFileName, jsonName); err != nil {
+				logger.Warn.Printf("⚠️ AUDIT: Failed to move audit.json: %v", err)
+				continue
+			}
+			logger.Verbose.Printf("📁 AUDIT: Moved audit to %s", jsonName)
+
+			// Extract Grok analysis from data and create markdown
+			var grokResult string
+			if action.Data != nil {
+				if dataMap, ok := action.Data.(map[string]interface{}); ok {
+					if result, exists := dataMap["grok_result"]; exists && result != nil {
+						grokResult = result.(string)
+					}
+				}
 			}
 
-			// Move audit.json to audits directory
-			archiveName := fmt.Sprintf("audits/%s.json", baseName)
-			if err := os.Rename(auditFileName, archiveName); err != nil {
-				logger.Warn.Printf("⚠️ AUDIT: Failed to move %s to %s: %v", auditFileName, archiveName, err)
-			} else {
-				logger.Warn.Printf("📁 AUDIT: Moved %s to %s (grok analysis complete)", auditFileName, archiveName)
+			// Create markdown with grok result
+			if grokResult != "" {
+				mdName := fmt.Sprintf("audits/%s.md", baseName)
+				if err := os.WriteFile(mdName, []byte(grokResult), 0644); err != nil {
+					logger.Warn.Printf("⚠️ AUDIT: Failed to create markdown: %v", err)
+				} else {
+					logger.Verbose.Printf("📋 AUDIT: Created analysis %s", mdName)
+				}
 			}
+		default:
+			logger.Warn.Printf("⚠️ AUDIT: INVALID ACTION TYPE '%s' - ONLY create_audit, append_entry, analysis_result ALLOWED", action.Type)
 		}
 	}
 }

@@ -36,7 +36,7 @@ func TestBlackScholesCalculation(t *testing.T) {
 			Symbol:           "TEST",
 			StrikePrice:      100.0,
 			UnderlyingPrice:  100.0,
-			TimeToExpiration: 0.25,
+			TimeToExpiration: 91.0 / 365.0, // ~3 months
 			RiskFreeRate:     0.05,
 			Volatility:       0.20,
 			OptionType:       'C',
@@ -81,7 +81,7 @@ func TestCPUMode(t *testing.T) {
 			Symbol:           "CPU_TEST",
 			StrikePrice:      100.0,
 			UnderlyingPrice:  100.0,
-			TimeToExpiration: 0.25,
+			TimeToExpiration: 91.0 / 365.0, // ~3 months
 			RiskFreeRate:     0.05,
 			Volatility:       0.20,
 			OptionType:       'P', // Put option

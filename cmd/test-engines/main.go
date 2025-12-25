@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
@@ -30,7 +31,7 @@ func main() {
 			UnderlyingPrice:  stockPrice,
 			TimeToExpiration: testdata.MockAppleOptionsData.TimeToExpiration,
 			RiskFreeRate:     testdata.MockAppleOptionsData.RiskFreeRate,
-			Volatility:       0.25, // Initial guess - will calculate IV from market price
+			Volatility:       math.Max(0.15, math.Min(0.50, mockOpt.GetMidPrice()*2.0/stockPrice)), // Market-derived volatility
 			OptionType:       mockOpt.Type,
 			TheoreticalPrice: mockOpt.GetMidPrice(), // Use mid price as "market" price
 		}

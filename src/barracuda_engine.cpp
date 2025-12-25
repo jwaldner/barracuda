@@ -132,6 +132,23 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
             double r = contract.risk_free_rate;
             double sigma = contract.volatility;
             
+            // Protect against zero volatility (causes division by zero)
+            if (sigma <= 1e-8) {
+                // For zero volatility, option value is intrinsic value only
+                if (contract.option_type == 'C') {
+                    contract.theoretical_price = fmax(0.0, S - K * exp(-r * T));
+                    contract.delta = (S > K * exp(-r * T)) ? 1.0 : 0.0;
+                } else {
+                    contract.theoretical_price = fmax(0.0, K * exp(-r * T) - S);
+                    contract.delta = (S < K * exp(-r * T)) ? -1.0 : 0.0;
+                }
+                contract.gamma = 0.0;
+                contract.theta = 0.0;
+                contract.vega = 0.0;
+                contract.rho = 0.0;
+                continue;
+            }
+            
             // Calculate d1 and d2
             double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
             double d2 = d1 - sigma * sqrt(T);
@@ -162,13 +179,15 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
             
             // Greeks calculations
             contract.gamma = nd1 / (S * sigma * sqrt(T));
-            contract.theta = -(S * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2;
             contract.vega = S * nd1 * sqrt(T);
-            contract.rho = K * T * exp(-r * T) * Nd2;
             
-            if (contract.option_type == 'P') {
-                contract.theta += r * K * exp(-r * T);
-                contract.rho = -contract.rho;
+            if (contract.option_type == 'C') {
+                contract.theta = -(S * nd1 * sigma) / (2.0 * sqrt(T)) - r * K * exp(-r * T) * Nd2;
+                contract.rho = K * T * exp(-r * T) * Nd2;
+            } else {
+                // Put theta: -S*N'(d1)*σ/(2√T) + r*K*e^(-r*T)*N(-d2)
+                contract.theta = -(S * nd1 * sigma) / (2.0 * sqrt(T)) + r * K * exp(-r * T) * (1.0 - Nd2);
+                contract.rho = -K * T * exp(-r * T) * (1.0 - Nd2);
             }
             
             // Apply market standard scaling
@@ -238,8 +257,8 @@ VolatilitySkew BarracudaEngine::Calculate25DeltaSkew(
     VolatilitySkew skew;
     skew.expiration = expiration;
     
-    // Find 25-delta options (simplified - would need iterative search in practice)
-    double target_delta = 0.25;
+    // Find target delta options (configurable based on market conditions)
+    double target_delta = 0.30; // Standard 30-delta for risk management
     double best_put_iv = 0.0, best_call_iv = 0.0;
     double min_put_diff = 1.0, min_call_diff = 1.0;
     
@@ -279,7 +298,7 @@ double BarracudaEngine::CalculateImpliedVolatility(
     
     const double tolerance = 1e-6;
     const int max_iterations = 100;
-    double vol = 0.25; // Initial guess: 25%
+    double vol = fmax(0.15, fmin(0.50, market_price * 2.0 / stock_price)); // Market-based initial guess
     
     for (int i = 0; i < max_iterations; i++) {
         // Calculate theoretical price and vega using Black-Scholes
@@ -397,11 +416,14 @@ std::vector<double> BarracudaEngine::MonteCarloSimulation(
 }
 
 double BarracudaEngine::BenchmarkCalculation(int num_contracts, int iterations) {
-    // Create test contracts
+    // Create test contracts with realistic market-like data
     std::vector<OptionContract> test_contracts(num_contracts);
     for (int i = 0; i < num_contracts; i++) {
+        double base_price = 150.0 + (i * 5.0);  // Vary stock prices: 150, 155, 160...
+        double strike = base_price * 0.95;      // 5% OTM strikes
+        double vol = 0.15 + (i * 0.02);        // Vary IV: 15%, 17%, 19%...
         test_contracts[i] = {
-            "TEST", 100.0 + i, 100.0, 0.25, 0.05, 0.20, 'C',
+            ("BENCH_" + std::to_string(i)).c_str(), strike, base_price, vol, 0.045, vol, 'P',
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         };
     }

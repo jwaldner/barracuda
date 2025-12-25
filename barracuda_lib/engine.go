@@ -342,6 +342,12 @@ func (be *BaracudaEngine) calculateBlackScholes(contracts []OptionContract, audi
 		cContracts[i].volatility = C.double(contract.Volatility)
 		cContracts[i].option_type = C.char(contract.OptionType)
 		cContracts[i].market_close_price = C.double(contract.MarketClosePrice)
+
+		// Debug: Log input data for CUDA engine
+		if auditSymbol != nil && contract.Symbol == *auditSymbol {
+			safeWarn("🔍 CUDA INPUT: %s underlying_price=%.2f strike_price=%.2f",
+				contract.Symbol, contract.UnderlyingPrice, contract.StrikePrice)
+		}
 	}
 
 	// Call calculation with audit symbol (C++ engine will choose CUDA or CPU path automatically)
@@ -374,6 +380,16 @@ func (be *BaracudaEngine) calculateBlackScholes(contracts []OptionContract, audi
 		results[i].Vega = float64(cContracts[i].vega)
 		results[i].Rho = float64(cContracts[i].rho)
 		results[i].TheoreticalPrice = float64(cContracts[i].theoretical_price)
+
+		// Debug: Check what CUDA engine returned vs what we're copying back
+		if auditSymbol != nil && contracts[i].Symbol == *auditSymbol {
+			cudaUnderlyingPrice := float64(cContracts[i].underlying_price)
+			safeWarn("🔍 CUDA OUTPUT: %s engine_returned_price=%.2f original_input_price=%.2f",
+				contracts[i].Symbol, cudaUnderlyingPrice, contracts[i].UnderlyingPrice)
+			if cudaUnderlyingPrice != contracts[i].UnderlyingPrice {
+				safeWarn("⚠️ CUDA MISMATCH: Engine returned different underlying price!")
+			}
+		}
 	}
 
 	return results, nil
@@ -587,13 +603,13 @@ func (be *BaracudaEngine) calculate25DeltaSkew(puts, calls []OptionContract, exp
 		return skew
 	}
 
-	// Find options closest to 25-delta
-	targetDelta := 0.25
+	// Find options closest to target delta (30-delta is more standard for risk management)
+	targetDelta := 0.30
 	var bestPut, bestCall OptionContract
 	minPutDiff := 1.0
 	minCallDiff := 1.0
 
-	// Find 25-delta put (delta ≈ -0.25)
+	// Find target-delta put (delta ≈ -0.30)
 	for _, put := range puts {
 		deltaDiff := abs(abs(put.Delta) - targetDelta)
 		if deltaDiff < minPutDiff {
@@ -603,7 +619,7 @@ func (be *BaracudaEngine) calculate25DeltaSkew(puts, calls []OptionContract, exp
 		}
 	}
 
-	// Find 25-delta call (delta ≈ +0.25)
+	// Find target-delta call (delta ≈ +0.30)
 	for _, call := range calls {
 		deltaDiff := abs(call.Delta - targetDelta)
 		if deltaDiff < minCallDiff {
