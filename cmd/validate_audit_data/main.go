@@ -46,7 +46,7 @@ func main() {
 	for _, file := range auditFiles {
 		fmt.Printf("📋 Analyzing: %s\n", filepath.Base(file))
 		issues := validateAuditFile(file)
-		
+
 		if len(issues) == 0 {
 			fmt.Println("✅ No issues found")
 		} else {
@@ -64,7 +64,7 @@ func main() {
 
 func validateAuditFile(filename string) []ValidationIssue {
 	var issues []ValidationIssue
-	
+
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return []ValidationIssue{{
@@ -77,7 +77,7 @@ func validateAuditFile(filename string) []ValidationIssue {
 	var audit AuditData
 	if err := json.Unmarshal(data, &audit); err != nil {
 		return []ValidationIssue{{
-			Type:        "JSON_ERROR", 
+			Type:        "JSON_ERROR",
 			Description: fmt.Sprintf("Invalid JSON: %v", err),
 			Severity:    "HIGH",
 		}}
@@ -86,13 +86,13 @@ func validateAuditFile(filename string) []ValidationIssue {
 	// Extract stock prices and Black-Scholes data
 	var stockPrices []float64
 	var bsCalculations []map[string]interface{}
-	
+
 	for _, entry := range audit.Entries {
 		// Stock price from batch data
 		if price, ok := entry.Data["price"].(float64); ok {
 			stockPrices = append(stockPrices, price)
 		}
-		
+
 		// Black-Scholes calculation data
 		if calcDetails, ok := entry.Data["calculation_details"].(map[string]interface{}); ok {
 			bsCalculations = append(bsCalculations, calcDetails)
@@ -128,7 +128,7 @@ func validateAuditFile(filename string) []ValidationIssue {
 						Contract:    fmt.Sprintf("Contract_%d", i+1),
 					})
 				}
-				
+
 				// Check stock price vs header ticker
 				if stockPrice, ok := variables["S"].(float64); ok {
 					if len(stockPrices) > 0 && math.Abs(stockPrice-stockPrices[0]) > stockPrices[0]*0.05 {
@@ -142,7 +142,7 @@ func validateAuditFile(filename string) []ValidationIssue {
 						})
 					}
 				}
-				
+
 				// Check for unrealistic option prices
 				if results, ok := contractData["results"].(map[string]interface{}); ok {
 					if price, ok := results["theoretical_price"].(float64); ok {

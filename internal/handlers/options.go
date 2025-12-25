@@ -953,22 +953,22 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 		// Debug: Log audit ticker stock price in selected contracts
 		if auditTicker != nil && symbol == *auditTicker {
 			logger.Info.Printf("🔍 DEBUG: Selected contract for %s with stock price: $%.2f", symbol, stockPrice.Price)
-			
+
 			// Log the selected contract details for audit prompt inclusion
 			selectedContractDetails := map[string]interface{}{
-				"ticker":             symbol,
-				"option_symbol":      bestContract.Symbol,
-				"option_type":        bestContract.Type,
-				"strike_price":       bestContract.StrikePrice,
-				"stock_price":        stockPrice.Price,
-				"expiration":         bestContract.ExpirationDate,
-				"underlying_symbol":  bestContract.UnderlyingSymbol,
+				"ticker":            symbol,
+				"option_symbol":     bestContract.Symbol,
+				"option_type":       bestContract.Type,
+				"strike_price":      bestContract.StrikePrice,
+				"stock_price":       stockPrice.Price,
+				"expiration":        bestContract.ExpirationDate,
+				"underlying_symbol": bestContract.UnderlyingSymbol,
 			}
-			
+
 			if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTicker, "SelectedContractForCalculation", selectedContractDetails); err != nil {
 				logger.Warn.Printf("📋 CONTRACT: Failed to log selected contract: %v", err)
 			} else {
-				logger.Warn.Printf("📋 CONTRACT: Logged selected contract %s %s @ $%s for %s calculation", 
+				logger.Warn.Printf("📋 CONTRACT: Logged selected contract %s %s @ $%s for %s calculation",
 					bestContract.Type, bestContract.Symbol, bestContract.StrikePrice, *auditTicker)
 			}
 		}
@@ -1323,7 +1323,7 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 				marketPrice = closePriceFloat
 			}
 		}
-		
+
 		// Validate minimum premium to prevent unrealistic calculations
 		if marketPrice < 0.01 {
 			logger.Verbose.Printf("⚠️  Skipping %s: Premium too small ($%.6f), likely data error", sc.symbol, marketPrice)

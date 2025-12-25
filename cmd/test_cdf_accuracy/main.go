@@ -5,7 +5,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/jwaldner/barracuda/barracuda_lib"
+	barracuda "github.com/jwaldner/barracuda/barracuda_lib"
 )
 
 // Test the improved CDF accuracy with Grok's expected values
@@ -14,10 +14,10 @@ func main() {
 	fmt.Println("===========================================")
 
 	// Grok's inputs from the analysis
-	S := 188.36    // stock price
-	K := 166.0     // strike price
-	T := 0.057534246575342465 // time to expiration
-	r := 0.03983   // risk-free rate
+	S := 188.36                  // stock price
+	K := 166.0                   // strike price
+	T := 0.057534246575342465    // time to expiration
+	r := 0.03983                 // risk-free rate
 	sigma := 0.39963570444400937 // volatility
 
 	// Grok's expected values
@@ -35,7 +35,7 @@ func main() {
 	// Create a test contract
 	engine := barracuda.NewBaracudaEngine()
 	defer engine.Close()
-	
+
 	contract := barracuda.OptionContract{
 		Symbol:           "NVDA",
 		StrikePrice:      K,
@@ -49,7 +49,7 @@ func main() {
 
 	// Calculate using our improved implementation
 	contracts := []barracuda.OptionContract{contract}
-	
+
 	// Try CUDA first, then CPU fallback
 	puts, calls, err := engine.MaximizeCUDAUsage(contracts, S)
 	if err != nil {
@@ -58,7 +58,7 @@ func main() {
 
 	var result barracuda.OptionContract
 	var found bool
-	
+
 	// Check puts (since we're testing a put option)
 	if len(puts) > 0 {
 		result = puts[0]
@@ -67,7 +67,7 @@ func main() {
 		result = calls[0]
 		found = true
 	}
-	
+
 	if !found {
 		// Try CPU fallback using complete function
 		fmt.Println("⚠️  CUDA returned no results, trying CPU fallback...")
@@ -75,7 +75,7 @@ func main() {
 		if err != nil || len(complete_results) == 0 {
 			log.Fatalf("❌ Both CUDA and CPU calculations failed")
 		}
-		
+
 		// Convert CompleteOptionResult to OptionContract for display
 		cr := complete_results[0]
 		result = barracuda.OptionContract{
@@ -111,7 +111,7 @@ func main() {
 	fmt.Println()
 
 	// Assessment
-	price_tolerance := 0.001  // ±0.001 as mentioned by user
+	price_tolerance := 0.001 // ±0.001 as mentioned by user
 	delta_tolerance := 0.001
 
 	price_accurate := price_diff <= price_tolerance
@@ -130,11 +130,11 @@ func main() {
 	}
 
 	// Show improvement from original error
-	original_error := 0.014  // User mentioned 0.014 difference
+	original_error := 0.014 // User mentioned 0.014 difference
 	improvement := ((original_error - price_diff) / original_error) * 100
 
 	if price_diff < original_error {
-		fmt.Printf("🎯 IMPROVEMENT: Reduced error by %.1f%% (from $%.3f to $%.6f)\n", 
+		fmt.Printf("🎯 IMPROVEMENT: Reduced error by %.1f%% (from $%.3f to $%.6f)\n",
 			improvement, original_error, price_diff)
 	}
 }
