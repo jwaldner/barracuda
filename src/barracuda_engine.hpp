@@ -173,7 +173,7 @@ public:
     double BenchmarkCalculation(int num_contracts, int iterations);
     
     // Complete option processing audit logging (public for C interface)
-    void ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash);
+    void ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash, const char* audit_symbol);
     
 private:
     // Helper function to append audit messages to JSON file
@@ -182,6 +182,9 @@ private:
     // Audit methods for Black-Scholes calculations
     void appendAuditCalculation(const std::string& calculation_data);
     void appendAuditFailure(const std::string& error_reason);
+    
+    // Helper function to build plugin formula with actual calculated values
+    std::string buildPluginFormula(const OptionContract& contract, double d1, double d2) const;
     
     // Implied volatility calculation
     double CalculateImpliedVolatility(
@@ -225,7 +228,8 @@ extern "C" {
         CompleteOptionContract* contracts,
         int count,
         double available_cash,
-        int days_to_expiration);
+        int days_to_expiration,
+        const char* audit_symbol);
     
     // Volatility skew
     int baracuda_calculate_skew(

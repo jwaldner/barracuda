@@ -61,7 +61,7 @@ ps aux | grep barracuda
 ## Main Components
 
 ### Core Services
-1. **Baracuda CUDA Engine** (`baracuda/engine.go`, `src/baracuda_engine.cpp`)
+1. **Barracuda CUDA Engine** (`barracuda/engine.go`, `src/barracuda_engine.cpp`)
    - GPU-accelerated Black-Scholes options pricing
    - Monte Carlo simulations
    - 25-delta volatility skew analysis

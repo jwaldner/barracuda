@@ -64,7 +64,7 @@ func run() error {
 	}
 
 	// Initialize engine based on configuration
-	var engine *barracuda.BaracudaEngine
+	var engine *barracuda.BarracudaEngine
 
 	// Check execution mode from config
 	executionMode := cfg.Engine.ExecutionMode
@@ -73,15 +73,15 @@ func run() error {
 	}
 
 	if executionMode == "cpu" {
-		// Force CPU mode by creating engine differently
-		engine = barracuda.NewBaracudaEngineForced("cpu")
+		logger.Info.Println("🖥️ Forcing CPU mode...")
+		engine = barracuda.NewBarracudaEngineForced("cpu")
 		if engine != nil && engine.IsCudaAvailable() {
 			logger.Always.Printf("🔧 EXECUTION MODE: CPU (CUDA hardware available but disabled by config)")
 		} else {
 			logger.Always.Printf("🔧 EXECUTION MODE: CPU (no CUDA hardware)")
 		}
 	} else {
-		engine = barracuda.NewBaracudaEngine()
+		engine = barracuda.NewBarracudaEngine()
 		if engine != nil && engine.IsCudaAvailable() {
 			logger.Always.Printf("🔧 EXECUTION MODE: CUDA")
 		} else {

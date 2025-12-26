@@ -64,7 +64,7 @@ func monteCarloSeqCPU(samples int) MonteCarloResult {
 }
 
 // monteCarloParallelCUDA simulates CUDA parallel execution (NO Go loop!)
-func monteCarloParallelCUDA(samples int, engine *barracuda.BaracudaEngine) MonteCarloResult {
+func monteCarloParallelCUDA(samples int, engine *barracuda.BarracudaEngine) MonteCarloResult {
 	if samples == 0 {
 		return MonteCarloResult{0, 0.0, 0.0, "CUDA_Parallel"}
 	}
@@ -115,7 +115,7 @@ func getSymbolCount(info map[string]interface{}) int {
 type OptionsHandler struct {
 	alpacaClient            alpaca.AlpacaInterface
 	config                  *config.Config
-	engine                  *barracuda.BaracudaEngine
+	engine                  *barracuda.BarracudaEngine
 	symbolService           *symbols.SP500Service
 	auditLogger             audit.OptionsAnalysisAuditor
 	treasuryClient          *treasury.TreasuryClient
@@ -124,7 +124,7 @@ type OptionsHandler struct {
 }
 
 // NewOptionsHandler creates a new options handler - just HTTP routing
-func NewOptionsHandler(alpacaClient alpaca.AlpacaInterface, cfg *config.Config, engine *barracuda.BaracudaEngine, symbolService *symbols.SP500Service) *OptionsHandler {
+func NewOptionsHandler(alpacaClient alpaca.AlpacaInterface, cfg *config.Config, engine *barracuda.BarracudaEngine, symbolService *symbols.SP500Service) *OptionsHandler {
 	return &OptionsHandler{
 		alpacaClient:   alpacaClient,
 		config:         cfg,

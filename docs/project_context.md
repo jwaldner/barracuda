@@ -1,7 +1,7 @@
 # Barracuda - Complete Project Context
 
 ## Project Overview
-Baracuda is a high-performance options trading and analysis system that combines:
+Barracuda is a high-performance options trading and analysis system that combines:
 - **Go backend** for web API and data handling
 - **CUDA acceleration** for Black-Scholes calculations
 - **Alpaca integration** for real-time market data
@@ -16,7 +16,7 @@ Baracuda is a high-performance options trading and analysis system that combines
 - **Port**: Configurable (default 8080)
 - **Environment**: Live trading support
 
-### CUDA Engine (Baracuda)
+### CUDA Engine (Barracuda)
 - **Language**: C++ with CUDA kernels
 - **Purpose**: High-performance Black-Scholes calculations
 - **Features**: 
@@ -144,7 +144,7 @@ type VolatilitySkew struct {
 ```
 go-cuda/
 ├── main.go                    # Main server with CUDA integration
-├── baracuda/
+├── barracuda/
 │   └── engine.go             # Go CUDA wrapper
 ├── internal/
 │   ├── alpaca/               # Market data client
@@ -223,4 +223,4 @@ go-cuda/
 - **Integration Tests**: Full API testing
 - **Performance Tests**: Benchmark utilities
 
-This comprehensive context covers the entire Baracuda system architecture, from CUDA acceleration to market data integration to precision calculations.
+This comprehensive context covers the entire Barracuda system architecture, from CUDA acceleration to market data integration to precision calculations.

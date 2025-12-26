@@ -1,9 +1,8 @@
 #include "barracuda_engine.hpp"
 #include <cuda_runtime.h>
-#include <curand_kernel.h>
 #include <cmath>
+#include <cstring>
 #include <iostream>
-#include <chrono>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -15,10 +14,6 @@ namespace barracuda {
 
 // External CUDA kernel declarations
 extern "C" {
-    void launch_monte_carlo_kernel(double* d_paths, double S0, double r, double sigma, 
-                                  double T, int num_steps, int num_paths, curandState* d_states);
-    void launch_setup_kernel(curandState* d_states, unsigned long seed, int num_paths);
-    
     // New CUDA kernels for maximum GPU utilization
     // NOTE: Old kernel removed - using combined IV+Black-Scholes kernel
     void launch_implied_volatility_black_scholes_kernel(OptionContract* d_contracts, int num_contracts);
@@ -90,35 +85,51 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         
         // Add audit message if audit_symbol is provided
         if (audit_symbol != nullptr) {
-            // Log detailed CUDA processing results
-            if (!results.empty()) {
-                const auto& sample = results[0]; // Use first contract as sample
-                std::stringstream audit_data;
-                audit_data << "{"
-                          << "\"execution_type\": \"CUDA\", "
-                          << "\"symbol\": \"" << audit_symbol << "\", "
-                          << "\"formula\": \"Black-Scholes\", "
-                          << "\"contract_data\": {"
-                          << "\"symbol\": \"" << sample.symbol << "\", "
-                          << "\"strike_price\": " << sample.strike_price << ", "
-                          << "\"underlying_price\": " << sample.underlying_price << ", "
-                          << "\"time_to_expiration\": " << sample.time_to_expiration << ", "
-                          << "\"risk_free_rate\": " << sample.risk_free_rate << ", "
-                          << "\"volatility\": " << sample.volatility << ", "
-                          << "\"option_type\": \"" << sample.option_type << "\", "
-                          << "\"market_close_price\": " << sample.market_close_price
-                          << "}, "
-                          << "\"calculated_results\": {"
-                          << "\"theoretical_price\": " << sample.theoretical_price << ", "
-                          << "\"delta\": " << sample.delta << ", "
-                          << "\"gamma\": " << sample.gamma << ", "
-                          << "\"theta\": " << sample.theta << ", "
-                          << "\"vega\": " << sample.vega << ", "
-                          << "\"rho\": " << sample.rho
-                          << "}, "
-                          << "\"contracts_processed\": " << results.size()
-                          << "}";
-                appendAuditCalculation(audit_data.str());
+            // Log detailed CUDA processing results - find matching audit symbol
+            for (const auto& contract : results) {
+                if (contract.symbol == std::string(audit_symbol)) {
+                    // Calculate d1 and d2 for plugin formula (CUDA results don't return these)
+                    double S = contract.underlying_price;
+                    double K = contract.strike_price;
+                    double T = contract.time_to_expiration;
+                    double r = contract.risk_free_rate;
+                    double sigma = contract.volatility;
+                    double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
+                    double d2 = d1 - sigma * sqrt(T);
+                    
+                    std::string plugin_formula = buildPluginFormula(contract, d1, d2);
+                    
+                    std::stringstream audit_data;
+                    audit_data << "{"
+                              << "\"execution_type\": \"CUDA\", "
+                              << "\"symbol\": \"" << audit_symbol << "\", "
+                              << "\"formula\": \"" << (contract.option_type == 'C' ? "C = S*N(d1) - K*e^(-r*T)*N(d2)" : "P = K*e^(-r*T)*N(-d2) - S*N(-d1)") << "\", "
+                              << "\"plug_in_formula\": \"" << plugin_formula << "\", "
+                              << "\"contract_data\": {"
+                              << "\"symbol\": \"" << contract.symbol << "\", "
+                              << "\"strike_price\": " << contract.strike_price << ", "
+                              << "\"underlying_price\": " << contract.underlying_price << ", "
+                              << "\"time_to_expiration\": " << contract.time_to_expiration << ", "
+                              << "\"risk_free_rate\": " << contract.risk_free_rate << ", "
+                              << "\"volatility\": " << contract.volatility << ", "
+                              << "\"option_type\": \"" << contract.option_type << "\", "
+                              << "\"market_close_price\": " << contract.market_close_price
+                              << "}, "
+                              << "\"calculated_results\": {"
+                              << "\"theoretical_price\": " << contract.theoretical_price << ", "
+                              << "\"d1\": " << d1 << ", "
+                              << "\"d2\": " << d2 << ", "
+                              << "\"delta\": " << contract.delta << ", "
+                              << "\"gamma\": " << contract.gamma << ", "
+                              << "\"theta\": " << contract.theta << ", "
+                              << "\"vega\": " << contract.vega << ", "
+                              << "\"rho\": " << contract.rho
+                              << "}, "
+                              << "\"contracts_processed\": " << results.size()
+                              << "}";
+                    appendAuditCalculation(audit_data.str());
+                    break; // Only audit the matching symbol once
+                }
             }
         }
         
@@ -199,221 +210,54 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
         
         // Add audit message if audit_symbol is provided
         if (audit_symbol != nullptr) {
-            // Log detailed CPU processing results
-            if (!results.empty()) {
-                const auto& sample = results[0]; // Use first contract as sample
-                std::stringstream audit_data;
-                audit_data << "{"
-                          << "\"execution_type\": \"CPU\", "
-                          << "\"symbol\": \"" << audit_symbol << "\", "
-                          << "\"formula\": \"Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls\", "
-                          << "\"contract_data\": {"
-                          << "\"symbol\": \"" << sample.symbol << "\", "
-                          << "\"strike_price\": " << sample.strike_price << ", "
-                          << "\"underlying_price\": " << sample.underlying_price << ", "
-                          << "\"time_to_expiration\": " << sample.time_to_expiration << ", "
-                          << "\"risk_free_rate\": " << sample.risk_free_rate << ", "
-                          << "\"volatility\": " << sample.volatility << ", "
-                          << "\"option_type\": \"" << sample.option_type << "\", "
-                          << "\"market_close_price\": " << sample.market_close_price
-                          << "}, "
-                          << "\"calculated_results\": {"
-                          << "\"theoretical_price\": " << sample.theoretical_price << ", "
-                          << "\"delta\": " << sample.delta << ", "
-                          << "\"gamma\": " << sample.gamma << ", "
-                          << "\"theta\": " << sample.theta << ", "
-                          << "\"vega\": " << sample.vega << ", "
-                          << "\"rho\": " << sample.rho
-                          << "}, "
-                          << "\"contracts_processed\": " << results.size()
-                          << "}";
-                appendAuditCalculation(audit_data.str());
+            // Log detailed CPU processing results with plugin formula
+            for (const auto& contract : results) {
+                if (contract.symbol == std::string(audit_symbol)) {
+                    // Calculate d1 and d2 for this specific contract
+                    double S = contract.underlying_price;
+                    double K = contract.strike_price;
+                    double T = contract.time_to_expiration;
+                    double r = contract.risk_free_rate;
+                    double sigma = contract.volatility;
+                    double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
+                    double d2 = d1 - sigma * sqrt(T);
+                    
+                    std::string plugin_formula = buildPluginFormula(contract, d1, d2);
+                    
+                    std::stringstream audit_data;
+                    audit_data << "{"
+                              << "\"execution_type\": \"CPU\", "
+                              << "\"symbol\": \"" << audit_symbol << "\", "
+                              << "\"formula\": \"" << (contract.option_type == 'C' ? "C = S*N(d1) - K*e^(-r*T)*N(d2)" : "P = K*e^(-r*T)*N(-d2) - S*N(-d1)") << "\", "
+                              << "\"plug_in_formula\": \"" << plugin_formula << "\", "
+                              << "\"contract_data\": {"
+                              << "\"symbol\": \"" << contract.symbol << "\", "
+                              << "\"strike_price\": " << contract.strike_price << ", "
+                              << "\"underlying_price\": " << contract.underlying_price << ", "
+                              << "\"time_to_expiration\": " << contract.time_to_expiration << ", "
+                              << "\"risk_free_rate\": " << contract.risk_free_rate << ", "
+                              << "\"volatility\": " << contract.volatility << ", "
+                              << "\"option_type\": \"" << contract.option_type << "\", "
+                              << "\"market_close_price\": " << contract.market_close_price
+                              << "}, "
+                              << "\"calculated_results\": {"
+                              << "\"theoretical_price\": " << contract.theoretical_price << ", "
+                              << "\"d1\": " << d1 << ", "
+                              << "\"d2\": " << d2 << ", "
+                              << "\"delta\": " << contract.delta << ", "
+                              << "\"gamma\": " << contract.gamma << ", "
+                              << "\"theta\": " << contract.theta << ", "
+                              << "\"vega\": " << contract.vega << ", "
+                              << "\"rho\": " << contract.rho
+                              << "}, "
+                              << "\"contracts_processed\": " << results.size()
+                              << "}";
+                    appendAuditCalculation(audit_data.str());
+                    break; // Only audit the matching symbol once
+                }
             }
         }
     }
-    
-    return results;
-}
-
-std::vector<OptionContract> BarracudaEngine::BatchProcessOptions(
-    const std::vector<OptionContract>& contracts, int batch_size) {
-    
-    std::vector<OptionContract> results;
-    results.reserve(contracts.size());
-    
-    for (size_t i = 0; i < contracts.size(); i += batch_size) {
-        size_t end = std::min(i + batch_size, contracts.size());
-        std::vector<OptionContract> batch(contracts.begin() + i, contracts.begin() + end);
-        
-        auto batch_results = CalculateBlackScholes(batch);
-        results.insert(results.end(), batch_results.begin(), batch_results.end());
-    }
-    
-    return results;
-}
-
-VolatilitySkew BarracudaEngine::Calculate25DeltaSkew(
-    const std::vector<OptionContract>& puts,
-    const std::vector<OptionContract>& calls,
-    const std::string& expiration) {
-    
-    VolatilitySkew skew;
-    skew.expiration = expiration;
-    
-    // Find target delta options (configurable based on market conditions)
-    double target_delta = 0.30; // Standard 30-delta for risk management
-    double best_put_iv = 0.0, best_call_iv = 0.0;
-    double min_put_diff = 1.0, min_call_diff = 1.0;
-    
-    // Calculate options first to get deltas
-    auto calculated_puts = CalculateBlackScholes(puts);
-    auto calculated_calls = CalculateBlackScholes(calls);
-    
-    for (const auto& put : calculated_puts) {
-        double delta_diff = std::abs(std::abs(put.delta) - target_delta);
-        if (delta_diff < min_put_diff) {
-            min_put_diff = delta_diff;
-            best_put_iv = put.volatility;
-            skew.symbol = put.symbol;
-        }
-    }
-    
-    for (const auto& call : calculated_calls) {
-        double delta_diff = std::abs(call.delta - target_delta);
-        if (delta_diff < min_call_diff) {
-            min_call_diff = delta_diff;
-            best_call_iv = call.volatility;
-        }
-    }
-    
-    skew.put_25d_iv = best_put_iv;
-    skew.call_25d_iv = best_call_iv;
-    skew.skew = best_put_iv - best_call_iv;
-    skew.atm_iv = (best_put_iv + best_call_iv) / 2.0;
-    
-    return skew;
-}
-
-// Newton-Raphson method for implied volatility calculation
-double BarracudaEngine::CalculateImpliedVolatility(
-    double market_price, double stock_price, double strike_price,
-    double time_to_expiration, double risk_free_rate, char option_type) {
-    
-    const double tolerance = 1e-6;
-    const int max_iterations = 100;
-    double vol = fmax(0.15, fmin(0.50, market_price * 2.0 / stock_price)); // Market-based initial guess
-    
-    for (int i = 0; i < max_iterations; i++) {
-        // Calculate theoretical price and vega using Black-Scholes
-        double d1 = (log(stock_price / strike_price) + (risk_free_rate + 0.5 * vol * vol) * time_to_expiration) / (vol * sqrt(time_to_expiration));
-        double d2 = d1 - vol * sqrt(time_to_expiration);
-        
-        auto norm_cdf = [](double x) -> double {
-            return 0.5 * (1.0 + erf(x / sqrt(2.0)));
-        };
-        
-        auto norm_pdf = [](double x) -> double {
-            return exp(-0.5 * x * x) / sqrt(2.0 * M_PI);
-        };
-        
-        double Nd1 = norm_cdf(d1);
-        double Nd2 = norm_cdf(d2);
-        double nd1 = norm_pdf(d1);
-        
-        double theoretical_price;
-        if (option_type == 'C') {
-            theoretical_price = stock_price * Nd1 - strike_price * exp(-risk_free_rate * time_to_expiration) * Nd2;
-        } else {
-            theoretical_price = strike_price * exp(-risk_free_rate * time_to_expiration) * (1.0 - Nd2) - stock_price * (1.0 - Nd1);
-        }
-        
-        double vega = stock_price * nd1 * sqrt(time_to_expiration);
-        
-        double price_diff = theoretical_price - market_price;
-        
-        if (abs(price_diff) < tolerance) {
-            return vol;
-        }
-        
-        if (vega < 1e-10) {
-            break; // Avoid division by zero
-        }
-        
-        vol -= price_diff / vega;
-        
-        // Keep volatility in reasonable bounds
-        if (vol < 0.001) vol = 0.001;
-        if (vol > 5.0) vol = 5.0;
-    }
-    
-    return vol; // Return best estimate even if not converged
-}
-
-// Legacy batch analysis functions removed - replaced by complete GPU processing
-
-std::vector<double> BarracudaEngine::CalculateRollingVolatility(
-    const std::vector<MarketData>& price_data, int window_size) {
-    
-    std::vector<double> volatilities;
-    
-    for (size_t i = window_size; i < price_data.size(); i++) {
-        std::vector<double> returns;
-        
-        for (int j = 0; j < window_size - 1; j++) {
-            double ret = log(price_data[i - j].price / price_data[i - j - 1].price);
-            returns.push_back(ret);
-        }
-        
-        // Calculate standard deviation
-        double mean = 0.0;
-        for (double ret : returns) mean += ret;
-        mean /= returns.size();
-        
-        double variance = 0.0;
-        for (double ret : returns) {
-            variance += (ret - mean) * (ret - mean);
-        }
-        variance /= returns.size() - 1;
-        
-        // Annualized volatility (assuming daily data)
-        double vol = sqrt(variance * 252);
-        volatilities.push_back(vol);
-    }
-    
-    return volatilities;
-}
-
-std::vector<double> BarracudaEngine::MonteCarloSimulation(
-    const std::vector<OptionContract>& portfolio,
-    int num_simulations, int time_steps) {
-    
-    if (!cuda_available_) {
-        return std::vector<double>(num_simulations, 0.0);
-    }
-    
-    // For simplicity, simulate just the first contract
-    if (portfolio.empty()) return {};
-    
-    const auto& contract = portfolio[0];
-    
-    double* d_paths;
-    curandState* d_states;
-    
-    cudaMalloc(&d_paths, num_simulations * sizeof(double));
-    cudaMalloc(&d_states, num_simulations * sizeof(curandState));
-    
-    // Setup random states and run Monte Carlo via wrapper functions
-    launch_setup_kernel(d_states, time(nullptr), num_simulations);
-    launch_monte_carlo_kernel(d_paths, contract.underlying_price, contract.risk_free_rate,
-                             contract.volatility, contract.time_to_expiration,
-                             time_steps, num_simulations, d_states);
-    
-    std::vector<double> results(num_simulations);
-    cudaMemcpy(results.data(), d_paths, 
-               num_simulations * sizeof(double), cudaMemcpyDeviceToHost);
-    
-    cudaFree(d_paths);
-    cudaFree(d_states);
     
     return results;
 }
@@ -431,32 +275,23 @@ double BarracudaEngine::BenchmarkCalculation(int num_contracts, int iterations) 
         };
     }
     
-    auto start = std::chrono::high_resolution_clock::now();
+    clock_t start = clock();
     
     for (int i = 0; i < iterations; i++) {
         CalculateBlackScholes(test_contracts);
     }
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    clock_t end = clock();
+    double duration = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
     
-    return duration.count() / 1000.0; // Return milliseconds
-}
-
-std::string BarracudaEngine::GetDeviceInfo(int device_id) const {
-    if (device_id >= device_count_) return "Invalid device ID";
-    
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, device_id);
-    
-    return std::string("Device ") + std::to_string(device_id) + ": " + 
-           prop.name + " (Compute " + std::to_string(prop.major) + "." + 
-           std::to_string(prop.minor) + ")";
+    return duration; // Return milliseconds
 }
 
 extern "C" {
     int barracuda_calculate_options_with_audit(void* engine, OptionContract* c_contracts, int count, const char* audit_symbol);
     void barracuda_set_execution_mode(void* engine, const char* mode);
+    int barracuda_calculate_options_complete(void* engine, CompleteOptionContract* c_contracts, int count,
+                                           double available_cash, int days_to_expiration, const char* audit_symbol);
 }
 
 // C interface implementations
@@ -608,7 +443,7 @@ extern "C" {
     
     // Complete option processing - ALL calculations on GPU
     int barracuda_calculate_options_complete(void* engine, CompleteOptionContract* c_contracts, int count,
-                                           double available_cash, int days_to_expiration) {
+                                           double available_cash, int days_to_expiration, const char* audit_symbol) {
         auto* eng = static_cast<BarracudaEngine*>(engine);
         
         if (!eng->IsCudaAvailable()) {
@@ -636,11 +471,8 @@ extern "C" {
         // Copy complete results back to CPU
         cudaMemcpy(c_contracts, d_contracts, contract_size, cudaMemcpyDeviceToHost);
         
-        // DEBUG: Print to see if this code is reached
-        std::cout << "DEBUG: Complete processing finished, calling audit method..." << std::endl;
-        
         // Handle audit logging through the engine method
-        eng->ProcessOptionsCompleteAudit(c_contracts, count, available_cash);
+        eng->ProcessOptionsCompleteAudit(c_contracts, count, available_cash, audit_symbol);
         
         // Cleanup GPU memory
         cudaFree(d_contracts);
@@ -650,130 +482,79 @@ extern "C" {
 }
 
 // Complete option processing audit logging only (processing already done)
-void BarracudaEngine::ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash) {
-    std::cout << "DEBUG: ProcessOptionsCompleteAudit called with " << count << " contracts and $" << available_cash << " available cash" << std::endl;
-    
-    // Check if we need to audit based on current ticker
-    std::ifstream audit_file("audit.json");
-    if (audit_file.is_open() && count > 0) {
-        std::cout << "DEBUG: audit.json opened successfully" << std::endl;
-        std::string content((std::istreambuf_iterator<char>(audit_file)),
-                           std::istreambuf_iterator<char>());
-        audit_file.close();
-        
-        std::cout << "DEBUG: audit.json content length: " << content.length() << std::endl;
-        
-        // Simple ticker extraction from JSON header
-        size_t ticker_pos = content.find("\"ticker\":");
-        if (ticker_pos != std::string::npos) {
-            size_t start = content.find("\"", ticker_pos + 9);
-            size_t end = content.find("\"", start + 1);
-            if (start != std::string::npos && end != std::string::npos) {
-                std::string ticker = content.substr(start + 1, end - start - 1);
-                std::cout << "DEBUG: Found ticker in audit.json: '" << ticker << "'" << std::endl;
-                
-                // Check if any contract matches the audit ticker
-                for (int i = 0; i < count; i++) {
-                    // Extract symbol from CompleteOptionContract
-                    std::string contract_symbol(contracts[i].symbol, 
-                        strnlen(contracts[i].symbol, sizeof(contracts[i].symbol)));
-                    std::cout << "DEBUG: Checking contract " << i << " symbol: '" << contract_symbol << "' against '" << ticker << "'" << std::endl;
-                    
-                    if (ticker == contract_symbol) {
-                        std::cout << "DEBUG: TICKER MATCH! Creating audit entry for " << ticker << std::endl;
-                        // Create detailed audit entry for this contract with complete row data
-                        std::stringstream audit_data;
-                        audit_data << "{"
-                                  << "\"execution_type\": \"CUDA\", "
-                                  << "\"symbol\": \"" << ticker << "\", "
-                                  << "\"formula\": \"Black-Scholes\", "
-                                  << "\"available_cash\": " << available_cash << ", "
-                                  << "\"contract_data\": {"
-                                  << "\"symbol\": \"" << ticker << "\", "
-                                  << "\"strike_price\": " << contracts[i].strike_price << ", "
-                                  << "\"underlying_price\": " << contracts[i].underlying_price << ", "
-                                  << "\"time_to_expiration\": " << contracts[i].time_to_expiration << ", "
-                                  << "\"risk_free_rate\": " << contracts[i].risk_free_rate << ", "
-                                  << "\"volatility\": " << contracts[i].volatility << ", "
-                                  << "\"option_type\": \"" << contracts[i].option_type << "\", "
-                                  << "\"market_close_price\": " << contracts[i].market_close_price << ", "
-                                  << "\"days_to_expiration\": " << contracts[i].days_to_expiration
-                                  << "}, "
-                                  << "\"calculated_results\": {"
-                                  << "\"theoretical_price\": " << contracts[i].theoretical_price << ", "
-                                  << "\"implied_volatility\": " << contracts[i].implied_volatility << ", "
-                                  << "\"delta\": " << contracts[i].delta << ", "
-                                  << "\"gamma\": " << contracts[i].gamma << ", "
-                                  << "\"theta\": " << contracts[i].theta << ", "
-                                  << "\"vega\": " << contracts[i].vega << ", "
-                                  << "\"rho\": " << contracts[i].rho << ", "
-                                  << "\"max_contracts\": " << contracts[i].max_contracts << ", "
-                                  << "\"total_premium\": " << contracts[i].total_premium << ", "
-                                  << "\"cash_needed\": " << contracts[i].cash_needed << ", "
-                                  << "\"profit_percentage\": " << contracts[i].profit_percentage << ", "
-                                  << "\"annualized_return\": " << contracts[i].annualized_return
-                                  << "}, "
-                                  << "\"contracts_processed\": " << count
-                                  << "}";
-                        appendAuditCalculation(audit_data.str());
-                        std::cout << "DEBUG: appendAuditCalculation called successfully!" << std::endl;
-                        break; // Only log once per ticker
-                    }
-                }
-            } else {
-                std::cout << "DEBUG: Could not parse ticker from JSON" << std::endl;
-            }
-        } else {
-            std::cout << "DEBUG: No ticker field found in audit.json" << std::endl;
-        }
-    } else {
-        std::cout << "DEBUG: Could not open audit.json or no contracts provided" << std::endl;
-    }
-    std::cout << "DEBUG: ProcessOptionsCompleteAudit finished" << std::endl;
-}
-
-// Helper function to append audit messages to JSON file
-void BarracudaEngine::appendAuditMessage(const std::string& message) {
-    std::ifstream inFile("audit.json");
-    if (!inFile.is_open()) {
-        return; // File doesn't exist, return silently
+void BarracudaEngine::ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash, const char* audit_symbol) {
+    // Only log if audit_symbol is provided
+    if (audit_symbol == nullptr) {
+        return;
     }
     
-    // Read entire file content
-    std::string content((std::istreambuf_iterator<char>(inFile)),
-                        std::istreambuf_iterator<char>());
-    inFile.close();
+    std::string target_symbol(audit_symbol);
     
-    // Get current timestamp
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%dT%H:%M:%S");
-    
-    // Find the api_requests array and insert before the closing ]
-    size_t api_requests_pos = content.find("\"api_requests\":");
-    if (api_requests_pos != std::string::npos) {
-        // Find the array content
-        size_t array_start = content.find("[", api_requests_pos);
-        size_t array_end = content.find_last_of("]");
+    // Find matching contract for the audit symbol
+    for (int i = 0; i < count; i++) {
+        std::string contract_symbol(contracts[i].symbol, 
+            strnlen(contracts[i].symbol, sizeof(contracts[i].symbol)));
         
-        if (array_start != std::string::npos && array_end != std::string::npos) {
-            // Create audit entry
-            std::string audit_entry = ",\n    {\n"
-                                      "      \"type\": \"BlackScholesCalculation\",\n"
-                                      "      \"message\": \"" + message + "\",\n"
-                                      "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
-                                      "    }";
+        if (target_symbol == contract_symbol) {
+            // Calculate d1 and d2 for plugin formula using IMPLIED VOLATILITY
+            double S = contracts[i].underlying_price;
+            double K = contracts[i].strike_price;
+            double T = contracts[i].time_to_expiration;
+            double r = contracts[i].risk_free_rate;
+            double sigma = contracts[i].implied_volatility;  // Use IMPLIED volatility, not input volatility
+            double d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T));
+            double d2 = d1 - sigma * sqrt(T);
             
-            // Insert before the closing ]
-            content.insert(array_end, audit_entry);
+            // Convert CompleteOptionContract to OptionContract for buildPluginFormula
+            OptionContract contract_for_formula;
+            contract_for_formula.symbol = target_symbol;
+            contract_for_formula.strike_price = contracts[i].strike_price;
+            contract_for_formula.underlying_price = contracts[i].underlying_price;
+            contract_for_formula.time_to_expiration = contracts[i].time_to_expiration;
+            contract_for_formula.risk_free_rate = contracts[i].risk_free_rate;
+            contract_for_formula.volatility = contracts[i].implied_volatility;  // Use IMPLIED volatility
+            contract_for_formula.option_type = contracts[i].option_type;
+            contract_for_formula.theoretical_price = contracts[i].theoretical_price;
             
-            // Write back to file
-            std::ofstream outFile("audit.json");
-            if (outFile.is_open()) {
-                outFile << content;
-                outFile.close();
-            }
+            std::string plugin_formula = buildPluginFormula(contract_for_formula, d1, d2);
+            
+            // Create detailed audit entry for this contract
+            std::stringstream audit_data;
+            audit_data << "{"
+                      << "\"execution_type\": \"CUDA\", "
+                      << "\"symbol\": \"" << target_symbol << "\", "
+                      << "\"formula\": \"" << (contracts[i].option_type == 'C' ? "C = S*N(d1) - K*e^(-r*T)*N(d2)" : "P = K*e^(-r*T)*N(-d2) - S*N(-d1)") << "\", "
+                      << "\"plug_in_formula\": \"" << plugin_formula << "\", "
+                      << "\"available_cash\": " << available_cash << ", "
+                      << "\"contract_data\": {"
+                      << "\"symbol\": \"" << target_symbol << "\", "
+                      << "\"strike_price\": " << contracts[i].strike_price << ", "
+                      << "\"underlying_price\": " << contracts[i].underlying_price << ", "
+                      << "\"time_to_expiration\": " << contracts[i].time_to_expiration << ", "
+                      << "\"risk_free_rate\": " << contracts[i].risk_free_rate << ", "
+                      << "\"volatility\": " << contracts[i].implied_volatility << ", "  // Use IMPLIED volatility in contract_data
+                      << "\"option_type\": \"" << contracts[i].option_type << "\", "
+                      << "\"market_close_price\": " << contracts[i].market_close_price << ", "
+                      << "\"days_to_expiration\": " << contracts[i].days_to_expiration
+                      << "}, "
+                      << "\"calculated_results\": {"
+                      << "\"theoretical_price\": " << contracts[i].theoretical_price << ", "
+                      << "\"implied_volatility\": " << contracts[i].implied_volatility << ", "
+                      << "\"delta\": " << contracts[i].delta << ", "
+                      << "\"gamma\": " << contracts[i].gamma << ", "
+                      << "\"theta\": " << contracts[i].theta << ", "
+                      << "\"vega\": " << contracts[i].vega << ", "
+                      << "\"rho\": " << contracts[i].rho << ", "
+                      << "\"max_contracts\": " << contracts[i].max_contracts << ", "
+                      << "\"total_premium\": " << contracts[i].total_premium << ", "
+                      << "\"cash_needed\": " << contracts[i].cash_needed << ", "
+                      << "\"profit_percentage\": " << contracts[i].profit_percentage << ", "
+                      << "\"annualized_return\": " << contracts[i].annualized_return
+                      << "}, "
+                      << "\"contracts_processed\": " << count
+                      << "}";
+            appendAuditCalculation(audit_data.str());
+            break; // Only log once per symbol
         }
     }
 }
@@ -802,10 +583,10 @@ void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data
     inFile.close();
     
     // Get current timestamp
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
+    time_t now = time(0);
+    struct tm* timeinfo = localtime(&now);
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%dT%H:%M:%S");
+    ss << std::put_time(timeinfo, "%Y-%m-%dT%H:%M:%S");
     
     // Find the entries array and insert before the closing ]
     size_t entries_pos = content.find("\"entries\":");
@@ -863,6 +644,36 @@ void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data
             debugFile6.close();
         }
     }
+}
+
+// Private helper function to build plugin formula with actual values
+std::string BarracudaEngine::buildPluginFormula(const OptionContract& contract, double d1, double d2) const {
+    std::stringstream formula;
+    formula << std::fixed << std::setprecision(4);
+    
+    double S = contract.underlying_price;
+    double K = contract.strike_price;
+    double T = contract.time_to_expiration;
+    double r = contract.risk_free_rate;
+    double sigma = contract.volatility;
+    
+    // Show the d1 and d2 calculations with actual values
+    formula << "d1 = (ln(" << S << "/" << K << ") + (" << r << " + " << (sigma*sigma/2) << ")*" << T << ") / (" << sigma << "*√" << T << ")\\n";
+    formula << "d1 = " << d1 << "\\n";
+    formula << "d2 = " << d1 << " - " << sigma << "*√" << T << " = " << d2 << "\\n";
+    
+    if (contract.option_type == 'C') {
+        // Call option: C = S*N(d1) - K*e^(-r*T)*N(d2)
+        formula << "C = " << S << " * N(" << d1 << ") - " << K << " * e^(-" << r << "*" << T << ") * N(" << d2 << ")\\n";
+        formula << "C = " << contract.theoretical_price;
+    } else {
+        // Put option: P = K*e^(-r*T)*N(-d2) - S*N(-d1)  
+        // Show the actual d1/d2 values, then show what goes into N()
+        formula << "P = " << K << " * e^(-" << r << "*" << T << ") * N(" << (-d2) << ") - " << S << " * N(" << (-d1) << ")\\n";
+        formula << "P = " << contract.theoretical_price;
+    }
+    
+    return formula.str();
 }
 
 } // namespace barracuda

@@ -412,21 +412,8 @@ func (s *SP500Service) saveSymbols(symbols []Symbol) error {
 
 // LoadSymbols loads symbols from the local file
 func (s *SP500Service) LoadSymbols() ([]Symbol, error) {
-	file, err := os.Open(s.symbolsFile)
-	if err != nil {
-		return nil, fmt.Errorf("symbols file not found: %v (run UpdateSymbols first)", err)
-	}
-	defer file.Close()
-
-	var data struct {
-		Symbols []Symbol `json:"symbols"`
-	}
-
-	if err := json.NewDecoder(file).Decode(&data); err != nil {
-		return nil, fmt.Errorf("failed to parse symbols file: %v", err)
-	}
-
-	return data.Symbols, nil
+	// Use the same asset file as GetSymbolInfo to prevent mismatches
+	return s.loadFromAssets()
 }
 
 // GetSymbolsAsStrings returns just the symbol strings
@@ -446,7 +433,7 @@ func (s *SP500Service) GetSymbolsAsStrings() ([]string, error) {
 
 // GetSymbolsInfo returns summary information
 func (s *SP500Service) GetSymbolsInfo() (map[string]interface{}, error) {
-	if _, err := os.Stat(s.symbolsFile); err != nil {
+	if _, err := os.Stat(s.assetFile); err != nil {
 		return map[string]interface{}{
 			"exists":       false,
 			"last_updated": "never",
@@ -454,7 +441,7 @@ func (s *SP500Service) GetSymbolsInfo() (map[string]interface{}, error) {
 		}, nil
 	}
 
-	file, err := os.Open(s.symbolsFile)
+	file, err := os.Open(s.assetFile)
 	if err != nil {
 		return nil, err
 	}
