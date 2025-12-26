@@ -172,6 +172,9 @@ public:
     // Performance benchmarking (public for C interface)
     double BenchmarkCalculation(int num_contracts, int iterations);
     
+    // Complete option processing audit logging (public for C interface)
+    void ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash);
+    
 private:
     // Helper function to append audit messages to JSON file
     void appendAuditMessage(const std::string& message);

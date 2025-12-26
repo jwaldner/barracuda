@@ -15,7 +15,6 @@ namespace barracuda {
 
 // External CUDA kernel declarations
 extern "C" {
-    void launch_black_scholes_kernel(OptionContract* d_contracts, int num_contracts);
     void launch_monte_carlo_kernel(double* d_paths, double S0, double r, double sigma, 
                                   double T, int num_steps, int num_paths, curandState* d_states);
     void launch_setup_kernel(curandState* d_states, unsigned long seed, int num_paths);
@@ -99,15 +98,17 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
                           << "\"execution_type\": \"CUDA\", "
                           << "\"symbol\": \"" << audit_symbol << "\", "
                           << "\"formula\": \"Black-Scholes\", "
-                          << "\"variables\": {"
-                          << "\"S\": " << sample.underlying_price << ", "
-                          << "\"K\": " << sample.strike_price << ", "
-                          << "\"T\": " << sample.time_to_expiration << ", "
-                          << "\"r\": " << sample.risk_free_rate << ", "
-                          << "\"sigma\": " << sample.volatility << ", "
-                          << "\"option_type\": \"" << sample.option_type << "\""
+                          << "\"contract_data\": {"
+                          << "\"symbol\": \"" << sample.symbol << "\", "
+                          << "\"strike_price\": " << sample.strike_price << ", "
+                          << "\"underlying_price\": " << sample.underlying_price << ", "
+                          << "\"time_to_expiration\": " << sample.time_to_expiration << ", "
+                          << "\"risk_free_rate\": " << sample.risk_free_rate << ", "
+                          << "\"volatility\": " << sample.volatility << ", "
+                          << "\"option_type\": \"" << sample.option_type << "\", "
+                          << "\"market_close_price\": " << sample.market_close_price
                           << "}, "
-                          << "\"results\": {"
+                          << "\"calculated_results\": {"
                           << "\"theoretical_price\": " << sample.theoretical_price << ", "
                           << "\"delta\": " << sample.delta << ", "
                           << "\"gamma\": " << sample.gamma << ", "
@@ -206,15 +207,17 @@ std::vector<OptionContract> BarracudaEngine::CalculateBlackScholes(
                           << "\"execution_type\": \"CPU\", "
                           << "\"symbol\": \"" << audit_symbol << "\", "
                           << "\"formula\": \"Black-Scholes: C = S*N(d1) - K*e^(-r*T)*N(d2) for calls\", "
-                          << "\"variables\": {"
-                          << "\"S\": " << sample.underlying_price << ", "
-                          << "\"K\": " << sample.strike_price << ", "
-                          << "\"T\": " << sample.time_to_expiration << ", "
-                          << "\"r\": " << sample.risk_free_rate << ", "
-                          << "\"sigma\": " << sample.volatility << ", "
-                          << "\"option_type\": \"" << sample.option_type << "\""
+                          << "\"contract_data\": {"
+                          << "\"symbol\": \"" << sample.symbol << "\", "
+                          << "\"strike_price\": " << sample.strike_price << ", "
+                          << "\"underlying_price\": " << sample.underlying_price << ", "
+                          << "\"time_to_expiration\": " << sample.time_to_expiration << ", "
+                          << "\"risk_free_rate\": " << sample.risk_free_rate << ", "
+                          << "\"volatility\": " << sample.volatility << ", "
+                          << "\"option_type\": \"" << sample.option_type << "\", "
+                          << "\"market_close_price\": " << sample.market_close_price
                           << "}, "
-                          << "\"results\": {"
+                          << "\"calculated_results\": {"
                           << "\"theoretical_price\": " << sample.theoretical_price << ", "
                           << "\"delta\": " << sample.delta << ", "
                           << "\"gamma\": " << sample.gamma << ", "
@@ -633,11 +636,100 @@ extern "C" {
         // Copy complete results back to CPU
         cudaMemcpy(c_contracts, d_contracts, contract_size, cudaMemcpyDeviceToHost);
         
+        // DEBUG: Print to see if this code is reached
+        std::cout << "DEBUG: Complete processing finished, calling audit method..." << std::endl;
+        
+        // Handle audit logging through the engine method
+        eng->ProcessOptionsCompleteAudit(c_contracts, count, available_cash);
+        
         // Cleanup GPU memory
         cudaFree(d_contracts);
         
         return 0; // Success
     }
+}
+
+// Complete option processing audit logging only (processing already done)
+void BarracudaEngine::ProcessOptionsCompleteAudit(CompleteOptionContract* contracts, int count, double available_cash) {
+    std::cout << "DEBUG: ProcessOptionsCompleteAudit called with " << count << " contracts and $" << available_cash << " available cash" << std::endl;
+    
+    // Check if we need to audit based on current ticker
+    std::ifstream audit_file("audit.json");
+    if (audit_file.is_open() && count > 0) {
+        std::cout << "DEBUG: audit.json opened successfully" << std::endl;
+        std::string content((std::istreambuf_iterator<char>(audit_file)),
+                           std::istreambuf_iterator<char>());
+        audit_file.close();
+        
+        std::cout << "DEBUG: audit.json content length: " << content.length() << std::endl;
+        
+        // Simple ticker extraction from JSON header
+        size_t ticker_pos = content.find("\"ticker\":");
+        if (ticker_pos != std::string::npos) {
+            size_t start = content.find("\"", ticker_pos + 9);
+            size_t end = content.find("\"", start + 1);
+            if (start != std::string::npos && end != std::string::npos) {
+                std::string ticker = content.substr(start + 1, end - start - 1);
+                std::cout << "DEBUG: Found ticker in audit.json: '" << ticker << "'" << std::endl;
+                
+                // Check if any contract matches the audit ticker
+                for (int i = 0; i < count; i++) {
+                    // Extract symbol from CompleteOptionContract
+                    std::string contract_symbol(contracts[i].symbol, 
+                        strnlen(contracts[i].symbol, sizeof(contracts[i].symbol)));
+                    std::cout << "DEBUG: Checking contract " << i << " symbol: '" << contract_symbol << "' against '" << ticker << "'" << std::endl;
+                    
+                    if (ticker == contract_symbol) {
+                        std::cout << "DEBUG: TICKER MATCH! Creating audit entry for " << ticker << std::endl;
+                        // Create detailed audit entry for this contract with complete row data
+                        std::stringstream audit_data;
+                        audit_data << "{"
+                                  << "\"execution_type\": \"CUDA\", "
+                                  << "\"symbol\": \"" << ticker << "\", "
+                                  << "\"formula\": \"Black-Scholes\", "
+                                  << "\"available_cash\": " << available_cash << ", "
+                                  << "\"contract_data\": {"
+                                  << "\"symbol\": \"" << ticker << "\", "
+                                  << "\"strike_price\": " << contracts[i].strike_price << ", "
+                                  << "\"underlying_price\": " << contracts[i].underlying_price << ", "
+                                  << "\"time_to_expiration\": " << contracts[i].time_to_expiration << ", "
+                                  << "\"risk_free_rate\": " << contracts[i].risk_free_rate << ", "
+                                  << "\"volatility\": " << contracts[i].volatility << ", "
+                                  << "\"option_type\": \"" << contracts[i].option_type << "\", "
+                                  << "\"market_close_price\": " << contracts[i].market_close_price << ", "
+                                  << "\"days_to_expiration\": " << contracts[i].days_to_expiration
+                                  << "}, "
+                                  << "\"calculated_results\": {"
+                                  << "\"theoretical_price\": " << contracts[i].theoretical_price << ", "
+                                  << "\"implied_volatility\": " << contracts[i].implied_volatility << ", "
+                                  << "\"delta\": " << contracts[i].delta << ", "
+                                  << "\"gamma\": " << contracts[i].gamma << ", "
+                                  << "\"theta\": " << contracts[i].theta << ", "
+                                  << "\"vega\": " << contracts[i].vega << ", "
+                                  << "\"rho\": " << contracts[i].rho << ", "
+                                  << "\"max_contracts\": " << contracts[i].max_contracts << ", "
+                                  << "\"total_premium\": " << contracts[i].total_premium << ", "
+                                  << "\"cash_needed\": " << contracts[i].cash_needed << ", "
+                                  << "\"profit_percentage\": " << contracts[i].profit_percentage << ", "
+                                  << "\"annualized_return\": " << contracts[i].annualized_return
+                                  << "}, "
+                                  << "\"contracts_processed\": " << count
+                                  << "}";
+                        appendAuditCalculation(audit_data.str());
+                        std::cout << "DEBUG: appendAuditCalculation called successfully!" << std::endl;
+                        break; // Only log once per ticker
+                    }
+                }
+            } else {
+                std::cout << "DEBUG: Could not parse ticker from JSON" << std::endl;
+            }
+        } else {
+            std::cout << "DEBUG: No ticker field found in audit.json" << std::endl;
+        }
+    } else {
+        std::cout << "DEBUG: Could not open audit.json or no contracts provided" << std::endl;
+    }
+    std::cout << "DEBUG: ProcessOptionsCompleteAudit finished" << std::endl;
 }
 
 // Helper function to append audit messages to JSON file
@@ -715,20 +807,26 @@ void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data
     std::stringstream ss;
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%dT%H:%M:%S");
     
-    // Find the api_requests array and insert before the closing ]
-    size_t api_requests_pos = content.find("\"api_requests\":");
-    if (api_requests_pos != std::string::npos) {
+    // Find the entries array and insert before the closing ]
+    size_t entries_pos = content.find("\"entries\":");
+    if (entries_pos != std::string::npos) {
         // Find the array content
-        size_t array_start = content.find("[", api_requests_pos);
+        size_t array_start = content.find("[", entries_pos);
         size_t array_end = content.find_last_of("]");
         
         if (array_start != std::string::npos && array_end != std::string::npos) {
+            // Check if array is empty by looking for content between [ and ]
+            std::string array_content = content.substr(array_start + 1, array_end - array_start - 1);
+            // Remove whitespace to check if truly empty
+            array_content.erase(std::remove_if(array_content.begin(), array_content.end(), ::isspace), array_content.end());
+            bool is_empty = array_content.empty();
+            
             // Create detailed audit entry
-            std::string audit_entry = ",\n    {\n"
-                                      "      \"type\": \"BlackScholesCalculation\",\n"
-                                      "      \"calculation_details\": " + calculation_data + ",\n"
-                                      "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
-                                      "    }";
+            std::string audit_entry = (is_empty ? "\n    {\n" : ",\n    {\n");
+            audit_entry += "      \"type\": \"BlackScholesCalculation\",\n"
+                          "      \"calculation_details\": " + calculation_data + ",\n"
+                          "      \"timestamp\": \"" + ss.str() + "-06:00\"\n"
+                          "    }";
             
             // Insert before the closing ]
             content.insert(array_end, audit_entry);
@@ -761,7 +859,7 @@ void BarracudaEngine::appendAuditCalculation(const std::string& calculation_data
     } else {
         std::ofstream debugFile6("/tmp/barracuda_audit_debug.txt", std::ios::app);
         if (debugFile6.is_open()) {
-            debugFile6 << "ERROR: Cannot find api_requests in audit.json" << std::endl;
+            debugFile6 << "ERROR: Cannot find entries in audit.json" << std::endl;
             debugFile6.close();
         }
     }

@@ -1355,7 +1355,6 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 	}
 
 	// Complete processing call - use CPU or CUDA function based on execution mode
-	startTime := time.Now()
 	// Pass ONLY the audit ticker if explicitly set - NO FALLBACKS
 	var auditSymbol *string
 	if req.AuditTicker != "" {
@@ -1404,71 +1403,12 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 		return nil
 	}
 
-	// Log successful Black-Scholes calculation to audit if this is the audit ticker
-	if auditSymbol != nil {
-		// Prepare detailed audit data including first contract sample for mathematical transparency
-		auditData := map[string]interface{}{
-			"success":         true,
-			"contracts":       len(completeResults),
-			"compute_time_ms": h.lastComputeDuration.Seconds() * 1000,
-			"execution_mode":  h.config.Engine.ExecutionMode,
-		}
-
-		// Add detailed calculation breakdown if we have results
-		if len(completeResults) > 0 {
-			// Find contract that matches the audit ticker for audit response data
-			var auditContract *barracuda.CompleteOptionResult
-			logger.Info.Printf("🔍 AUDIT SEARCH: Looking for '%s' in %d results", *auditSymbol, len(completeResults))
-			for i := range completeResults {
-				logger.Info.Printf("🔍 AUDIT SEARCH: Result[%d] symbol='%s' underlying_price=$%.2f (comparing with '%s')", i, completeResults[i].Symbol, completeResults[i].UnderlyingPrice, *auditSymbol)
-				if completeResults[i].Symbol == *auditSymbol {
-					auditContract = &completeResults[i]
-					logger.Info.Printf("✅ AUDIT SEARCH: Found matching contract for '%s' at index %d", *auditSymbol, i)
-					break
-				}
-			}
-			// Only log if we found the matching audit ticker contract
-			if auditContract != nil {
-				auditData["calculation_details"] = map[string]interface{}{
-					"execution_type": h.config.Engine.ExecutionMode,
-					"symbol":         *auditSymbol,
-					fmt.Sprintf("%s_contract", *auditSymbol): map[string]interface{}{
-						"symbol": auditContract.Symbol,
-						"variables": map[string]interface{}{
-							"S":           auditContract.UnderlyingPrice,
-							"K":           auditContract.StrikePrice,
-							"T":           float64(auditContract.DaysToExpiration) / 365.0, // Convert days to years
-							"r":           h.treasuryClient.GetRiskFreeRateWithLastKnown(), // Current Treasury Bill rate
-							"sigma":       auditContract.ImpliedVolatility,
-							"option_type": string(auditContract.OptionType),
-						},
-						"results": map[string]interface{}{
-							"theoretical_price": auditContract.TheoreticalPrice,
-							"delta":             auditContract.Delta,
-							"gamma":             auditContract.Gamma,
-							"theta":             auditContract.Theta,
-							"vega":              auditContract.Vega,
-							"rho":               auditContract.Rho,
-						},
-					},
-					"contracts_processed": len(completeResults),
-				}
-			} else {
-				logger.Warn.Printf("⚠️ Audit contract not found for symbol %s in %d results", *auditSymbol, len(completeResults))
-			}
-		}
-
-		if auditErr := h.auditLogger.LogOptionsAnalysisOperation(*auditSymbol, "BlackScholesCalculation", auditData); auditErr != nil {
-			logger.Warn.Printf("⚠️ Failed to log Black-Scholes audit entry: %v", auditErr)
-		}
-	}
-
-	duration := time.Since(startTime)
+	// Engine handles its own audit logging - HTTP handler should not contain business logic
 	h.lastComputeDuration = computeDuration
 
 	// DEBUG: Log timing details
-	logger.Warn.Printf("🔍 TIMING DEBUG: Total duration: %.3fms, Compute duration: %.3fms",
-		duration.Seconds()*1000, h.lastComputeDuration.Seconds()*1000)
+	logger.Warn.Printf("🔍 TIMING DEBUG: Compute duration: %.3fms",
+		h.lastComputeDuration.Seconds()*1000)
 
 	// Convert complete CUDA results to business results
 	var results []models.OptionResult
@@ -1507,7 +1447,7 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 	})
 
 	logger.Info.Printf("⚡ COMPLETE GPU: %.3fms | %d contracts → %d results | ALL calculations on CUDA, sorted by profit %%",
-		duration.Seconds()*1000, len(engineContracts), len(results))
+		h.lastComputeDuration.Seconds()*1000, len(engineContracts), len(results))
 
 	return results
 }

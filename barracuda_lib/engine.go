@@ -898,13 +898,6 @@ func (be *BaracudaEngine) MaximizeCUDAUsageComplete(options []OptionContract, st
 
 	safeLog("⚡ COMPLETE CUDA: %d contracts processed with ALL calculations on GPU", len(results))
 
-	// Append audit entry directly to audit.json if audit symbol provided
-	if auditSymbol != nil && len(results) > 0 {
-		if err := be.appendToAuditFile(*auditSymbol, results, options); err != nil {
-			safeWarn("⚠️ CUDA audit logging failed: %v", err)
-		}
-	}
-
 	return results, nil
 }
 
@@ -1005,95 +998,7 @@ func (be *BaracudaEngine) MaximizeCPUUsageComplete(options []OptionContract, sto
 		}
 	}
 
-	// Append audit entry directly to audit.json if audit symbol provided
-	if auditSymbol != nil && len(results) > 0 {
-		if err := be.appendToAuditFile(*auditSymbol, results, options); err != nil {
-			safeWarn("⚠️ CPU audit logging failed: %v", err)
-		}
-	}
-
 	return results, nil
-}
-
-// appendToAuditFile appends CUDA calculation results directly to audit.json
-func (be *BaracudaEngine) appendToAuditFile(symbol string, results []CompleteOptionResult, options []OptionContract) error {
-	if len(results) == 0 {
-		return nil
-	}
-
-	auditData := map[string]interface{}{
-		"data": map[string]interface{}{
-			"calculation_details": map[string]interface{}{
-				fmt.Sprintf("%s_contract", symbol): map[string]interface{}{
-					"symbol": symbol,
-					"variables": map[string]interface{}{
-						"S":           results[0].UnderlyingPrice,
-						"K":           results[0].StrikePrice,
-						"T":           options[0].TimeToExpiration,
-						"r":           options[0].RiskFreeRate,
-						"sigma":       options[0].Volatility,
-						"option_type": string(results[0].OptionType),
-					},
-					"results": map[string]interface{}{
-						"theoretical_price": results[0].TheoreticalPrice,
-						"delta":             results[0].Delta,
-						"gamma":             results[0].Gamma,
-						"theta":             results[0].Theta,
-						"vega":              results[0].Vega,
-						"rho":               results[0].Rho,
-					},
-				},
-				"contracts_processed": len(results),
-				"execution_type":      "auto",
-				"symbol":              symbol,
-			},
-			"compute_time_ms": 0.0,
-			"contracts":       len(results),
-			"execution_mode":  "auto",
-			"success":         true,
-		},
-		"expiry":    "",
-		"operation": "BlackScholesCalculation",
-		"ticker":    symbol,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-
-	return be.appendEntryToAuditFile(auditData)
-}
-
-func (be *BaracudaEngine) appendEntryToAuditFile(entry map[string]interface{}) error {
-	const auditFileName = "audit.json"
-
-	// Read existing audit file
-	var auditFile map[string]interface{}
-	if data, err := os.ReadFile(auditFileName); err == nil {
-		if err := json.Unmarshal(data, &auditFile); err != nil {
-			return fmt.Errorf("failed to parse existing audit file: %v", err)
-		}
-	} else {
-		// Create new audit structure if file doesn't exist
-		auditFile = map[string]interface{}{
-			"header": map[string]interface{}{
-				"ticker":      entry["ticker"],
-				"expiry_date": "",
-				"start_time":  time.Now().Format(time.RFC3339Nano),
-			},
-			"entries": []interface{}{},
-		}
-	}
-
-	// Add new entry
-	if entries, ok := auditFile["entries"].([]interface{}); ok {
-		auditFile["entries"] = append(entries, entry)
-	}
-
-	// Write back to file
-	data, err := json.MarshalIndent(auditFile, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal audit data: %v", err)
-	}
-
-	return os.WriteFile(auditFileName, data, 0644)
 }
 
 // Close cleans up engine resources
