@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/jwaldner/barracuda/internal/logger"
 )
 
 // Symbol represents a single S&P 500 stock symbol with metadata
@@ -48,7 +46,7 @@ func NewSP500Service(dataDir string) *SP500Service {
 
 	return &SP500Service{
 		dataDir:     dataDir,
-		symbolsFile: filepath.Join(dataDir, "sp500_symbols.json"),
+		symbolsFile: filepath.Join("assets/symbols", "sp500_symbols.json"),
 		assetFile:   filepath.Join("assets/symbols", "sp500_symbols.json"),
 	}
 }
@@ -64,12 +62,10 @@ func (s *SP500Service) UpdateSymbols() error {
 		// Fallback to GitHub CSV
 		symbols, err = s.fetchFromGitHubCSV()
 		if err != nil {
-			logger.Warn.Printf("📦 All fetch sources failed, loading from assets...")
 			symbols, err = s.loadFromAssets()
 			if err != nil || len(symbols) == 0 {
 				return fmt.Errorf("fetch failed and no assets available: %v", err)
 			}
-			logger.Info.Printf("✅ Loaded %d symbols from assets", len(symbols))
 		} else {
 			// Success! Build new assets
 			s.buildAssets(symbols)
@@ -93,16 +89,11 @@ func (s *SP500Service) UpdateSymbols() error {
 		return fmt.Errorf("failed to save symbols: %v", err)
 	}
 
-	logger.Info.Printf("✅ Successfully updated %d S&P 500 symbols", len(symbols))
 	return nil
 }
 
 // fetchFromSPDowJones gets S&P 500 list from official S&P Dow Jones source (quarterly updates)
 func (s *SP500Service) fetchFromSPDowJones() ([]Symbol, error) {
-	// Note: S&P Dow Jones official sources are complex (Excel files, web scraping)
-	// For now, we use GitHub CSV which is sourced from S&P quarterly updates
-	// This gives us the quarterly accuracy you remember without parsing complexity
-	logger.Info.Printf("📊 Using S&P-sourced GitHub CSV (reflects quarterly S&P updates)")
 	return s.fetchFromGitHubCSV()
 }
 
@@ -117,7 +108,6 @@ func (s *SP500Service) fetchFromGitHubCSV() ([]Symbol, error) {
 	for _, url := range urls {
 		symbols, err := s.fetchCSVSource(url)
 		if err != nil {
-			logger.Warn.Printf("GitHub CSV failed from %s: %v", url, err)
 			continue
 		}
 		return symbols, nil
@@ -196,8 +186,17 @@ func (s *SP500Service) fetchCSVSource(url string) ([]Symbol, error) {
 			symbol.Founded = strings.TrimSpace(record[columns["founded"]])
 		}
 
-		// Validate symbol
-		if len(symbol.Symbol) > 0 && len(symbol.Symbol) <= 5 {
+		// Clean and validate symbol
+		if symbol.Symbol != "" && len(symbol.Symbol) <= 5 {
+			// Clean all fields
+			symbol.Symbol = strings.ToUpper(strings.TrimSpace(symbol.Symbol))
+			symbol.Company = strings.TrimSpace(symbol.Company)
+			symbol.Sector = strings.TrimSpace(symbol.Sector)
+			symbol.SubIndustry = strings.TrimSpace(symbol.SubIndustry)
+			symbol.HeadquartersLocation = strings.TrimSpace(symbol.HeadquartersLocation)
+			symbol.DateAdded = strings.TrimSpace(symbol.DateAdded)
+			symbol.CIK = strings.TrimSpace(symbol.CIK)
+			symbol.Founded = strings.TrimSpace(symbol.Founded)
 			symbols = append(symbols, symbol)
 		}
 
@@ -464,7 +463,6 @@ func (s *SP500Service) AutoUpdate(maxAge time.Duration) error {
 	}
 
 	if !info["exists"].(bool) {
-		logger.Info.Printf("📋 No S&P 500 symbols found, fetching for the first time...")
 		return s.UpdateSymbols()
 	}
 
@@ -479,11 +477,8 @@ func (s *SP500Service) AutoUpdate(maxAge time.Duration) error {
 	}
 
 	if time.Since(updateTime) > maxAge {
-		logger.Info.Printf("📋 S&P 500 symbols are %v old, updating...", time.Since(updateTime))
 		return s.UpdateSymbols()
 	}
-
-	logger.Info.Printf("📋 S&P 500 symbols are up to date (%v old)", time.Since(updateTime))
 	return nil
 }
 
@@ -498,20 +493,12 @@ func (s *SP500Service) buildAssets(symbols []Symbol) {
 		"symbols":      symbols,
 	}
 
-	file, err := os.Create(s.assetFile)
-	if err != nil {
-		logger.Warn.Printf("⚠️ Failed to create asset file: %v", err)
-		return
-	}
+	file, _ := os.Create(s.assetFile)
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(data); err != nil {
-		logger.Warn.Printf("⚠️ Failed to write asset file: %v", err)
-	} else {
-		logger.Info.Printf("📦 Built asset backup with %d symbols", len(symbols))
-	}
+	encoder.Encode(data)
 }
 
 // loadFromAssets loads symbols from asset backup
@@ -534,20 +521,13 @@ func (s *SP500Service) loadFromAssets() ([]Symbol, error) {
 
 // GetSymbolInfo looks up company and sector info for any symbol (universal lookup)
 func (s *SP500Service) GetSymbolInfo(ticker string) (company, sector string) {
-	// Load symbols from assets (cached)
-	symbols, err := s.loadFromAssets()
-	if err != nil {
-		// Return ticker as company name if lookup fails
-		return ticker, "Unknown"
-	}
+	symbols, _ := s.loadFromAssets()
 
-	// Search for the symbol
 	for _, symbol := range symbols {
 		if strings.EqualFold(symbol.Symbol, ticker) {
 			return symbol.Company, symbol.Sector
 		}
 	}
 
-	// Symbol not found in assets - return ticker as company name
-	return ticker, "Unknown"
+	return "", ""
 }

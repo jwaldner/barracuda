@@ -60,6 +60,9 @@ config.yaml
 audit.json
 audits/
 
+# Data directories (only assets/ should be tracked for backup)
+data/
+
 # Log files
 *.log
 

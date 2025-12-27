@@ -191,11 +191,13 @@ func (h *OptionsHandler) HomeHandler(w http.ResponseWriter, r *http.Request) {
 			// Provide all asset data to frontend (symbol -> {company, sector})
 			symbols, err := h.symbolService.LoadSymbols()
 			if err != nil {
-				return make(map[string]map[string]string)
+				logger.Error.Printf("❌ ASSET SYMBOLS FAILED: Cannot load symbols for frontend: %v", err)
+				return make(map[string]map[string]string) // Return empty map to expose failure
 			}
 
 			assets := make(map[string]map[string]string)
 			for _, symbol := range symbols {
+				// NO FALLBACKS - expose empty data
 				assets[symbol.Symbol] = map[string]string{
 					"company": symbol.Company,
 					"sector":  symbol.Sector,
@@ -529,50 +531,14 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	startTime := time.Now()
 
-	// Clean and prepare symbols
-	logger.Debug.Printf("🔍 REQUEST: Strategy=%s, Delta=%.3f, Expiration=%s, Cash=%.2f",
-		req.Strategy, req.TargetDelta, req.ExpirationDate, req.AvailableCash)
-	logger.Debug.Printf("🔍 RAW SYMBOLS: %v", req.Symbols)
-
-	cleanSymbols := make([]string, 0, len(req.Symbols))
-	for _, symbol := range req.Symbols {
-		if cleaned := strings.TrimSpace(symbol); cleaned != "" {
-			cleanSymbols = append(cleanSymbols, cleaned)
-		}
-	}
-
-	logger.Debug.Printf("🔍 CLEANED SYMBOLS: %v", cleanSymbols)
-
-	// If no cleaned symbols AND original request was empty, use S&P 500
-	if len(cleanSymbols) == 0 {
-		if len(req.Symbols) == 0 {
-			// Original request was empty - this was handled above, should not happen
-			logger.Error.Printf("❌ Unexpected: cleanSymbols empty but req.Symbols was filled")
-		}
-		logger.Warn.Printf("⚠️ No valid symbols after cleaning")
-		duration := time.Since(startTime)
-		response := models.AnalysisResponse{
-			Results:         []models.OptionResult{},
-			RequestedDelta:  req.TargetDelta,
-			Strategy:        req.Strategy,
-			ExpirationDate:  req.ExpirationDate,
-			Timestamp:       time.Now().Format(time.RFC3339),
-			ProcessingTime:  duration.Seconds(),
-			ProcessingStats: "No valid symbols provided",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
 	// Major Step: Analysis Start
 	if req.AuditTicker != "" {
 		logger.Warn.Printf("🔍 AUDIT: Starting analysis with audit ticker %s - detailed logging enabled", req.AuditTicker)
 	}
 
 	// Get stock prices in batches (up to 100 symbols per API call)
-	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(cleanSymbols))
-	stockPrices, err := h.alpacaClient.GetStockPricesBatch(cleanSymbols, auditTickerPtr)
+	logger.Info.Printf("📈 Fetching stock prices for %d symbols in batches...", len(req.Symbols))
+	stockPrices, err := h.alpacaClient.GetStockPricesBatch(req.Symbols, auditTickerPtr)
 	if err != nil {
 		logger.Error.Printf("❌ Error fetching stock prices: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to get stock prices: %v", err), http.StatusInternalServerError)
@@ -598,12 +564,12 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 	logger.Info.Printf("📊 Retrieved %d stock prices", len(stockPrices))
 	logger.Debug.Printf("📊 Processing options for %d symbols with valid prices", len(stockPrices))
 
-	// Pre-load company/sector info for all symbols (universal lookup)
+	// Pre-load company/sector info for symbols with prices only
 	companyData := make(map[string]struct {
 		Company string
 		Sector  string
 	})
-	for _, symbol := range cleanSymbols {
+	for symbol := range stockPrices {
 		company, sector := h.symbolService.GetSymbolInfo(symbol)
 		companyData[symbol] = struct {
 			Company string
@@ -730,7 +696,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Final processing summary - ALWAYS show real job stats, ADD workload if present
 	processingStats := fmt.Sprintf("✅ Processed %d symbols | Returned %d results | %.3f seconds | Engine: %s",
-		len(cleanSymbols), len(results), duration.Seconds(), engineType)
+		len(req.Symbols), len(results), duration.Seconds(), engineType)
 
 	// ADD workload benchmark stats to the real job processing
 	if h.config.Engine.WorkloadFactor > 0.0 && totalSamplesProcessed > 0 {
@@ -779,7 +745,7 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			Engine:             engineType,
 			CudaAvailable:      h.engine.IsCudaAvailable(),
 			ExecutionMode:      engineType, // Use actual resolved execution mode, not config setting
-			SymbolCount:        len(cleanSymbols),
+			SymbolCount:        len(req.Symbols),
 			ResultCount:        len(results),
 			WorkloadFactor:     h.config.Engine.WorkloadFactor,
 			SamplesProcessed:   totalSamplesProcessed,
@@ -935,7 +901,8 @@ func (h *OptionsHandler) processRealOptions(stockPrices map[string]*alpaca.Stock
 		// Add to selected contracts for batch processing
 		companyInfo, exists := companyData[symbol]
 		if !exists {
-			companyInfo = struct{ Company, Sector string }{Company: symbol, Sector: "Unknown"}
+			logger.Error.Printf("❌ COMPANY DATA MISSING: No company info found for %s in companyData map", symbol)
+			companyInfo = struct{ Company, Sector string }{Company: "", Sector: ""}
 		}
 
 		selectedContracts = append(selectedContracts, struct {
@@ -1419,7 +1386,7 @@ func (h *OptionsHandler) batchProcessContractsComplete(selectedContracts []struc
 
 		sc := selectedContracts[i]
 		results = append(results, models.OptionResult{
-			Ticker:           completeResult.Symbol,
+			Ticker:           sc.symbol, // Use symbol from selectedContracts, not completeResult
 			Company:          sc.companyInfo.Company,
 			Sector:           sc.companyInfo.Sector,
 			OptionSymbol:     sc.contract.Symbol,

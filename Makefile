@@ -37,8 +37,8 @@ $(CU_OBJECTS): $(CU_SOURCES) $(SRCDIR)/barracuda_engine.hpp
 	$(CC) $(CFLAGS) -Xcompiler -fPIC $(INCLUDES) -c $< -o $@
 
 # Create shared library
-$(LIBRARY): $(CPP_OBJECTS) $(CU_OBJECTS)
-	$(CC) -shared -o $@ $^ $(LIBS)
+$(LIBRARY): $(CPP_OBJECTS) $(CU_OBJECTS) | directories
+	$(CC) -shared -o $@ $(CPP_OBJECTS) $(CU_OBJECTS) $(LIBS)
 
 # Build benchmark executable
 $(BENCHMARK): src/benchmark.cpp $(LIBRARY)
@@ -94,6 +94,10 @@ benchmark-quick: $(BENCHMARK)
 clean:
 	rm -rf $(OBJDIR) $(LIBDIR) bin/ tests/bin/ barracuda
 
+# Clean audit files and logs
+cleanup:
+	@python3 python/cleanup.py
+
 # Install dependencies (Ubuntu/Debian)
 install-deps:
 	sudo apt update
@@ -104,4 +108,4 @@ cuda-info:
 	nvcc --version
 	nvidia-smi
 
-.PHONY: all directories go-build test benchmark clean install-deps cuda-info
+.PHONY: all directories go-build test benchmark clean cleanup install-deps cuda-info

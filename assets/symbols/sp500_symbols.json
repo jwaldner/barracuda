@@ -1,6 +1,7 @@
 {
   "count": 503,
-  "last_updated": "2025-12-13 07:56:37",
+  "last_updated": "2025-12-27 11:17:42",
+  "source": "Asset Build",
   "symbols": [
     {
       "symbol": "MMM",
@@ -11,7 +12,7 @@
       "date_added": "1957-03-04",
       "cik": "66740",
       "founded": "1902",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AOS",
@@ -22,7 +23,7 @@
       "date_added": "2017-07-26",
       "cik": "91142",
       "founded": "1916",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ABT",
@@ -33,7 +34,7 @@
       "date_added": "1957-03-04",
       "cik": "1800",
       "founded": "1888",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ABBV",
@@ -44,7 +45,7 @@
       "date_added": "2012-12-31",
       "cik": "1551152",
       "founded": "2013 (1888)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ACN",
@@ -55,7 +56,7 @@
       "date_added": "2011-07-06",
       "cik": "1467373",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ADBE",
@@ -66,7 +67,7 @@
       "date_added": "1997-05-05",
       "cik": "796343",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMD",
@@ -77,7 +78,7 @@
       "date_added": "2017-03-20",
       "cik": "2488",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AES",
@@ -88,7 +89,7 @@
       "date_added": "1998-10-02",
       "cik": "874761",
       "founded": "1981",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AFL",
@@ -99,7 +100,7 @@
       "date_added": "1999-05-28",
       "cik": "4977",
       "founded": "1955",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "A",
@@ -110,7 +111,7 @@
       "date_added": "2000-06-05",
       "cik": "1090872",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "APD",
@@ -121,7 +122,7 @@
       "date_added": "1985-04-30",
       "cik": "2969",
       "founded": "1940",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ABNB",
@@ -132,7 +133,7 @@
       "date_added": "2023-09-18",
       "cik": "1559720",
       "founded": "2008",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AKAM",
@@ -143,7 +144,7 @@
       "date_added": "2007-07-12",
       "cik": "1086222",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ALB",
@@ -154,7 +155,7 @@
       "date_added": "2016-07-01",
       "cik": "915913",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ARE",
@@ -165,7 +166,7 @@
       "date_added": "2017-03-20",
       "cik": "1035443",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ALGN",
@@ -176,7 +177,7 @@
       "date_added": "2017-06-19",
       "cik": "1097149",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ALLE",
@@ -187,7 +188,7 @@
       "date_added": "2013-12-02",
       "cik": "1579241",
       "founded": "1908",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LNT",
@@ -198,7 +199,7 @@
       "date_added": "2016-07-01",
       "cik": "352541",
       "founded": "1917",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ALL",
@@ -209,7 +210,7 @@
       "date_added": "1995-07-13",
       "cik": "899051",
       "founded": "1931",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GOOGL",
@@ -220,7 +221,7 @@
       "date_added": "2014-04-03",
       "cik": "1652044",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GOOG",
@@ -231,7 +232,7 @@
       "date_added": "2006-04-03",
       "cik": "1652044",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MO",
@@ -242,7 +243,7 @@
       "date_added": "1957-03-04",
       "cik": "764180",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMZN",
@@ -253,7 +254,7 @@
       "date_added": "2005-11-18",
       "cik": "1018724",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMCR",
@@ -264,7 +265,7 @@
       "date_added": "2019-06-07",
       "cik": "1748790",
       "founded": "2019 (1860)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AEE",
@@ -275,7 +276,7 @@
       "date_added": "1991-09-19",
       "cik": "1002910",
       "founded": "1902",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AEP",
@@ -286,7 +287,7 @@
       "date_added": "1957-03-04",
       "cik": "4904",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AXP",
@@ -297,7 +298,7 @@
       "date_added": "1976-06-30",
       "cik": "4962",
       "founded": "1850",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AIG",
@@ -308,7 +309,7 @@
       "date_added": "1980-03-31",
       "cik": "5272",
       "founded": "1919",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMT",
@@ -319,7 +320,7 @@
       "date_added": "2007-11-19",
       "cik": "1053507",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AWK",
@@ -330,7 +331,7 @@
       "date_added": "2016-03-04",
       "cik": "1410636",
       "founded": "1886",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMP",
@@ -341,7 +342,7 @@
       "date_added": "2005-10-03",
       "cik": "820027",
       "founded": "1894",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AME",
@@ -352,7 +353,7 @@
       "date_added": "2013-09-23",
       "cik": "1037868",
       "founded": "1930",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMGN",
@@ -363,7 +364,7 @@
       "date_added": "1992-01-02",
       "cik": "318154",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "APH",
@@ -374,7 +375,7 @@
       "date_added": "2008-09-30",
       "cik": "820313",
       "founded": "1932",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ADI",
@@ -385,7 +386,7 @@
       "date_added": "1999-10-12",
       "cik": "6281",
       "founded": "1965",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AON",
@@ -396,7 +397,7 @@
       "date_added": "1996-04-23",
       "cik": "315293",
       "founded": "1982 (1919)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "APA",
@@ -407,7 +408,7 @@
       "date_added": "1997-07-28",
       "cik": "1841666",
       "founded": "1954",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "APO",
@@ -418,7 +419,7 @@
       "date_added": "2024-12-23",
       "cik": "1858681",
       "founded": "1990",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AAPL",
@@ -429,7 +430,7 @@
       "date_added": "1982-11-30",
       "cik": "320193",
       "founded": "1977",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AMAT",
@@ -440,7 +441,7 @@
       "date_added": "1995-03-16",
       "cik": "6951",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "APTV",
@@ -451,7 +452,7 @@
       "date_added": "2012-12-24",
       "cik": "1521332",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ACGL",
@@ -462,7 +463,7 @@
       "date_added": "2022-11-01",
       "cik": "947484",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ADM",
@@ -473,7 +474,7 @@
       "date_added": "1957-03-04",
       "cik": "7084",
       "founded": "1902",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ANET",
@@ -484,7 +485,7 @@
       "date_added": "2018-08-28",
       "cik": "1596532",
       "founded": "2004",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AJG",
@@ -495,7 +496,7 @@
       "date_added": "2016-05-31",
       "cik": "354190",
       "founded": "1927",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AIZ",
@@ -506,7 +507,7 @@
       "date_added": "2007-04-10",
       "cik": "1267238",
       "founded": "1892",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "T",
@@ -517,7 +518,7 @@
       "date_added": "1983-11-30",
       "cik": "732717",
       "founded": "1983 (1885)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ATO",
@@ -528,7 +529,7 @@
       "date_added": "2019-02-15",
       "cik": "731802",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ADSK",
@@ -539,7 +540,7 @@
       "date_added": "1989-12-01",
       "cik": "769397",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ADP",
@@ -550,7 +551,7 @@
       "date_added": "1981-03-31",
       "cik": "8670",
       "founded": "1949",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AZO",
@@ -561,7 +562,7 @@
       "date_added": "1997-01-02",
       "cik": "866787",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AVB",
@@ -572,7 +573,7 @@
       "date_added": "2007-01-10",
       "cik": "915912",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AVY",
@@ -583,7 +584,7 @@
       "date_added": "1987-12-31",
       "cik": "8818",
       "founded": "1935",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AXON",
@@ -594,7 +595,7 @@
       "date_added": "2023-05-04",
       "cik": "1069183",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BKR",
@@ -605,7 +606,7 @@
       "date_added": "2017-07-07",
       "cik": "1701605",
       "founded": "2017",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BALL",
@@ -616,7 +617,7 @@
       "date_added": "1984-10-31",
       "cik": "9389",
       "founded": "1880",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BAC",
@@ -627,7 +628,7 @@
       "date_added": "1976-06-30",
       "cik": "70858",
       "founded": "1998 (1923 / 1874)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BAX",
@@ -638,7 +639,7 @@
       "date_added": "1972-09-30",
       "cik": "10456",
       "founded": "1931",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BDX",
@@ -649,7 +650,7 @@
       "date_added": "1972-09-30",
       "cik": "10795",
       "founded": "1897",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BRK.B",
@@ -660,7 +661,7 @@
       "date_added": "2010-02-16",
       "cik": "1067983",
       "founded": "1839",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BBY",
@@ -671,7 +672,7 @@
       "date_added": "1999-06-29",
       "cik": "764478",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TECH",
@@ -682,7 +683,7 @@
       "date_added": "2021-08-30",
       "cik": "842023",
       "founded": "1976",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BIIB",
@@ -693,7 +694,7 @@
       "date_added": "2003-11-13",
       "cik": "875045",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BLK",
@@ -704,7 +705,7 @@
       "date_added": "2011-04-04",
       "cik": "2012383",
       "founded": "1988",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BX",
@@ -715,7 +716,7 @@
       "date_added": "2023-09-18",
       "cik": "1393818",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "XYZ",
@@ -726,7 +727,7 @@
       "date_added": "2025-07-23",
       "cik": "1512673",
       "founded": "2009",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BK",
@@ -737,7 +738,7 @@
       "date_added": "1995-03-31",
       "cik": "1390777",
       "founded": "1784",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BA",
@@ -748,7 +749,7 @@
       "date_added": "1957-03-04",
       "cik": "12927",
       "founded": "1916",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BKNG",
@@ -759,7 +760,7 @@
       "date_added": "2009-11-06",
       "cik": "1075531",
       "founded": "1996",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BSX",
@@ -770,7 +771,7 @@
       "date_added": "1995-02-24",
       "cik": "885725",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BMY",
@@ -781,7 +782,7 @@
       "date_added": "1957-03-04",
       "cik": "14272",
       "founded": "1989 (1887)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "AVGO",
@@ -792,7 +793,7 @@
       "date_added": "2014-05-08",
       "cik": "1730168",
       "founded": "1961",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BR",
@@ -803,7 +804,7 @@
       "date_added": "2018-06-18",
       "cik": "1383312",
       "founded": "1962",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BRO",
@@ -814,7 +815,7 @@
       "date_added": "2021-09-20",
       "cik": "79282",
       "founded": "1939",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BF.B",
@@ -825,7 +826,7 @@
       "date_added": "1982-10-31",
       "cik": "14693",
       "founded": "1870",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BLDR",
@@ -836,7 +837,7 @@
       "date_added": "2023-12-18",
       "cik": "1316835",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BG",
@@ -847,7 +848,7 @@
       "date_added": "2023-03-15",
       "cik": "1996862",
       "founded": "1818",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BXP",
@@ -858,7 +859,7 @@
       "date_added": "2006-04-03",
       "cik": "1037540",
       "founded": "1970",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CHRW",
@@ -869,7 +870,7 @@
       "date_added": "2007-03-02",
       "cik": "1043277",
       "founded": "1905",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CDNS",
@@ -880,7 +881,7 @@
       "date_added": "2017-09-18",
       "cik": "813672",
       "founded": "1988",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CZR",
@@ -891,7 +892,7 @@
       "date_added": "2021-03-22",
       "cik": "1590895",
       "founded": "1973",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CPT",
@@ -902,7 +903,7 @@
       "date_added": "2022-04-04",
       "cik": "906345",
       "founded": "1981",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CPB",
@@ -913,7 +914,7 @@
       "date_added": "1957-03-04",
       "cik": "16732",
       "founded": "1869",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COF",
@@ -924,7 +925,7 @@
       "date_added": "1998-07-01",
       "cik": "927628",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CAH",
@@ -935,7 +936,7 @@
       "date_added": "1997-05-27",
       "cik": "721371",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KMX",
@@ -946,7 +947,7 @@
       "date_added": "2010-06-28",
       "cik": "1170010",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CCL",
@@ -957,7 +958,7 @@
       "date_added": "1998-12-22",
       "cik": "815097",
       "founded": "1972",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CARR",
@@ -968,7 +969,7 @@
       "date_added": "2020-04-03",
       "cik": "1783180",
       "founded": "2020 (1915, United Technologies spinoff)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CAT",
@@ -979,7 +980,7 @@
       "date_added": "1957-03-04",
       "cik": "18230",
       "founded": "1925",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CBOE",
@@ -990,7 +991,7 @@
       "date_added": "2017-03-01",
       "cik": "1374310",
       "founded": "1973",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CBRE",
@@ -1001,7 +1002,7 @@
       "date_added": "2006-11-10",
       "cik": "1138118",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CDW",
@@ -1012,7 +1013,7 @@
       "date_added": "2019-09-23",
       "cik": "1402057",
       "founded": "1984",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COR",
@@ -1023,7 +1024,7 @@
       "date_added": "2001-08-30",
       "cik": "1140859",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CNC",
@@ -1034,7 +1035,7 @@
       "date_added": "2016-03-30",
       "cik": "1071739",
       "founded": "1984",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CNP",
@@ -1045,7 +1046,7 @@
       "date_added": "1985-07-31",
       "cik": "1130310",
       "founded": "1882",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CF",
@@ -1056,7 +1057,7 @@
       "date_added": "2008-08-27",
       "cik": "1324404",
       "founded": "1946",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CRL",
@@ -1067,7 +1068,7 @@
       "date_added": "2021-05-14",
       "cik": "1100682",
       "founded": "1947",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SCHW",
@@ -1078,7 +1079,7 @@
       "date_added": "1997-06-02",
       "cik": "316709",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CHTR",
@@ -1089,7 +1090,7 @@
       "date_added": "2016-09-08",
       "cik": "1091667",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CVX",
@@ -1100,7 +1101,7 @@
       "date_added": "1957-03-04",
       "cik": "93410",
       "founded": "1879",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CMG",
@@ -1111,7 +1112,7 @@
       "date_added": "2011-04-28",
       "cik": "1058090",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CB",
@@ -1122,7 +1123,7 @@
       "date_added": "2010-07-15",
       "cik": "896159",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CHD",
@@ -1133,7 +1134,7 @@
       "date_added": "2015-12-29",
       "cik": "313927",
       "founded": "1847",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CI",
@@ -1144,7 +1145,7 @@
       "date_added": "1976-06-30",
       "cik": "1739940",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CINF",
@@ -1155,7 +1156,7 @@
       "date_added": "1997-12-18",
       "cik": "20286",
       "founded": "1950",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CTAS",
@@ -1166,7 +1167,7 @@
       "date_added": "2001-03-01",
       "cik": "723254",
       "founded": "1929",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CSCO",
@@ -1177,7 +1178,7 @@
       "date_added": "1993-12-01",
       "cik": "858877",
       "founded": "1984",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "C",
@@ -1188,7 +1189,7 @@
       "date_added": "1988-05-31",
       "cik": "831001",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CFG",
@@ -1199,7 +1200,7 @@
       "date_added": "2016-01-29",
       "cik": "759944",
       "founded": "1828",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CLX",
@@ -1210,7 +1211,7 @@
       "date_added": "1969-03-31",
       "cik": "21076",
       "founded": "1913",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CME",
@@ -1221,7 +1222,7 @@
       "date_added": "2006-08-11",
       "cik": "1156375",
       "founded": "1848",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CMS",
@@ -1232,7 +1233,7 @@
       "date_added": "1957-03-04",
       "cik": "811156",
       "founded": "1886",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KO",
@@ -1243,7 +1244,7 @@
       "date_added": "1957-03-04",
       "cik": "21344",
       "founded": "1886",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CTSH",
@@ -1254,7 +1255,7 @@
       "date_added": "2006-11-17",
       "cik": "1058290",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COIN",
@@ -1265,7 +1266,7 @@
       "date_added": "2025-05-19",
       "cik": "1679788",
       "founded": "2012",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CL",
@@ -1276,7 +1277,7 @@
       "date_added": "1957-03-04",
       "cik": "21665",
       "founded": "1806",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CMCSA",
@@ -1287,7 +1288,7 @@
       "date_added": "2002-11-19",
       "cik": "1166691",
       "founded": "1963",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CAG",
@@ -1298,7 +1299,7 @@
       "date_added": "1983-08-31",
       "cik": "23217",
       "founded": "1919",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COP",
@@ -1309,7 +1310,7 @@
       "date_added": "1957-03-04",
       "cik": "1163165",
       "founded": "2002",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ED",
@@ -1320,7 +1321,7 @@
       "date_added": "1957-03-04",
       "cik": "1047862",
       "founded": "1823",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "STZ",
@@ -1331,7 +1332,7 @@
       "date_added": "2005-07-01",
       "cik": "16918",
       "founded": "1945",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CEG",
@@ -1342,7 +1343,7 @@
       "date_added": "2022-02-02",
       "cik": "1868275",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COO",
@@ -1353,7 +1354,7 @@
       "date_added": "2016-09-23",
       "cik": "711404",
       "founded": "1958",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CPRT",
@@ -1364,7 +1365,7 @@
       "date_added": "2018-07-02",
       "cik": "900075",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GLW",
@@ -1375,7 +1376,7 @@
       "date_added": "1995-02-27",
       "cik": "24741",
       "founded": "1851",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CPAY",
@@ -1386,7 +1387,7 @@
       "date_added": "2018-06-20",
       "cik": "1175454",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CTVA",
@@ -1397,7 +1398,7 @@
       "date_added": "2019-06-03",
       "cik": "1755672",
       "founded": "2019",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CSGP",
@@ -1408,7 +1409,7 @@
       "date_added": "2022-09-19",
       "cik": "1057352",
       "founded": "1987",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "COST",
@@ -1419,7 +1420,7 @@
       "date_added": "1993-10-01",
       "cik": "909832",
       "founded": "1976",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CTRA",
@@ -1430,7 +1431,7 @@
       "date_added": "2008-06-23",
       "cik": "858470",
       "founded": "2021 (1989)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CRWD",
@@ -1441,7 +1442,7 @@
       "date_added": "2024-06-24",
       "cik": "1535527",
       "founded": "2011",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CCI",
@@ -1452,7 +1453,7 @@
       "date_added": "2012-03-14",
       "cik": "1051470",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CSX",
@@ -1463,7 +1464,7 @@
       "date_added": "1957-03-04",
       "cik": "277948",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CMI",
@@ -1474,7 +1475,7 @@
       "date_added": "1965-03-31",
       "cik": "26172",
       "founded": "1919",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CVS",
@@ -1485,7 +1486,7 @@
       "date_added": "1957-03-04",
       "cik": "64803",
       "founded": "1996",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DHR",
@@ -1496,7 +1497,7 @@
       "date_added": "1998-11-18",
       "cik": "313616",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DRI",
@@ -1507,7 +1508,7 @@
       "date_added": "1995-05-31",
       "cik": "940944",
       "founded": "1938",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DDOG",
@@ -1518,7 +1519,7 @@
       "date_added": "2025-07-09",
       "cik": "1561550",
       "founded": "2010",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DVA",
@@ -1529,7 +1530,7 @@
       "date_added": "2008-07-31",
       "cik": "927066",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DAY",
@@ -1540,7 +1541,7 @@
       "date_added": "2021-09-20",
       "cik": "1725057",
       "founded": "1992",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DECK",
@@ -1551,7 +1552,7 @@
       "date_added": "2024-03-18",
       "cik": "910521",
       "founded": "1973",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DE",
@@ -1562,7 +1563,7 @@
       "date_added": "1957-03-04",
       "cik": "315189",
       "founded": "1837",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DELL",
@@ -1573,7 +1574,7 @@
       "date_added": "2024-09-23",
       "cik": "1571996",
       "founded": "2016",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DAL",
@@ -1584,7 +1585,7 @@
       "date_added": "2013-09-11",
       "cik": "27904",
       "founded": "1929",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DVN",
@@ -1595,7 +1596,7 @@
       "date_added": "2000-08-30",
       "cik": "1090012",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DXCM",
@@ -1606,7 +1607,7 @@
       "date_added": "2020-05-12",
       "cik": "1093557",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FANG",
@@ -1617,7 +1618,7 @@
       "date_added": "2018-12-03",
       "cik": "1539838",
       "founded": "2007",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DLR",
@@ -1628,7 +1629,7 @@
       "date_added": "2016-05-18",
       "cik": "1297996",
       "founded": "2004",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DG",
@@ -1639,7 +1640,7 @@
       "date_added": "2012-12-03",
       "cik": "29534",
       "founded": "1939",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DLTR",
@@ -1650,7 +1651,7 @@
       "date_added": "2011-12-19",
       "cik": "935703",
       "founded": "1986",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "D",
@@ -1661,7 +1662,7 @@
       "date_added": "2016-11-30",
       "cik": "715957",
       "founded": "1983",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DPZ",
@@ -1672,7 +1673,7 @@
       "date_added": "2020-05-12",
       "cik": "1286681",
       "founded": "1960",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DASH",
@@ -1683,7 +1684,7 @@
       "date_added": "2025-03-24",
       "cik": "1792789",
       "founded": "2012",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DOV",
@@ -1694,7 +1695,7 @@
       "date_added": "1985-10-31",
       "cik": "29905",
       "founded": "1955",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DOW",
@@ -1705,7 +1706,7 @@
       "date_added": "2019-04-01",
       "cik": "1751788",
       "founded": "2019 (1897)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DHI",
@@ -1716,7 +1717,7 @@
       "date_added": "2005-06-22",
       "cik": "882184",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DTE",
@@ -1727,7 +1728,7 @@
       "date_added": "1957-03-04",
       "cik": "936340",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DUK",
@@ -1738,7 +1739,7 @@
       "date_added": "1976-06-30",
       "cik": "1326160",
       "founded": "1904",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DD",
@@ -1749,7 +1750,7 @@
       "date_added": "2019-06-03",
       "cik": "1666700",
       "founded": "2017 (1802)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EMN",
@@ -1760,7 +1761,7 @@
       "date_added": "1994-01-01",
       "cik": "915389",
       "founded": "1920",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ETN",
@@ -1771,7 +1772,7 @@
       "date_added": "1957-03-04",
       "cik": "1551182",
       "founded": "1911",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EBAY",
@@ -1782,7 +1783,7 @@
       "date_added": "2002-07-22",
       "cik": "1065088",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ECL",
@@ -1793,7 +1794,7 @@
       "date_added": "1989-01-31",
       "cik": "31462",
       "founded": "1923",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EIX",
@@ -1804,7 +1805,7 @@
       "date_added": "1957-03-04",
       "cik": "827052",
       "founded": "1886",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EW",
@@ -1815,7 +1816,7 @@
       "date_added": "2011-04-01",
       "cik": "1099800",
       "founded": "1958",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EA",
@@ -1826,7 +1827,7 @@
       "date_added": "2002-07-22",
       "cik": "712515",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ELV",
@@ -1837,7 +1838,7 @@
       "date_added": "2002-07-25",
       "cik": "1156039",
       "founded": "2014 (1946)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EMR",
@@ -1848,7 +1849,7 @@
       "date_added": "1965-03-31",
       "cik": "32604",
       "founded": "1890",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ENPH",
@@ -1859,7 +1860,7 @@
       "date_added": "2021-01-07",
       "cik": "1463101",
       "founded": "2006",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ETR",
@@ -1870,7 +1871,7 @@
       "date_added": "1957-03-04",
       "cik": "65984",
       "founded": "1913",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EOG",
@@ -1881,7 +1882,7 @@
       "date_added": "2000-11-02",
       "cik": "821189",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EPAM",
@@ -1892,7 +1893,7 @@
       "date_added": "2021-12-14",
       "cik": "1352010",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EQT",
@@ -1903,7 +1904,7 @@
       "date_added": "2022-10-03",
       "cik": "33213",
       "founded": "1888",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EFX",
@@ -1914,7 +1915,7 @@
       "date_added": "1997-06-19",
       "cik": "33185",
       "founded": "1899",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EQIX",
@@ -1925,7 +1926,7 @@
       "date_added": "2015-03-20",
       "cik": "1101239",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EQR",
@@ -1936,7 +1937,7 @@
       "date_added": "2001-12-03",
       "cik": "906107",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ERIE",
@@ -1947,7 +1948,7 @@
       "date_added": "2024-09-23",
       "cik": "922621",
       "founded": "1925",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ESS",
@@ -1958,7 +1959,7 @@
       "date_added": "2014-04-02",
       "cik": "920522",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EL",
@@ -1969,7 +1970,7 @@
       "date_added": "2006-01-05",
       "cik": "1001250",
       "founded": "1946",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EG",
@@ -1980,7 +1981,7 @@
       "date_added": "2017-06-19",
       "cik": "1095073",
       "founded": "1973",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EVRG",
@@ -1991,7 +1992,7 @@
       "date_added": "2018-06-05",
       "cik": "1711269",
       "founded": "1909",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ES",
@@ -2002,7 +2003,7 @@
       "date_added": "2009-07-24",
       "cik": "72741",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EXC",
@@ -2013,7 +2014,7 @@
       "date_added": "1957-03-04",
       "cik": "1109357",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EXE",
@@ -2024,7 +2025,7 @@
       "date_added": "2025-03-24",
       "cik": "895126",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EXPE",
@@ -2035,7 +2036,7 @@
       "date_added": "2007-10-02",
       "cik": "1324424",
       "founded": "1996",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EXPD",
@@ -2046,7 +2047,7 @@
       "date_added": "2007-10-10",
       "cik": "746515",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "EXR",
@@ -2057,7 +2058,7 @@
       "date_added": "2016-01-19",
       "cik": "1289490",
       "founded": "1977",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "XOM",
@@ -2068,7 +2069,7 @@
       "date_added": "1957-03-04",
       "cik": "34088",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FFIV",
@@ -2079,7 +2080,7 @@
       "date_added": "2010-12-20",
       "cik": "1048695",
       "founded": "1996",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FDS",
@@ -2090,7 +2091,7 @@
       "date_added": "2021-12-20",
       "cik": "1013237",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FICO",
@@ -2101,7 +2102,7 @@
       "date_added": "2023-03-20",
       "cik": "814547",
       "founded": "1956",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FAST",
@@ -2112,7 +2113,7 @@
       "date_added": "2008-09-15",
       "cik": "815556",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FRT",
@@ -2123,7 +2124,7 @@
       "date_added": "2016-02-01",
       "cik": "34903",
       "founded": "1962",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FDX",
@@ -2134,7 +2135,7 @@
       "date_added": "1980-12-31",
       "cik": "1048911",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FIS",
@@ -2145,7 +2146,7 @@
       "date_added": "2006-11-10",
       "cik": "1136893",
       "founded": "1968",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FITB",
@@ -2156,7 +2157,7 @@
       "date_added": "1996-03-29",
       "cik": "35527",
       "founded": "1858",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FSLR",
@@ -2167,7 +2168,7 @@
       "date_added": "2022-12-19",
       "cik": "1274494",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FE",
@@ -2178,7 +2179,7 @@
       "date_added": "1997-11-28",
       "cik": "1031296",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FI",
@@ -2189,7 +2190,7 @@
       "date_added": "2001-04-02",
       "cik": "798354",
       "founded": "1984",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "F",
@@ -2200,7 +2201,7 @@
       "date_added": "1957-03-04",
       "cik": "37996",
       "founded": "1903",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FTNT",
@@ -2211,7 +2212,7 @@
       "date_added": "2018-10-11",
       "cik": "1262039",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FTV",
@@ -2222,7 +2223,7 @@
       "date_added": "2016-07-01",
       "cik": "1659166",
       "founded": "2016",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FOXA",
@@ -2233,7 +2234,7 @@
       "date_added": "2019-03-19",
       "cik": "1754301",
       "founded": "2019",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FOX",
@@ -2244,7 +2245,7 @@
       "date_added": "2019-03-19",
       "cik": "1754301",
       "founded": "2019",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "BEN",
@@ -2255,7 +2256,7 @@
       "date_added": "1998-04-30",
       "cik": "38777",
       "founded": "1947",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "FCX",
@@ -2266,7 +2267,7 @@
       "date_added": "2011-07-01",
       "cik": "831259",
       "founded": "1912",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GRMN",
@@ -2277,7 +2278,7 @@
       "date_added": "2012-12-12",
       "cik": "1121788",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IT",
@@ -2288,7 +2289,7 @@
       "date_added": "2017-04-05",
       "cik": "749251",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GE",
@@ -2299,7 +2300,7 @@
       "date_added": "1957-03-04",
       "cik": "40545",
       "founded": "1892",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GEHC",
@@ -2310,7 +2311,7 @@
       "date_added": "2023-01-04",
       "cik": "1932393",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GEV",
@@ -2321,7 +2322,7 @@
       "date_added": "2024-04-02",
       "cik": "1996810",
       "founded": "2024",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GEN",
@@ -2332,7 +2333,7 @@
       "date_added": "2003-03-25",
       "cik": "849399",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GNRC",
@@ -2343,7 +2344,7 @@
       "date_added": "2021-03-22",
       "cik": "1474735",
       "founded": "1959",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GD",
@@ -2354,7 +2355,7 @@
       "date_added": "1957-03-04",
       "cik": "40533",
       "founded": "1899",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GIS",
@@ -2365,7 +2366,7 @@
       "date_added": "1957-03-04",
       "cik": "40704",
       "founded": "1856",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GM",
@@ -2376,7 +2377,7 @@
       "date_added": "2013-06-06",
       "cik": "1467858",
       "founded": "1908",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GPC",
@@ -2387,7 +2388,7 @@
       "date_added": "1973-12-31",
       "cik": "40987",
       "founded": "1925",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GILD",
@@ -2398,7 +2399,7 @@
       "date_added": "2004-07-01",
       "cik": "882095",
       "founded": "1987",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GPN",
@@ -2409,7 +2410,7 @@
       "date_added": "2016-04-25",
       "cik": "1123360",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GL",
@@ -2420,7 +2421,7 @@
       "date_added": "1989-04-30",
       "cik": "320335",
       "founded": "1900",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GDDY",
@@ -2431,7 +2432,7 @@
       "date_added": "2024-06-24",
       "cik": "1609711",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GS",
@@ -2442,7 +2443,7 @@
       "date_added": "2002-07-22",
       "cik": "886982",
       "founded": "1869",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HAL",
@@ -2453,7 +2454,7 @@
       "date_added": "1957-03-04",
       "cik": "45012",
       "founded": "1919",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HIG",
@@ -2464,7 +2465,7 @@
       "date_added": "1957-03-04",
       "cik": "874766",
       "founded": "1810",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HAS",
@@ -2475,7 +2476,7 @@
       "date_added": "1984-09-30",
       "cik": "46080",
       "founded": "1923",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HCA",
@@ -2486,7 +2487,7 @@
       "date_added": "2015-01-27",
       "cik": "860730",
       "founded": "1968",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DOC",
@@ -2497,7 +2498,7 @@
       "date_added": "2008-03-31",
       "cik": "765880",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HSIC",
@@ -2508,7 +2509,7 @@
       "date_added": "2015-03-17",
       "cik": "1000228",
       "founded": "1932",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HSY",
@@ -2519,7 +2520,7 @@
       "date_added": "1957-03-04",
       "cik": "47111",
       "founded": "1894",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HPE",
@@ -2530,7 +2531,7 @@
       "date_added": "2015-11-02",
       "cik": "1645590",
       "founded": "2015",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HLT",
@@ -2541,7 +2542,7 @@
       "date_added": "2017-06-19",
       "cik": "1585689",
       "founded": "1919",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HOLX",
@@ -2552,7 +2553,7 @@
       "date_added": "2016-03-30",
       "cik": "859737",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HD",
@@ -2563,7 +2564,7 @@
       "date_added": "1988-03-31",
       "cik": "354950",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HON",
@@ -2574,7 +2575,7 @@
       "date_added": "1957-03-04",
       "cik": "773840",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HRL",
@@ -2585,7 +2586,7 @@
       "date_added": "2009-03-04",
       "cik": "48465",
       "founded": "1891",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HST",
@@ -2596,7 +2597,7 @@
       "date_added": "2007-03-20",
       "cik": "1070750",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HWM",
@@ -2607,7 +2608,7 @@
       "date_added": "2016-10-21",
       "cik": "4281",
       "founded": "1888",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HPQ",
@@ -2618,7 +2619,7 @@
       "date_added": "1974-12-31",
       "cik": "47217",
       "founded": "1939 (2015)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HUBB",
@@ -2629,7 +2630,7 @@
       "date_added": "2023-10-18",
       "cik": "48898",
       "founded": "1888",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HUM",
@@ -2640,7 +2641,7 @@
       "date_added": "2012-12-10",
       "cik": "49071",
       "founded": "1961",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HBAN",
@@ -2651,7 +2652,7 @@
       "date_added": "1997-08-28",
       "cik": "49196",
       "founded": "1866",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "HII",
@@ -2662,7 +2663,7 @@
       "date_added": "2018-01-03",
       "cik": "1501585",
       "founded": "2011",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IBM",
@@ -2673,7 +2674,7 @@
       "date_added": "1957-03-04",
       "cik": "51143",
       "founded": "1911",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IEX",
@@ -2684,7 +2685,7 @@
       "date_added": "2019-08-09",
       "cik": "832101",
       "founded": "1988",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IDXX",
@@ -2695,7 +2696,7 @@
       "date_added": "2017-01-05",
       "cik": "874716",
       "founded": "1983",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ITW",
@@ -2706,7 +2707,7 @@
       "date_added": "1986-02-28",
       "cik": "49826",
       "founded": "1912",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "INCY",
@@ -2717,7 +2718,7 @@
       "date_added": "2017-02-28",
       "cik": "879169",
       "founded": "1991",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IR",
@@ -2728,7 +2729,7 @@
       "date_added": "2020-03-03",
       "cik": "1699150",
       "founded": "1859",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PODD",
@@ -2739,7 +2740,7 @@
       "date_added": "2023-03-15",
       "cik": "1145197",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "INTC",
@@ -2750,7 +2751,7 @@
       "date_added": "1976-12-31",
       "cik": "50863",
       "founded": "1968",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ICE",
@@ -2761,7 +2762,7 @@
       "date_added": "2007-09-26",
       "cik": "1571949",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IFF",
@@ -2772,7 +2773,7 @@
       "date_added": "1976-03-31",
       "cik": "51253",
       "founded": "1958 (1889)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IP",
@@ -2783,7 +2784,7 @@
       "date_added": "1957-03-04",
       "cik": "51434",
       "founded": "1898",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IPG",
@@ -2794,7 +2795,7 @@
       "date_added": "1992-10-01",
       "cik": "51644",
       "founded": "1961 (1930)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "INTU",
@@ -2805,7 +2806,7 @@
       "date_added": "2000-12-05",
       "cik": "896878",
       "founded": "1983",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ISRG",
@@ -2816,7 +2817,7 @@
       "date_added": "2008-06-02",
       "cik": "1035267",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IVZ",
@@ -2827,7 +2828,7 @@
       "date_added": "2008-08-21",
       "cik": "914208",
       "founded": "1935",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "INVH",
@@ -2838,7 +2839,7 @@
       "date_added": "2022-09-19",
       "cik": "1687229",
       "founded": "2012",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IQV",
@@ -2849,7 +2850,7 @@
       "date_added": "2017-08-29",
       "cik": "1478242",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "IRM",
@@ -2860,7 +2861,7 @@
       "date_added": "2009-01-06",
       "cik": "1020569",
       "founded": "1951",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JBHT",
@@ -2871,7 +2872,7 @@
       "date_added": "2015-07-01",
       "cik": "728535",
       "founded": "1961",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JBL",
@@ -2882,7 +2883,7 @@
       "date_added": "2023-12-18",
       "cik": "898293",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JKHY",
@@ -2893,7 +2894,7 @@
       "date_added": "2018-11-13",
       "cik": "779152",
       "founded": "1976",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "J",
@@ -2904,7 +2905,7 @@
       "date_added": "2007-10-26",
       "cik": "52988",
       "founded": "1947",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JNJ",
@@ -2915,7 +2916,7 @@
       "date_added": "1973-06-30",
       "cik": "200406",
       "founded": "1886",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JCI",
@@ -2926,7 +2927,7 @@
       "date_added": "2010-08-27",
       "cik": "833444",
       "founded": "1885",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "JPM",
@@ -2937,7 +2938,7 @@
       "date_added": "1975-06-30",
       "cik": "19617",
       "founded": "2000 (1799 / 1871)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "K",
@@ -2948,7 +2949,7 @@
       "date_added": "1989-09-11",
       "cik": "55067",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KVUE",
@@ -2959,7 +2960,7 @@
       "date_added": "2023-08-25",
       "cik": "1944048",
       "founded": "2022 (Johnson \u0026 Johnson spinoff)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KDP",
@@ -2970,7 +2971,7 @@
       "date_added": "2022-06-21",
       "cik": "1418135",
       "founded": "1981",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KEY",
@@ -2981,7 +2982,7 @@
       "date_added": "1994-03-01",
       "cik": "91576",
       "founded": "1825",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KEYS",
@@ -2992,7 +2993,7 @@
       "date_added": "2018-11-06",
       "cik": "1601046",
       "founded": "2014 (1939)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KMB",
@@ -3003,7 +3004,7 @@
       "date_added": "1957-03-04",
       "cik": "55785",
       "founded": "1872",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KIM",
@@ -3014,7 +3015,7 @@
       "date_added": "2006-04-04",
       "cik": "879101",
       "founded": "1958",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KMI",
@@ -3025,7 +3026,7 @@
       "date_added": "2012-05-25",
       "cik": "1506307",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KKR",
@@ -3036,7 +3037,7 @@
       "date_added": "2024-06-24",
       "cik": "1404912",
       "founded": "1976",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KLAC",
@@ -3047,7 +3048,7 @@
       "date_added": "1997-09-30",
       "cik": "319201",
       "founded": "1975/1977 (1997)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KHC",
@@ -3058,7 +3059,7 @@
       "date_added": "2015-07-06",
       "cik": "1637459",
       "founded": "2015 (1869)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "KR",
@@ -3069,7 +3070,7 @@
       "date_added": "1957-03-04",
       "cik": "56873",
       "founded": "1883",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LHX",
@@ -3080,7 +3081,7 @@
       "date_added": "2008-09-22",
       "cik": "202058",
       "founded": "2019 (L3 1997, Harris 1895)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LH",
@@ -3091,7 +3092,7 @@
       "date_added": "2004-11-01",
       "cik": "920148",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LRCX",
@@ -3102,7 +3103,7 @@
       "date_added": "2012-06-29",
       "cik": "707549",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LW",
@@ -3113,7 +3114,7 @@
       "date_added": "2018-12-03",
       "cik": "1679273",
       "founded": "2016 (1950)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LVS",
@@ -3124,7 +3125,7 @@
       "date_added": "2019-10-03",
       "cik": "1300514",
       "founded": "1988",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LDOS",
@@ -3135,7 +3136,7 @@
       "date_added": "2019-08-09",
       "cik": "1336920",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LEN",
@@ -3146,7 +3147,7 @@
       "date_added": "2005-10-04",
       "cik": "920760",
       "founded": "1954",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LII",
@@ -3157,7 +3158,7 @@
       "date_added": "2024-12-23",
       "cik": "1069202",
       "founded": "1895",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LLY",
@@ -3168,7 +3169,7 @@
       "date_added": "1970-12-31",
       "cik": "59478",
       "founded": "1876",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LIN",
@@ -3179,7 +3180,7 @@
       "date_added": "1992-07-01",
       "cik": "1707925",
       "founded": "1879",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LYV",
@@ -3190,7 +3191,7 @@
       "date_added": "2019-12-23",
       "cik": "1335258",
       "founded": "2010",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LKQ",
@@ -3201,7 +3202,7 @@
       "date_added": "2016-05-23",
       "cik": "1065696",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LMT",
@@ -3212,7 +3213,7 @@
       "date_added": "1957-03-04",
       "cik": "936468",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "L",
@@ -3223,7 +3224,7 @@
       "date_added": "1995-05-31",
       "cik": "60086",
       "founded": "1959",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LOW",
@@ -3234,7 +3235,7 @@
       "date_added": "1984-02-29",
       "cik": "60667",
       "founded": "1904/1946/1959",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LULU",
@@ -3245,7 +3246,7 @@
       "date_added": "2023-10-18",
       "cik": "1397187",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LYB",
@@ -3256,7 +3257,7 @@
       "date_added": "2012-09-05",
       "cik": "1489393",
       "founded": "2007",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MTB",
@@ -3267,7 +3268,7 @@
       "date_added": "2004-02-23",
       "cik": "36270",
       "founded": "1856",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MPC",
@@ -3278,7 +3279,7 @@
       "date_added": "2011-07-01",
       "cik": "1510295",
       "founded": "2009 (1887)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MKTX",
@@ -3289,7 +3290,7 @@
       "date_added": "2019-07-01",
       "cik": "1278021",
       "founded": "2000",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MAR",
@@ -3300,7 +3301,7 @@
       "date_added": "1998-05-29",
       "cik": "1048286",
       "founded": "1927",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MMC",
@@ -3311,7 +3312,7 @@
       "date_added": "1987-08-31",
       "cik": "62709",
       "founded": "1905",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MLM",
@@ -3322,7 +3323,7 @@
       "date_added": "2014-07-02",
       "cik": "916076",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MAS",
@@ -3333,7 +3334,7 @@
       "date_added": "1981-06-30",
       "cik": "62996",
       "founded": "1929",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MA",
@@ -3344,7 +3345,7 @@
       "date_added": "2008-07-18",
       "cik": "1141391",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MTCH",
@@ -3355,7 +3356,7 @@
       "date_added": "2021-09-20",
       "cik": "891103",
       "founded": "1986",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MKC",
@@ -3366,7 +3367,7 @@
       "date_added": "2003-03-20",
       "cik": "63754",
       "founded": "1889",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MCD",
@@ -3377,7 +3378,7 @@
       "date_added": "1970-06-30",
       "cik": "63908",
       "founded": "1940",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MCK",
@@ -3388,7 +3389,7 @@
       "date_added": "1999-01-13",
       "cik": "927653",
       "founded": "1833",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MDT",
@@ -3399,7 +3400,7 @@
       "date_added": "1986-10-31",
       "cik": "1613103",
       "founded": "1949",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MRK",
@@ -3410,7 +3411,7 @@
       "date_added": "1957-03-04",
       "cik": "310158",
       "founded": "1891",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "META",
@@ -3421,7 +3422,7 @@
       "date_added": "2013-12-23",
       "cik": "1326801",
       "founded": "2004",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MET",
@@ -3432,7 +3433,7 @@
       "date_added": "2000-12-11",
       "cik": "1099219",
       "founded": "1868",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MTD",
@@ -3443,7 +3444,7 @@
       "date_added": "2016-09-06",
       "cik": "1037646",
       "founded": "1945",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MGM",
@@ -3454,7 +3455,7 @@
       "date_added": "2017-07-26",
       "cik": "789570",
       "founded": "1986",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MCHP",
@@ -3465,7 +3466,7 @@
       "date_added": "2007-09-07",
       "cik": "827054",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MU",
@@ -3476,7 +3477,7 @@
       "date_added": "1994-09-27",
       "cik": "723125",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MSFT",
@@ -3487,7 +3488,7 @@
       "date_added": "1994-06-01",
       "cik": "789019",
       "founded": "1975",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MAA",
@@ -3498,7 +3499,7 @@
       "date_added": "2016-12-02",
       "cik": "912595",
       "founded": "1977",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MRNA",
@@ -3509,7 +3510,7 @@
       "date_added": "2021-07-21",
       "cik": "1682852",
       "founded": "2010",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MHK",
@@ -3520,7 +3521,7 @@
       "date_added": "2013-12-23",
       "cik": "851968",
       "founded": "1878",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MOH",
@@ -3531,7 +3532,7 @@
       "date_added": "2022-03-02",
       "cik": "1179929",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TAP",
@@ -3542,7 +3543,7 @@
       "date_added": "1976-06-30",
       "cik": "24545",
       "founded": "2005 (Molson 1786, Coors 1873)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MDLZ",
@@ -3553,7 +3554,7 @@
       "date_added": "2012-10-02",
       "cik": "1103982",
       "founded": "2012",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MPWR",
@@ -3564,7 +3565,7 @@
       "date_added": "2021-02-12",
       "cik": "1280452",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MNST",
@@ -3575,7 +3576,7 @@
       "date_added": "2012-06-28",
       "cik": "865752",
       "founded": "2012 (1935)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MCO",
@@ -3586,7 +3587,7 @@
       "date_added": "1998-07-01",
       "cik": "1059556",
       "founded": "1909",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MS",
@@ -3597,7 +3598,7 @@
       "date_added": "1993-07-29",
       "cik": "895421",
       "founded": "1935",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MOS",
@@ -3608,7 +3609,7 @@
       "date_added": "2011-09-26",
       "cik": "1285785",
       "founded": "2004 (1865 / 1909)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MSI",
@@ -3619,7 +3620,7 @@
       "date_added": "1957-03-04",
       "cik": "68505",
       "founded": "1928 (2011)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "MSCI",
@@ -3630,7 +3631,7 @@
       "date_added": "2018-04-04",
       "cik": "1408198",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NDAQ",
@@ -3641,7 +3642,7 @@
       "date_added": "2008-10-22",
       "cik": "1120193",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NTAP",
@@ -3652,7 +3653,7 @@
       "date_added": "1999-06-25",
       "cik": "1002047",
       "founded": "1992",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NFLX",
@@ -3663,7 +3664,7 @@
       "date_added": "2010-12-20",
       "cik": "1065280",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NEM",
@@ -3674,7 +3675,7 @@
       "date_added": "1969-06-30",
       "cik": "1164727",
       "founded": "1921",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NWSA",
@@ -3685,7 +3686,7 @@
       "date_added": "2013-08-01",
       "cik": "1564708",
       "founded": "2013 (News Corporation 1980)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NWS",
@@ -3696,7 +3697,7 @@
       "date_added": "2015-09-18",
       "cik": "1564708",
       "founded": "2013 (News Corporation 1980)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NEE",
@@ -3707,7 +3708,7 @@
       "date_added": "1976-06-30",
       "cik": "753308",
       "founded": "1984 (1925)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NKE",
@@ -3718,7 +3719,7 @@
       "date_added": "1988-11-30",
       "cik": "320187",
       "founded": "1964",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NI",
@@ -3729,7 +3730,7 @@
       "date_added": "2000-11-02",
       "cik": "1111711",
       "founded": "1912",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NDSN",
@@ -3740,7 +3741,7 @@
       "date_added": "2022-02-15",
       "cik": "72331",
       "founded": "1935",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NSC",
@@ -3751,7 +3752,7 @@
       "date_added": "1957-03-04",
       "cik": "702165",
       "founded": "1881/1894 (1980)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NTRS",
@@ -3762,7 +3763,7 @@
       "date_added": "1998-01-30",
       "cik": "73124",
       "founded": "1889",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NOC",
@@ -3773,7 +3774,7 @@
       "date_added": "1957-03-04",
       "cik": "1133421",
       "founded": "1994 (Northrop 1939, Grumman 1930)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NCLH",
@@ -3784,7 +3785,7 @@
       "date_added": "2017-10-13",
       "cik": "1513761",
       "founded": "2011 (1966)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NRG",
@@ -3795,7 +3796,7 @@
       "date_added": "2010-01-29",
       "cik": "1013871",
       "founded": "1992",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NUE",
@@ -3806,7 +3807,7 @@
       "date_added": "1985-04-30",
       "cik": "73309",
       "founded": "1940",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NVDA",
@@ -3817,7 +3818,7 @@
       "date_added": "2001-11-30",
       "cik": "1045810",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NVR",
@@ -3828,7 +3829,7 @@
       "date_added": "2019-09-26",
       "cik": "906163",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NXPI",
@@ -3839,7 +3840,7 @@
       "date_added": "2021-03-22",
       "cik": "1413447",
       "founded": "1953",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ORLY",
@@ -3850,7 +3851,7 @@
       "date_added": "2009-03-27",
       "cik": "898173",
       "founded": "1957",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "OXY",
@@ -3861,7 +3862,7 @@
       "date_added": "1957-03-04",
       "cik": "797468",
       "founded": "1920",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ODFL",
@@ -3872,7 +3873,7 @@
       "date_added": "2019-12-09",
       "cik": "878927",
       "founded": "1934",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "OMC",
@@ -3883,7 +3884,7 @@
       "date_added": "1997-12-31",
       "cik": "29989",
       "founded": "1986",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ON",
@@ -3894,7 +3895,7 @@
       "date_added": "2022-06-21",
       "cik": "1097864",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "OKE",
@@ -3905,7 +3906,7 @@
       "date_added": "2010-03-15",
       "cik": "1039684",
       "founded": "1906",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ORCL",
@@ -3916,7 +3917,7 @@
       "date_added": "1989-08-31",
       "cik": "1341439",
       "founded": "1977",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "OTIS",
@@ -3927,7 +3928,7 @@
       "date_added": "2020-04-03",
       "cik": "1781335",
       "founded": "2020 (1853, United Technologies spinoff)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PCAR",
@@ -3938,7 +3939,7 @@
       "date_added": "1980-12-31",
       "cik": "75362",
       "founded": "1905",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PKG",
@@ -3949,7 +3950,7 @@
       "date_added": "2017-07-26",
       "cik": "75677",
       "founded": "1959",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PLTR",
@@ -3960,7 +3961,7 @@
       "date_added": "2024-09-23",
       "cik": "1321655",
       "founded": "2003",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PANW",
@@ -3971,7 +3972,7 @@
       "date_added": "2023-06-20",
       "cik": "1327567",
       "founded": "2005",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PSKY",
@@ -3982,7 +3983,7 @@
       "date_added": "1994-09-30",
       "cik": "2041610",
       "founded": "2025 (Paramount Pictures 1912)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PH",
@@ -3993,7 +3994,7 @@
       "date_added": "1985-11-30",
       "cik": "76334",
       "founded": "1917",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PAYX",
@@ -4004,7 +4005,7 @@
       "date_added": "1998-10-01",
       "cik": "723531",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PAYC",
@@ -4015,7 +4016,7 @@
       "date_added": "2020-01-28",
       "cik": "1590955",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PYPL",
@@ -4026,7 +4027,7 @@
       "date_added": "2015-07-20",
       "cik": "1633917",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PNR",
@@ -4037,7 +4038,7 @@
       "date_added": "2012-10-01",
       "cik": "77360",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PEP",
@@ -4048,7 +4049,7 @@
       "date_added": "1957-03-04",
       "cik": "77476",
       "founded": "1898",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PFE",
@@ -4059,7 +4060,7 @@
       "date_added": "1957-03-04",
       "cik": "78003",
       "founded": "1849",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PCG",
@@ -4070,7 +4071,7 @@
       "date_added": "2022-10-03",
       "cik": "1004980",
       "founded": "1905",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PM",
@@ -4081,7 +4082,7 @@
       "date_added": "2008-03-31",
       "cik": "1413329",
       "founded": "2008 (1847)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PSX",
@@ -4092,7 +4093,7 @@
       "date_added": "2012-05-01",
       "cik": "1534701",
       "founded": "2012 (1917)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PNW",
@@ -4103,7 +4104,7 @@
       "date_added": "1999-10-04",
       "cik": "764622",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PNC",
@@ -4114,7 +4115,7 @@
       "date_added": "1988-04-30",
       "cik": "713676",
       "founded": "1845",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "POOL",
@@ -4125,7 +4126,7 @@
       "date_added": "2020-10-07",
       "cik": "945841",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PPG",
@@ -4136,7 +4137,7 @@
       "date_added": "1957-03-04",
       "cik": "79879",
       "founded": "1883",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PPL",
@@ -4147,7 +4148,7 @@
       "date_added": "2001-10-01",
       "cik": "922224",
       "founded": "1920",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PFG",
@@ -4158,7 +4159,7 @@
       "date_added": "2002-07-22",
       "cik": "1126328",
       "founded": "1879",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PG",
@@ -4169,7 +4170,7 @@
       "date_added": "1957-03-04",
       "cik": "80424",
       "founded": "1837",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PGR",
@@ -4180,7 +4181,7 @@
       "date_added": "1997-08-04",
       "cik": "80661",
       "founded": "1937",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PLD",
@@ -4191,7 +4192,7 @@
       "date_added": "2003-07-17",
       "cik": "1045609",
       "founded": "1983",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PRU",
@@ -4202,7 +4203,7 @@
       "date_added": "2002-07-22",
       "cik": "1137774",
       "founded": "1875",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PEG",
@@ -4213,7 +4214,7 @@
       "date_added": "1957-03-04",
       "cik": "788784",
       "founded": "1903",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PTC",
@@ -4224,7 +4225,7 @@
       "date_added": "2021-04-20",
       "cik": "857005",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PSA",
@@ -4235,7 +4236,7 @@
       "date_added": "2005-08-19",
       "cik": "1393311",
       "founded": "1972",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PHM",
@@ -4246,7 +4247,7 @@
       "date_added": "1984-04-30",
       "cik": "822416",
       "founded": "1956",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "PWR",
@@ -4257,7 +4258,7 @@
       "date_added": "2009-07-01",
       "cik": "1050915",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "QCOM",
@@ -4268,7 +4269,7 @@
       "date_added": "1999-07-22",
       "cik": "804328",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DGX",
@@ -4279,7 +4280,7 @@
       "date_added": "2002-12-12",
       "cik": "1022079",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RL",
@@ -4290,7 +4291,7 @@
       "date_added": "2007-02-02",
       "cik": "1037038",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RJF",
@@ -4301,7 +4302,7 @@
       "date_added": "2017-03-20",
       "cik": "720005",
       "founded": "1962",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RTX",
@@ -4312,7 +4313,7 @@
       "date_added": "1957-03-04",
       "cik": "101829",
       "founded": "1922",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "O",
@@ -4323,7 +4324,7 @@
       "date_added": "2015-04-07",
       "cik": "726728",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "REG",
@@ -4334,7 +4335,7 @@
       "date_added": "2017-03-02",
       "cik": "910606",
       "founded": "1963",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "REGN",
@@ -4345,7 +4346,7 @@
       "date_added": "2013-05-01",
       "cik": "872589",
       "founded": "1988",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RF",
@@ -4356,7 +4357,7 @@
       "date_added": "1998-08-28",
       "cik": "1281761",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RSG",
@@ -4367,7 +4368,7 @@
       "date_added": "2008-12-05",
       "cik": "1060391",
       "founded": "1998 (1981)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RMD",
@@ -4378,7 +4379,7 @@
       "date_added": "2017-07-26",
       "cik": "943819",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RVTY",
@@ -4389,7 +4390,7 @@
       "date_added": "1985-05-31",
       "cik": "31791",
       "founded": "1937",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ROK",
@@ -4400,7 +4401,7 @@
       "date_added": "2000-03-12",
       "cik": "1024478",
       "founded": "1903",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ROL",
@@ -4411,7 +4412,7 @@
       "date_added": "2018-10-01",
       "cik": "84839",
       "founded": "1948",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ROP",
@@ -4422,7 +4423,7 @@
       "date_added": "2009-12-23",
       "cik": "882835",
       "founded": "1981",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ROST",
@@ -4433,7 +4434,7 @@
       "date_added": "2009-12-21",
       "cik": "745732",
       "founded": "1982",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "RCL",
@@ -4444,7 +4445,7 @@
       "date_added": "2014-12-05",
       "cik": "884887",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SPGI",
@@ -4455,7 +4456,7 @@
       "date_added": "1957-03-04",
       "cik": "64040",
       "founded": "1917",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "CRM",
@@ -4466,7 +4467,7 @@
       "date_added": "2008-09-15",
       "cik": "1108524",
       "founded": "1999",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SBAC",
@@ -4477,7 +4478,7 @@
       "date_added": "2017-09-01",
       "cik": "1034054",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SLB",
@@ -4488,7 +4489,7 @@
       "date_added": "1957-03-04",
       "cik": "87347",
       "founded": "1926",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "STX",
@@ -4499,7 +4500,7 @@
       "date_added": "2012-07-02",
       "cik": "1137789",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SRE",
@@ -4510,7 +4511,7 @@
       "date_added": "2017-03-17",
       "cik": "1032208",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "NOW",
@@ -4521,7 +4522,7 @@
       "date_added": "2019-11-21",
       "cik": "1373715",
       "founded": "2003",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SHW",
@@ -4532,7 +4533,7 @@
       "date_added": "1964-06-30",
       "cik": "89800",
       "founded": "1866",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SPG",
@@ -4543,7 +4544,7 @@
       "date_added": "2002-06-26",
       "cik": "1063761",
       "founded": "2003",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SWKS",
@@ -4554,7 +4555,7 @@
       "date_added": "2015-03-12",
       "cik": "4127",
       "founded": "2002",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SJM",
@@ -4565,7 +4566,7 @@
       "date_added": "2008-11-06",
       "cik": "91419",
       "founded": "1897",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SW",
@@ -4576,7 +4577,7 @@
       "date_added": "2024-07-08",
       "cik": "2005951",
       "founded": "1934",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SNA",
@@ -4587,7 +4588,7 @@
       "date_added": "1982-09-30",
       "cik": "91440",
       "founded": "1920",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SOLV",
@@ -4598,7 +4599,7 @@
       "date_added": "2024-04-01",
       "cik": "1964738",
       "founded": "2023",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SO",
@@ -4609,7 +4610,7 @@
       "date_added": "1957-03-04",
       "cik": "92122",
       "founded": "1945",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "LUV",
@@ -4620,7 +4621,7 @@
       "date_added": "1994-07-01",
       "cik": "92380",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SWK",
@@ -4631,7 +4632,7 @@
       "date_added": "1982-09-30",
       "cik": "93556",
       "founded": "1843",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SBUX",
@@ -4642,7 +4643,7 @@
       "date_added": "2000-06-07",
       "cik": "829224",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "STT",
@@ -4653,7 +4654,7 @@
       "date_added": "2003-03-14",
       "cik": "93751",
       "founded": "1792",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "STLD",
@@ -4664,7 +4665,7 @@
       "date_added": "2022-12-22",
       "cik": "1022671",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "STE",
@@ -4675,7 +4676,7 @@
       "date_added": "2019-12-23",
       "cik": "1757898",
       "founded": "1985",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SYK",
@@ -4686,7 +4687,7 @@
       "date_added": "2000-12-12",
       "cik": "310764",
       "founded": "1941",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SMCI",
@@ -4697,7 +4698,7 @@
       "date_added": "2024-03-18",
       "cik": "1375365",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SYF",
@@ -4708,7 +4709,7 @@
       "date_added": "2015-11-18",
       "cik": "1601712",
       "founded": "2003",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SNPS",
@@ -4719,7 +4720,7 @@
       "date_added": "2017-03-16",
       "cik": "883241",
       "founded": "1986",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "SYY",
@@ -4730,7 +4731,7 @@
       "date_added": "1986-12-31",
       "cik": "96021",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TMUS",
@@ -4741,7 +4742,7 @@
       "date_added": "2019-07-15",
       "cik": "1283699",
       "founded": "1994",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TROW",
@@ -4752,7 +4753,7 @@
       "date_added": "2019-07-29",
       "cik": "1113169",
       "founded": "1937",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TTWO",
@@ -4763,7 +4764,7 @@
       "date_added": "2018-03-19",
       "cik": "946581",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TPR",
@@ -4774,7 +4775,7 @@
       "date_added": "2004-09-01",
       "cik": "1116132",
       "founded": "2017",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TRGP",
@@ -4785,7 +4786,7 @@
       "date_added": "2022-10-12",
       "cik": "1389170",
       "founded": "2005",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TGT",
@@ -4796,7 +4797,7 @@
       "date_added": "1976-12-31",
       "cik": "27419",
       "founded": "1902",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TEL",
@@ -4807,7 +4808,7 @@
       "date_added": "2011-10-17",
       "cik": "1385157",
       "founded": "2007",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TDY",
@@ -4818,7 +4819,7 @@
       "date_added": "2020-06-22",
       "cik": "1094285",
       "founded": "1960",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TER",
@@ -4829,7 +4830,7 @@
       "date_added": "2020-09-21",
       "cik": "97210",
       "founded": "1960",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TSLA",
@@ -4840,7 +4841,7 @@
       "date_added": "2020-12-21",
       "cik": "1318605",
       "founded": "2003",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TXN",
@@ -4851,7 +4852,7 @@
       "date_added": "2001-03-12",
       "cik": "97476",
       "founded": "1930",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TPL",
@@ -4862,7 +4863,7 @@
       "date_added": "2024-11-26",
       "cik": "1811074",
       "founded": "1888",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TXT",
@@ -4873,7 +4874,7 @@
       "date_added": "1978-12-31",
       "cik": "217346",
       "founded": "1923",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TMO",
@@ -4884,7 +4885,7 @@
       "date_added": "2004-08-03",
       "cik": "97745",
       "founded": "2006 (1902)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TJX",
@@ -4895,7 +4896,7 @@
       "date_added": "1985-09-30",
       "cik": "109198",
       "founded": "1987",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TKO",
@@ -4906,7 +4907,7 @@
       "date_added": "2025-03-24",
       "cik": "1973266",
       "founded": "2023",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TTD",
@@ -4917,7 +4918,7 @@
       "date_added": "2025-07-18",
       "cik": "1671933",
       "founded": "2009",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TSCO",
@@ -4928,7 +4929,7 @@
       "date_added": "2014-01-24",
       "cik": "916365",
       "founded": "1938",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TT",
@@ -4939,7 +4940,7 @@
       "date_added": "2010-11-17",
       "cik": "1466258",
       "founded": "1871",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TDG",
@@ -4950,7 +4951,7 @@
       "date_added": "2016-06-03",
       "cik": "1260221",
       "founded": "1993",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TRV",
@@ -4961,7 +4962,7 @@
       "date_added": "2002-08-21",
       "cik": "86312",
       "founded": "1853",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TRMB",
@@ -4972,7 +4973,7 @@
       "date_added": "2021-01-21",
       "cik": "864749",
       "founded": "1978",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TFC",
@@ -4983,7 +4984,7 @@
       "date_added": "1997-12-04",
       "cik": "92230",
       "founded": "1872",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TYL",
@@ -4994,7 +4995,7 @@
       "date_added": "2020-06-22",
       "cik": "860731",
       "founded": "1966",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "TSN",
@@ -5005,7 +5006,7 @@
       "date_added": "2005-08-10",
       "cik": "100493",
       "founded": "1935",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "USB",
@@ -5016,7 +5017,7 @@
       "date_added": "1999-11-01",
       "cik": "36104",
       "founded": "1968",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UBER",
@@ -5027,7 +5028,7 @@
       "date_added": "2023-12-18",
       "cik": "1543151",
       "founded": "2009",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UDR",
@@ -5038,7 +5039,7 @@
       "date_added": "2016-03-07",
       "cik": "74208",
       "founded": "1972",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ULTA",
@@ -5049,7 +5050,7 @@
       "date_added": "2016-04-18",
       "cik": "1403568",
       "founded": "1990",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UNP",
@@ -5060,7 +5061,7 @@
       "date_added": "1957-03-04",
       "cik": "100885",
       "founded": "1862",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UAL",
@@ -5071,7 +5072,7 @@
       "date_added": "2015-09-03",
       "cik": "100517",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UPS",
@@ -5082,7 +5083,7 @@
       "date_added": "2002-07-22",
       "cik": "1090727",
       "founded": "1907",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "URI",
@@ -5093,7 +5094,7 @@
       "date_added": "2014-09-20",
       "cik": "1067701",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UNH",
@@ -5104,7 +5105,7 @@
       "date_added": "1994-07-01",
       "cik": "731766",
       "founded": "1977",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "UHS",
@@ -5115,7 +5116,7 @@
       "date_added": "2014-09-20",
       "cik": "352915",
       "founded": "1979",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VLO",
@@ -5126,7 +5127,7 @@
       "date_added": "2002-12-20",
       "cik": "1035002",
       "founded": "1980",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VTR",
@@ -5137,7 +5138,7 @@
       "date_added": "2009-03-04",
       "cik": "740260",
       "founded": "1998",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VLTO",
@@ -5148,7 +5149,7 @@
       "date_added": "2023-10-02",
       "cik": "1967680",
       "founded": "2023",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VRSN",
@@ -5159,7 +5160,7 @@
       "date_added": "2006-02-01",
       "cik": "1014473",
       "founded": "1995",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VRSK",
@@ -5170,7 +5171,7 @@
       "date_added": "2015-10-08",
       "cik": "1442145",
       "founded": "1971",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VZ",
@@ -5181,7 +5182,7 @@
       "date_added": "1983-11-30",
       "cik": "732712",
       "founded": "1983 (1877)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VRTX",
@@ -5192,7 +5193,7 @@
       "date_added": "2013-09-23",
       "cik": "875320",
       "founded": "1989",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VTRS",
@@ -5203,7 +5204,7 @@
       "date_added": "2004-04-23",
       "cik": "1792044",
       "founded": "1961",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VICI",
@@ -5214,7 +5215,7 @@
       "date_added": "2022-06-08",
       "cik": "1705696",
       "founded": "2017",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "V",
@@ -5225,7 +5226,7 @@
       "date_added": "2009-12-21",
       "cik": "1403161",
       "founded": "1958",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VST",
@@ -5236,7 +5237,7 @@
       "date_added": "2024-05-08",
       "cik": "1692819",
       "founded": "2016",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "VMC",
@@ -5247,7 +5248,7 @@
       "date_added": "1999-06-30",
       "cik": "1396009",
       "founded": "1909",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WRB",
@@ -5258,7 +5259,7 @@
       "date_added": "2019-12-05",
       "cik": "11544",
       "founded": "1967",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "GWW",
@@ -5269,7 +5270,7 @@
       "date_added": "1981-06-30",
       "cik": "277135",
       "founded": "1927",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WAB",
@@ -5280,7 +5281,7 @@
       "date_added": "2019-02-27",
       "cik": "943452",
       "founded": "1999 (1869)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WBA",
@@ -5291,7 +5292,7 @@
       "date_added": "1979-12-31",
       "cik": "1618921",
       "founded": "2014",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WMT",
@@ -5302,7 +5303,7 @@
       "date_added": "1982-08-31",
       "cik": "104169",
       "founded": "1962",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "DIS",
@@ -5313,7 +5314,7 @@
       "date_added": "1976-06-30",
       "cik": "1744489",
       "founded": "1923",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WBD",
@@ -5324,7 +5325,7 @@
       "date_added": "2022-04-11",
       "cik": "1437107",
       "founded": "2022 (Warner Bros. 1923)",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WM",
@@ -5335,7 +5336,7 @@
       "date_added": "1998-08-31",
       "cik": "823768",
       "founded": "1968",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WAT",
@@ -5346,7 +5347,7 @@
       "date_added": "2002-01-02",
       "cik": "1000697",
       "founded": "1958",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WEC",
@@ -5357,7 +5358,7 @@
       "date_added": "2008-10-31",
       "cik": "783325",
       "founded": "1896",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WFC",
@@ -5368,7 +5369,7 @@
       "date_added": "1976-06-30",
       "cik": "72971",
       "founded": "1852",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WELL",
@@ -5379,7 +5380,7 @@
       "date_added": "2009-01-30",
       "cik": "766704",
       "founded": "1970",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WST",
@@ -5390,7 +5391,7 @@
       "date_added": "2020-05-22",
       "cik": "105770",
       "founded": "1923",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WDC",
@@ -5401,7 +5402,7 @@
       "date_added": "2009-07-01",
       "cik": "106040",
       "founded": "1970",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WY",
@@ -5412,7 +5413,7 @@
       "date_added": "1979-10-01",
       "cik": "106535",
       "founded": "1900",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WSM",
@@ -5423,7 +5424,7 @@
       "date_added": "2025-03-24",
       "cik": "719955",
       "founded": "1956",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WMB",
@@ -5434,7 +5435,7 @@
       "date_added": "1975-03-31",
       "cik": "107263",
       "founded": "1908",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WTW",
@@ -5445,7 +5446,7 @@
       "date_added": "2016-01-05",
       "cik": "1140536",
       "founded": "2016",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WDAY",
@@ -5456,7 +5457,7 @@
       "date_added": "2024-12-23",
       "cik": "1327811",
       "founded": "2005",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "WYNN",
@@ -5467,7 +5468,7 @@
       "date_added": "2008-11-14",
       "cik": "1174922",
       "founded": "2002",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "XEL",
@@ -5478,7 +5479,7 @@
       "date_added": "1957-03-04",
       "cik": "72903",
       "founded": "1909",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "XYL",
@@ -5489,7 +5490,7 @@
       "date_added": "2011-11-01",
       "cik": "1524472",
       "founded": "2011",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "YUM",
@@ -5500,7 +5501,7 @@
       "date_added": "1997-10-06",
       "cik": "1041061",
       "founded": "1997",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ZBRA",
@@ -5511,7 +5512,7 @@
       "date_added": "2019-12-23",
       "cik": "877212",
       "founded": "1969",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ZBH",
@@ -5522,7 +5523,7 @@
       "date_added": "2001-08-07",
       "cik": "1136869",
       "founded": "1927",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     },
     {
       "symbol": "ZTS",
@@ -5533,7 +5534,7 @@
       "date_added": "2013-06-21",
       "cik": "1555280",
       "founded": "1952",
-      "last_updated": "2025-12-13 07:56:37"
+      "last_updated": "2025-12-27 11:17:42"
     }
   ]
 }
