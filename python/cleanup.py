@@ -46,11 +46,19 @@ def cleanup_barracuda():
                 # Remove all contents but keep the folder
                 for item in folder_path.iterdir():
                     if item.is_file():
-                        item.unlink()
-                        print(f"✅ Deleted: {folder_path.name}/{item.name}")
+                        try:
+                            item.unlink()
+                            print(f"✅ Deleted: {folder_path.name}/{item.name}")
+                        except PermissionError:
+                            print(f"⚠️  Permission denied: {folder_path.name}/{item.name} (file may be open)")
+                        except Exception as e:
+                            print(f"❌ Failed to delete {folder_path.name}/{item.name}: {e}")
                     elif item.is_dir():
-                        shutil.rmtree(item)
-                        print(f"✅ Deleted folder: {folder_path.name}/{item.name}")
+                        try:
+                            shutil.rmtree(item)
+                            print(f"✅ Deleted folder: {folder_path.name}/{item.name}")
+                        except Exception as e:
+                            print(f"❌ Failed to delete folder {folder_path.name}/{item.name}: {e}")
                 
                 # Count remaining items
                 remaining = list(folder_path.iterdir())

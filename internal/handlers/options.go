@@ -613,8 +613,14 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Log ranking results to audit if audit ticker is set
 	if auditTickerPtr != nil && *auditTickerPtr != "" {
-		rankings := make([]map[string]interface{}, len(results))
-		for i, result := range results {
+		// Limit audit rankings to top 10
+		auditResults := results
+		if len(auditResults) > 10 {
+			auditResults = auditResults[:10]
+		}
+
+		rankings := make([]map[string]interface{}, len(auditResults))
+		for i, result := range auditResults {
 			rankings[i] = map[string]interface{}{
 				"rank":      i + 1,
 				"symbol":    result.Ticker,
@@ -627,14 +633,14 @@ func (h *OptionsHandler) AnalyzeHandler(w http.ResponseWriter, r *http.Request) 
 			"operation":      "SortByProfitPercentage",
 			"ranking_method": "profit_percentage_descending",
 			"rankings":       rankings,
-			"total_symbols":  len(results),
+			"total_symbols":  len(auditResults),
 		}
 
 		rankingData["operation"] = "SortByProfitPercentage"
 		if err := h.auditLogger.LogOptionsAnalysisOperation(*auditTickerPtr, "RankingResults", rankingData); err != nil {
 			logger.Warn.Printf("📊 RANKING: Failed to log ranking results: %v", err)
 		} else {
-			logger.Warn.Printf("📊 RANKING: Logged ranking results for %d symbols", len(results))
+			logger.Warn.Printf("📊 RANKING: Logged top %d ranking results for audit", len(auditResults))
 		}
 	}
 
